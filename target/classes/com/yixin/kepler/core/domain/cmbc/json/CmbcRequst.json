@@ -1,0 +1,27 @@
+//民生银行请求报文格式示例
+{
+	"transCode":"",
+	"transType":"",
+	"version":"",
+	"reqSeq":"",
+	"reqTime":"",
+	"systemCode":"",
+	"transDate":"",
+	"transTime":"",
+	"merchantNum":"",
+	"sgntr":"",
+	"charset":"",
+	"remark":"",
+	"reserve":"",
+	"reserve2":"",
+	"body":{
+		"":"",
+		"":"",
+		"reserve1":'{}', // || "reserve1":{}
+		"receiveMg":{
+			"txDt":"",
+			"chnlTxNo":"",
+			"txTm":""
+		}
+	}
+}

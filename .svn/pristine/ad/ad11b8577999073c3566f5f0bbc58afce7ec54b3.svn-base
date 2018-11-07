@@ -1,0 +1,1234 @@
+package com.yixin.dsc.entity.order;
+
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+
+import javax.persistence.Column;
+import javax.persistence.Entity;
+import javax.persistence.Table;
+
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.yixin.common.utils.serializer.JsonDateSerializer;
+import com.yixin.common.utils.serializer.JsonDateTimeSerializer;
+import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.assertj.core.util.Lists;
+
+import com.yixin.common.system.domain.BZBaseEntiy;
+import org.springframework.format.annotation.DateTimeFormat;
+
+/**
+ * 合同申请客户信息
+ * Package : com.yixin.dsc.entity
+ * 
+ * @author YixinCapital -- wangwenlong
+ *		   2018年6月4日 下午4:27:39
+ *
+ */
+@Entity
+@Table(name = "dsc_sales_apply_cust")
+public class DscSalesApplyCust extends BZBaseEntiy{
+
+	private static final long serialVersionUID = -5129120079758846319L;
+
+	/**
+	 * 订单主表ID
+	 */
+	@Column(name = "main_id", columnDefinition = "varchar(50) comment '订单主表ID'")
+	private String mainId;
+
+	/**
+	 * 客户类型
+	 * 005900000 个人客户  005900001 企业客户
+	 */
+	@Column(name = "cust_type", columnDefinition = "varchar(50) comment '客户类型'")
+	private String custType;
+
+
+	//------------------ 基本信息 start ------------------------------
+	@Column(name = "akhxm", columnDefinition = "varchar(128) comment '申请人姓名'")
+	private String akhxm;
+		
+	@Column(name = "azjlx", columnDefinition = "varchar(64) comment '证件类型'")
+	private String azjlx;
+		
+	@Column(name = "azjhm", columnDefinition = "varchar(64) comment '证件号码'")
+	private String azjhm;
+		
+	@Column(name = "azczx", columnDefinition = "varchar(64) comment '自查征信'")
+	private String azczx;
+		
+	@Column(name = "akhxb", columnDefinition = "varchar(64) comment '申请人性别'")
+	private String akhxb;
+
+	@JsonSerialize(using=JsonDateSerializer.class)
+	@Column(name = "dcsrq", columnDefinition = "datetime comment '出生日期'")
+	private Date dcsrq;
+		
+	@Column(name = "asjhm", columnDefinition = "varchar(64) comment '手机号码'")
+	private String asjhm;
+		
+	@Column(name = "ahyzk", columnDefinition = "varchar(64) comment '婚姻状况'")
+	private String ahyzk;
+	
+	@Column(name = "akhqdlx", columnDefinition = "varchar(64) comment '客户渠道二级科目'")
+	private String akhqdlx;
+		
+	@Column(name = "akhsx", columnDefinition = "varchar(64) comment '客户属性'")
+	private String akhsx;
+		
+	@Column(name = "asqrxl", columnDefinition = "varchar(64) comment '申请人学历'")
+	private String asqrxl;
+	
+	@Column(name = "asqrxw", columnDefinition = "varchar(64) comment '申请人学位'")
+	private String asqrxw;
+		
+	@Column(name = "aywfc", columnDefinition = "varchar(64) comment '有无房产'")
+	private String aywfc;
+		
+	@Column(name = "qqnumber", columnDefinition = "varchar(64) comment 'QQ号'")
+	private String qqnumber;
+		
+	@Column(name = "webchatno", columnDefinition = "varchar(64) comment '微信号'")
+	private String webchatno;
+
+	@JsonSerialize(using=JsonDateSerializer.class)
+	@Column(name = "dsqsqsrq", columnDefinition = "datetime comment '授权书签署日期'")
+	private Date dsqsqsrq;
+		
+	@Column(name = "adhjg", columnDefinition = "varchar(64) comment '电核结果'")
+	private String adhjg;
+		
+	@Column(name = "axsly", columnDefinition = "varchar(64) comment '电核结果'")
+	private String axsly;	
+	
+	@Column(name = "asffqz", columnDefinition = "varchar(64) comment '是否主动提交反欺诈'")
+	private String asffqz;
+	
+	//------------------ 基本信息 end ------------------------------
+	//------------------ 职业信息 start ------------------------------
+	@Column(name = "adwmc", columnDefinition = "varchar(64) comment '单位名称'")
+	private String adwmc;
+	
+	@Column(name = "adwxxdh", columnDefinition = "varchar(64) comment '固定电话'")
+	private String adwxxdh;
+		
+	@Column(name = "adwszsf", columnDefinition = "varchar(64) comment '单位所在省份'")
+	private String adwszsf;
+		
+	@Column(name = "adwszcs", columnDefinition = "varchar(64) comment '单位所在城市'")
+	private String adwszcs;
+		
+	@Column(name = "adwqyxz", columnDefinition = "varchar(64) comment '企业性质'")
+	private String adwqyxz;
+		
+	@Column(name = "adwxxdz", columnDefinition = "varchar(64) comment '单位详细地址'")
+	private String adwxxdz;
+	
+	@Column(name = "adwsshy", columnDefinition = "varchar(64) comment '所属行业'")
+	private String adwsshy;
+	
+	@Column(name = "asqrzy", columnDefinition = "varchar(64) comment '申请人职业'")
+	private String asqrzy;
+		
+	@Column(name = "asqrzw", columnDefinition = "varchar(64) comment '申请人职务'")
+	private String asqrzw;
+		
+	@Column(name = "asqrzc", columnDefinition = "varchar(64) comment '申请人职称'")
+	private String asqrzc;
+	
+	@Column(name = "izznx", columnDefinition = "varchar(64) comment '单位在职年限'")
+	private String izznx;
+		
+	@Column(name = "fshnx", columnDefinition = "decimal(19,2) comment '税后年薪(万元)'")
+	private BigDecimal fshnx;
+		
+	@Column(name = "fqtshnsr", columnDefinition = "decimal(19,2) comment '其他税后年收入(万元)'")
+	private BigDecimal fqtshnsr;
+	
+	//------------------ 职业信息 end ------------------------------
+	
+	//------------------ 居住信息 start ------------------------------
+	@Column(name = "axjzdsf", columnDefinition = "varchar(64) comment '现居住地省份'")
+	private String axjzdsf;
+		
+	@Column(name = "axjzdcs", columnDefinition = "varchar(64) comment '现居住地城市'")
+	private String axjzdcs;
+	
+	@Column(name = "axjzddh", columnDefinition = "varchar(64) comment '现居住地电话'")
+	private String axjzddh;
+		
+	@Column(name = "axjzddz", columnDefinition = "varchar(1024) comment '现居住地详细地址'")
+	private String axjzddz;
+		
+	@Column(name = "axjzdyb", columnDefinition = "varchar(64) comment '居住地址邮编'")
+	private String axjzdyb;
+		
+	@Column(name = "ajzzk", columnDefinition = "varchar(64) comment '居住状况'")
+	private String ajzzk;
+		
+	@Column(name = "ahjszsf", columnDefinition = "varchar(64) comment '户籍地省份'")
+	private String ahjszsf;
+		
+	@Column(name = "ahjszcs", columnDefinition = "varchar(64) comment '户籍地城市'")
+	private String ahjszcs;
+		
+	@Column(name = "ixjzdjznx", columnDefinition = "varchar(64) comment '现居住地居住年限'")
+	private String ixjzdjznx;
+		
+	@Column(name = "ahjszdz", columnDefinition = "varchar(64) comment '户籍地详细地址'")
+	private String ahjszdz;
+	//------------------ 居住信息 end ------------------------------
+	
+	//------------------ 配偶信息 start ------------------------------
+	@Column(name = "apoxm", columnDefinition = "varchar(64) comment '配偶姓名'")
+	private String apoxm;
+		
+	@Column(name = "apozjlx", columnDefinition = "varchar(64) comment '配偶证件类型'")
+	private String apozjlx;
+	
+	@Column(name = "apozjhm", columnDefinition = "varchar(64) comment '配偶证件号码'")
+	private String apozjhm;
+		
+	@Column(name = "apogzdw", columnDefinition = "varchar(64) comment '配偶单位名称'")
+	private String apogzdw;
+		
+	@Column(name = "aposjhm", columnDefinition = "varchar(64) comment '配偶手机号码'")
+	private String aposjhm;
+		
+	@Column(name = "apodwxxdz", columnDefinition = "varchar(1024) comment '配偶单位详细地址'")
+	private String apodwxxdz;
+		
+	@Column(name = "apozw", columnDefinition = "varchar(64) comment '配偶职位'")
+	private String apozw;
+		
+	@Column(name = "apodwdh", columnDefinition = "varchar(64) comment '配偶单位电话'")
+	private String apodwdh;
+		
+	@Column(name = "aposhnx", columnDefinition = "decimal(19,2) comment '配偶税后年薪(万元)'")
+	private BigDecimal aposhnx;
+		
+	//------------------ 配偶信息 end ------------------------------
+	
+	//------------------ 企业信息 start ------------------------------
+	@Column(name = "aqymc2", columnDefinition = "varchar(128) comment '企业名称'")
+	private String aqymc2;
+		
+	@Column(name = "apply_type", columnDefinition = "varchar(64) comment '订单申请类型'")
+	private String applyType;
+		
+	@Column(name = "median_code", columnDefinition = "varchar(128) comment '中征码'")
+	private String medianCode;
+		
+	/*@Column(name = "azczx", columnDefinition = "varchar(64) comment '自查征信'")
+	private String azczx;*/
+		
+	@Column(name = "country", columnDefinition = "varchar(64) comment '国别'")
+	private String country;
+		
+	@Column(name = "public_institution", columnDefinition = "varchar(64) comment '是否事业单位'")
+	private String publicInstitution;
+	
+	@Column(name = "aqyyyzz", columnDefinition = "varchar(128) comment '登记注册号码,统一社会信用代码'")
+	private String aqyyyzz;
+	
+	@Column(name = "azzjgdm", columnDefinition = "varchar(128) comment '组织机构代码'")
+	private String azzjgdm;
+	
+	@Column(name = "taxpayer_number", columnDefinition = "varchar(128) comment '纳税人识别号'")
+	private String taxpayerNumber;
+
+	@JsonSerialize(using=JsonDateSerializer.class)
+	@Column(name = "establish_date", columnDefinition = "datetime comment '成立日期'")
+	private Date establishDate;
+
+	@JsonSerialize(using=JsonDateSerializer.class)
+	@Column(name = "certificate_maturity_date", columnDefinition = "datetime comment '证书到期日期'")
+	private Date certificateMaturityDate;
+		
+	@Column(name = "certificate_long", columnDefinition = "varchar(128) comment '长期'")
+	private String certificateLong;
+		
+	@Column(name = "org_category", columnDefinition = "varchar(64) comment '组织机构类别'")
+	private String orgCategory;
+		
+	@Column(name = "org_subcategory", columnDefinition = "varchar(64) comment '组织机构类别细分'")
+	private String orgSubcategory;
+		
+	@Column(name = "enterprise_scale", columnDefinition = "varchar(64) comment '企业规模'")
+	private String enterpriseScale;
+		
+	@Column(name = "registe_capital_curr", columnDefinition = "varchar(64) comment '注册资本币种'")
+	private String registeCapitalCurr;
+		
+	@Column(name = "registe_capital", columnDefinition = "decimal(19,2) comment '注册资本（万元）'")
+	private BigDecimal registeCapital;
+		
+	@Column(name = "institutional_state", columnDefinition = "varchar(64) comment '机构状态'")
+	private String institutionalState;
+		
+	@Column(name = "aqyxz", columnDefinition = "varchar(64) comment '经济类型'")
+	private String aqyxz;
+		
+	@Column(name = "ind_category", columnDefinition = "varchar(64) comment '经济行业大类'")
+	private String indCategory;
+		
+	@Column(name = "ind_subcategory", columnDefinition = "varchar(64) comment '经济行业小类'")
+	private String indSubcategory;
+		
+	@Column(name = "legal_iden_type", columnDefinition = "varchar(64) comment '法人证件类型'")
+	private String legalIdenType;
+		
+	@Column(name = "aqyfrxm", columnDefinition = "varchar(128) comment '法人姓名'")
+	private String aqyfrxm;
+		
+	@Column(name = "aqyfrsfz", columnDefinition = "varchar(64) comment '法人证件号码'")
+	private String aqyfrsfz;
+		
+	@Column(name = "legal_shareholding_ratio", columnDefinition = "decimal(21,4) comment '法人持股比例(%)'")
+	private BigDecimal legalShareholdingRatio;
+		
+	/*@Column(name = "asjhm", columnDefinition = "varchar(64) comment '手机号码'")
+	private String asjhm;*/
+		
+	@Column(name = "aqylxdh", columnDefinition = "varchar(64) comment '企业联系人电话'")
+	private String aqylxdh;
+		
+	@Column(name = "aqyszsf", columnDefinition = "varchar(64) comment '企业注册地省份'")
+	private String aqyszsf;
+		
+	@Column(name = "aqyszcs", columnDefinition = "varchar(64) comment '企业注册地城市'")
+	private String aqyszcs;
+		
+	@Column(name = "aqyszqx", columnDefinition = "varchar(64) comment '企业注册地区/县'")
+	private String aqyszqx;
+		
+	@Column(name = "aqyszdz", columnDefinition = "varchar(1024) comment '企业注册地详细地址'")
+	private String aqyszdz;
+		
+	@Column(name = "aqyjydsf", columnDefinition = "varchar(64) comment '企业经营地省份'")
+	private String aqyjydsf;
+		
+	@Column(name = "aqyjydcs", columnDefinition = "varchar(64) comment '企业经营地城市'")
+	private String aqyjydcs;
+		
+	@Column(name = "aqyjydqx", columnDefinition = "varchar(64) comment '企业经营地区/县'")
+	private String aqyjydqx;
+		
+	@Column(name = "aqyjyddz", columnDefinition = "varchar(1024) comment '企业经营地地址'")
+	private String aqyjyddz;
+		
+	/*@Column(name = "akhqdlx", columnDefinition = "varchar(64) comment '客户渠道二级科目'")
+	private String akhqdlx;*/
+		
+	/*@Column(name = "akhsx", columnDefinition = "varchar(64) comment '客户属性'")
+	private String akhsx;*/
+	
+	/*@Column(name = "adhjg", columnDefinition = "varchar(64) comment '电核结果'")
+	private String adhjg;*/
+		
+	@Column(name = "business_scope", columnDefinition = "varchar(64) comment '经营（业务）范围'")
+	private String businessScope;
+	
+	/*@Column(name = "asffqz", columnDefinition = "varchar(64) comment '是否主动提交反欺诈'")
+	private String asffqz;*/
+
+	//------------------ 企业信息 end ------------------------------
+
+
+	//------------------ 0609wxl补充字段 start
+	/**
+	 * 证件有效期起
+	 */
+	@Column(name = "azjyxqq", columnDefinition = "varchar(64) comment '证件有效期起'")
+	private String azjyxqq;
+
+	/**
+	 * 证件有效期止
+	 */
+	@Column(name = "azjyxqz", columnDefinition = "varchar(64) comment '证件有效期止'")
+	private String azjyxqz;
+
+	/**
+	 * 税前年收入(元)
+	 */
+	@Column(name = "asqnsr", columnDefinition = "varchar(64) comment '税前年收入(元)'")
+	private String asqnsr;
+
+
+	//------------------ 0609wxl补充字段 end
+	
+	//============== 2018/07/11 新增字段  =============================
+	/**
+	 * 户口类别码值
+	 *  户口类别 【 本市农业 01 /本市非农业 02 /非本市农业 03 /非本市非农业  04】
+	 */
+	@Column(name = "residence_type_code", columnDefinition = "varchar(32) comment '户口类别码值  本市农业 01 /本市非农业 02 /非本市农业 03 /非本市非农业  04'")
+	private String residenceTypeCode;
+
+	/**
+	 * 户口类别描述
+	 */
+	@Column(name = "residence_type_desc", columnDefinition = "varchar(64) comment '户口类别描述  本市农业 01 /本市非农业 02 /非本市农业 03 /非本市非农业  04'")
+	private String residenceTypeDesc;
+	//============== 2018/07/11 新增字段  =============================
+
+	//============== 2018/09/13  工行新增字段开始  =============================
+	// 配偶信息
+	@Column(name = "ethnic1", columnDefinition = "varchar(32) comment '配偶-民族'")
+	private String ethnic1;
+
+	@Column(name = "education1", columnDefinition = "varchar(4) comment '配偶-学历'")
+	private String education1;
+
+	@Column(name = "regaddr1", columnDefinition = "varchar(1024) comment '配偶-户籍地址'")
+	private String regaddr1;
+
+	@Column(name = "comptype1", columnDefinition = "varchar(4) comment '配偶-工作单位类型'")
+	private String comptype1;
+
+
+	@Column(name = "workyears1", columnDefinition = "varchar(5) comment '配偶-现单位工作年限，单位（年）'")
+	private String workyears1;
+
+	@Column(name = "monthincome1", columnDefinition = "decimal(19,2) comment '配偶-月收入（元）'")
+	private BigDecimal monthincome1;
+	//============== 2018/09/13  工行新增字段结束  =============================
+	
+	public String getMainId() {
+		return mainId;
+	}
+
+	public String getResidenceTypeCode() {
+		return residenceTypeCode;
+	}
+
+	public void setResidenceTypeCode(String residenceTypeCode) {
+		this.residenceTypeCode = residenceTypeCode;
+	}
+
+	public String getResidenceTypeDesc() {
+		return residenceTypeDesc;
+	}
+
+	public void setResidenceTypeDesc(String residenceTypeDesc) {
+		this.residenceTypeDesc = residenceTypeDesc;
+	}
+
+	public void setMainId(String mainId) {
+		this.mainId = mainId;
+	}
+
+	public String getAhjszcs() {
+		return ahjszcs;
+	}
+
+	public void setAhjszcs(String ahjszcs) {
+		this.ahjszcs = ahjszcs;
+	}
+
+	public String getAkhxm() {
+		return akhxm;
+	}
+
+	public void setAkhxm(String akhxm) {
+		this.akhxm = akhxm;
+	}
+
+	public String getAzjlx() {
+		return azjlx;
+	}
+
+	public void setAzjlx(String azjlx) {
+		this.azjlx = azjlx;
+	}
+
+	public String getAzjhm() {
+		return azjhm;
+	}
+
+	public void setAzjhm(String azjhm) {
+		this.azjhm = azjhm;
+	}
+
+	public String getAzczx() {
+		return azczx;
+	}
+
+	public void setAzczx(String azczx) {
+		this.azczx = azczx;
+	}
+
+	public String getAkhxb() {
+		return akhxb;
+	}
+
+	public void setAkhxb(String akhxb) {
+		this.akhxb = akhxb;
+	}
+
+	public String getAsjhm() {
+		return asjhm;
+	}
+
+	public void setAsjhm(String asjhm) {
+		this.asjhm = asjhm;
+	}
+
+	public String getAhyzk() {
+		return ahyzk;
+	}
+
+	public void setAhyzk(String ahyzk) {
+		this.ahyzk = ahyzk;
+	}
+
+	public String getAkhqdlx() {
+		return akhqdlx;
+	}
+
+	public void setAkhqdlx(String akhqdlx) {
+		this.akhqdlx = akhqdlx;
+	}
+
+	public String getAkhsx() {
+		return akhsx;
+	}
+
+	public void setAkhsx(String akhsx) {
+		this.akhsx = akhsx;
+	}
+
+	public String getAsqrxl() {
+		return asqrxl;
+	}
+
+	public void setAsqrxl(String asqrxl) {
+		this.asqrxl = asqrxl;
+	}
+
+	public String getAsqrxw() {
+		return asqrxw;
+	}
+
+	public void setAsqrxw(String asqrxw) {
+		this.asqrxw = asqrxw;
+	}
+
+	public String getAywfc() {
+		return aywfc;
+	}
+
+	public void setAywfc(String aywfc) {
+		this.aywfc = aywfc;
+	}
+
+	public String getQqnumber() {
+		return qqnumber;
+	}
+
+	public void setQqnumber(String qqnumber) {
+		this.qqnumber = qqnumber;
+	}
+
+	public String getWebchatno() {
+		return webchatno;
+	}
+
+	public void setWebchatno(String webchatno) {
+		this.webchatno = webchatno;
+	}
+
+
+	public String getAdhjg() {
+		return adhjg;
+	}
+
+	public void setAdhjg(String adhjg) {
+		this.adhjg = adhjg;
+	}
+
+	public String getAsffqz() {
+		return asffqz;
+	}
+
+	public void setAsffqz(String asffqz) {
+		this.asffqz = asffqz;
+	}
+
+	public String getAdwmc() {
+		return adwmc;
+	}
+
+	public void setAdwmc(String adwmc) {
+		this.adwmc = adwmc;
+	}
+
+	public String getAdwxxdh() {
+		return adwxxdh;
+	}
+
+	public void setAdwxxdh(String adwxxdh) {
+		this.adwxxdh = adwxxdh;
+	}
+
+	public String getAdwszsf() {
+		return adwszsf;
+	}
+
+	public void setAdwszsf(String adwszsf) {
+		this.adwszsf = adwszsf;
+	}
+
+	public String getAdwszcs() {
+		return adwszcs;
+	}
+
+	public void setAdwszcs(String adwszcs) {
+		this.adwszcs = adwszcs;
+	}
+
+	public String getAdwqyxz() {
+		return adwqyxz;
+	}
+
+	public void setAdwqyxz(String adwqyxz) {
+		this.adwqyxz = adwqyxz;
+	}
+
+	public String getAdwxxdz() {
+		return adwxxdz;
+	}
+
+	public void setAdwxxdz(String adwxxdz) {
+		this.adwxxdz = adwxxdz;
+	}
+
+	public String getAdwsshy() {
+		return adwsshy;
+	}
+
+	public void setAdwsshy(String adwsshy) {
+		this.adwsshy = adwsshy;
+	}
+
+	public String getAsqrzy() {
+		return asqrzy;
+	}
+
+	public void setAsqrzy(String asqrzy) {
+		this.asqrzy = asqrzy;
+	}
+
+	public String getAsqrzw() {
+		return asqrzw;
+	}
+
+	public void setAsqrzw(String asqrzw) {
+		this.asqrzw = asqrzw;
+	}
+
+	public String getAsqrzc() {
+		return asqrzc;
+	}
+
+	public void setAsqrzc(String asqrzc) {
+		this.asqrzc = asqrzc;
+	}
+
+	public String getIzznx() {
+		return izznx;
+	}
+
+	public void setIzznx(String izznx) {
+		this.izznx = izznx;
+	}
+
+	public Date getDcsrq() {
+		return dcsrq;
+	}
+
+	public void setDcsrq(Date dcsrq) {
+		this.dcsrq = dcsrq;
+	}
+
+	public Date getDsqsqsrq() {
+		return dsqsqsrq;
+	}
+
+	public void setDsqsqsrq(Date dsqsqsrq) {
+		this.dsqsqsrq = dsqsqsrq;
+	}
+
+	public BigDecimal getFshnx() {
+		return fshnx;
+	}
+
+	public void setFshnx(BigDecimal fshnx) {
+		this.fshnx = fshnx;
+	}
+
+	public BigDecimal getFqtshnsr() {
+		return fqtshnsr;
+	}
+
+	public void setFqtshnsr(BigDecimal fqtshnsr) {
+		this.fqtshnsr = fqtshnsr;
+	}
+
+	public String getAxjzdsf() {
+		return axjzdsf;
+	}
+
+	public void setAxjzdsf(String axjzdsf) {
+		this.axjzdsf = axjzdsf;
+	}
+
+	public String getAxjzdcs() {
+		return axjzdcs;
+	}
+
+	public void setAxjzdcs(String axjzdcs) {
+		this.axjzdcs = axjzdcs;
+	}
+
+	public String getAxjzddh() {
+		return axjzddh;
+	}
+
+	public void setAxjzddh(String axjzddh) {
+		this.axjzddh = axjzddh;
+	}
+
+	public String getAxjzddz() {
+		return axjzddz;
+	}
+
+	public void setAxjzddz(String axjzddz) {
+		this.axjzddz = axjzddz;
+	}
+
+	public String getAxjzdyb() {
+		return axjzdyb;
+	}
+
+	public void setAxjzdyb(String axjzdyb) {
+		this.axjzdyb = axjzdyb;
+	}
+
+	public String getAjzzk() {
+		return ajzzk;
+	}
+
+	public void setAjzzk(String ajzzk) {
+		this.ajzzk = ajzzk;
+	}
+
+	public String getAhjszsf() {
+		return ahjszsf;
+	}
+
+	public void setAhjszsf(String ahjszsf) {
+		this.ahjszsf = ahjszsf;
+	}
+
+	public String getIxjzdjznx() {
+		return ixjzdjznx;
+	}
+
+	public void setIxjzdjznx(String ixjzdjznx) {
+		this.ixjzdjznx = ixjzdjznx;
+	}
+
+	public String getAhjszdz() {
+		return ahjszdz;
+	}
+
+	public void setAhjszdz(String ahjszdz) {
+		this.ahjszdz = ahjszdz;
+	}
+
+	public String getApoxm() {
+		return apoxm;
+	}
+
+	public void setApoxm(String apoxm) {
+		this.apoxm = apoxm;
+	}
+
+	public String getApozjlx() {
+		return apozjlx;
+	}
+
+	public void setApozjlx(String apozjlx) {
+		this.apozjlx = apozjlx;
+	}
+
+	public String getApozjhm() {
+		return apozjhm;
+	}
+
+	public void setApozjhm(String apozjhm) {
+		this.apozjhm = apozjhm;
+	}
+
+	public String getApogzdw() {
+		return apogzdw;
+	}
+
+	public void setApogzdw(String apogzdw) {
+		this.apogzdw = apogzdw;
+	}
+
+	public String getAposjhm() {
+		return aposjhm;
+	}
+
+	public void setAposjhm(String aposjhm) {
+		this.aposjhm = aposjhm;
+	}
+
+	public String getApodwxxdz() {
+		return apodwxxdz;
+	}
+
+	public void setApodwxxdz(String apodwxxdz) {
+		this.apodwxxdz = apodwxxdz;
+	}
+
+	public String getApozw() {
+		return apozw;
+	}
+
+	public void setApozw(String apozw) {
+		this.apozw = apozw;
+	}
+
+	public String getApodwdh() {
+		return apodwdh;
+	}
+
+	public void setApodwdh(String apodwdh) {
+		this.apodwdh = apodwdh;
+	}
+
+	public BigDecimal getAposhnx() {
+		return aposhnx;
+	}
+
+	public void setAposhnx(BigDecimal aposhnx) {
+		this.aposhnx = aposhnx;
+	}
+
+	public String getAqymc2() {
+		return aqymc2;
+	}
+
+	public void setAqymc2(String aqymc2) {
+		this.aqymc2 = aqymc2;
+	}
+
+	public String getApplyType() {
+		return applyType;
+	}
+
+	public void setApplyType(String applyType) {
+		this.applyType = applyType;
+	}
+
+	public String getMedianCode() {
+		return medianCode;
+	}
+
+	public void setMedianCode(String medianCode) {
+		this.medianCode = medianCode;
+	}
+
+	public String getCountry() {
+		return country;
+	}
+
+	public void setCountry(String country) {
+		this.country = country;
+	}
+
+	public String getPublicInstitution() {
+		return publicInstitution;
+	}
+
+	public void setPublicInstitution(String publicInstitution) {
+		this.publicInstitution = publicInstitution;
+	}
+
+	public String getAqyyyzz() {
+		return aqyyyzz;
+	}
+
+	public void setAqyyyzz(String aqyyyzz) {
+		this.aqyyyzz = aqyyyzz;
+	}
+
+	public String getAzzjgdm() {
+		return azzjgdm;
+	}
+
+	public void setAzzjgdm(String azzjgdm) {
+		this.azzjgdm = azzjgdm;
+	}
+
+	public String getTaxpayerNumber() {
+		return taxpayerNumber;
+	}
+
+	public void setTaxpayerNumber(String taxpayerNumber) {
+		this.taxpayerNumber = taxpayerNumber;
+	}
+
+	public Date getEstablishDate() {
+		return establishDate;
+	}
+
+	public void setEstablishDate(Date establishDate) {
+		this.establishDate = establishDate;
+	}
+
+	public Date getCertificateMaturityDate() {
+		return certificateMaturityDate;
+	}
+
+	public void setCertificateMaturityDate(Date certificateMaturityDate) {
+		this.certificateMaturityDate = certificateMaturityDate;
+	}
+
+	public String getCertificateLong() {
+		return certificateLong;
+	}
+
+	public void setCertificateLong(String certificateLong) {
+		this.certificateLong = certificateLong;
+	}
+
+	public String getOrgCategory() {
+		return orgCategory;
+	}
+
+	public void setOrgCategory(String orgCategory) {
+		this.orgCategory = orgCategory;
+	}
+
+	public String getOrgSubcategory() {
+		return orgSubcategory;
+	}
+
+	public void setOrgSubcategory(String orgSubcategory) {
+		this.orgSubcategory = orgSubcategory;
+	}
+
+	public String getEnterpriseScale() {
+		return enterpriseScale;
+	}
+
+	public void setEnterpriseScale(String enterpriseScale) {
+		this.enterpriseScale = enterpriseScale;
+	}
+
+	public String getRegisteCapitalCurr() {
+		return registeCapitalCurr;
+	}
+
+	public void setRegisteCapitalCurr(String registeCapitalCurr) {
+		this.registeCapitalCurr = registeCapitalCurr;
+	}
+
+	public BigDecimal getRegisteCapital() {
+		return registeCapital;
+	}
+
+	public void setRegisteCapital(BigDecimal registeCapital) {
+		this.registeCapital = registeCapital;
+	}
+
+	public String getInstitutionalState() {
+		return institutionalState;
+	}
+
+	public void setInstitutionalState(String institutionalState) {
+		this.institutionalState = institutionalState;
+	}
+
+	public String getAqyxz() {
+		return aqyxz;
+	}
+
+	public void setAqyxz(String aqyxz) {
+		this.aqyxz = aqyxz;
+	}
+
+	public String getIndCategory() {
+		return indCategory;
+	}
+
+	public void setIndCategory(String indCategory) {
+		this.indCategory = indCategory;
+	}
+
+	public String getIndSubcategory() {
+		return indSubcategory;
+	}
+
+	public void setIndSubcategory(String indSubcategory) {
+		this.indSubcategory = indSubcategory;
+	}
+
+	public String getLegalIdenType() {
+		return legalIdenType;
+	}
+
+	public void setLegalIdenType(String legalIdenType) {
+		this.legalIdenType = legalIdenType;
+	}
+
+	public String getAqyfrxm() {
+		return aqyfrxm;
+	}
+
+	public void setAqyfrxm(String aqyfrxm) {
+		this.aqyfrxm = aqyfrxm;
+	}
+
+	public String getAqyfrsfz() {
+		return aqyfrsfz;
+	}
+
+	public void setAqyfrsfz(String aqyfrsfz) {
+		this.aqyfrsfz = aqyfrsfz;
+	}
+
+	public BigDecimal getLegalShareholdingRatio() {
+		return legalShareholdingRatio;
+	}
+
+	public void setLegalShareholdingRatio(BigDecimal legalShareholdingRatio) {
+		this.legalShareholdingRatio = legalShareholdingRatio;
+	}
+
+	public String getAqylxdh() {
+		return aqylxdh;
+	}
+
+	public void setAqylxdh(String aqylxdh) {
+		this.aqylxdh = aqylxdh;
+	}
+
+	public String getAqyszsf() {
+		return aqyszsf;
+	}
+
+	public void setAqyszsf(String aqyszsf) {
+		this.aqyszsf = aqyszsf;
+	}
+
+	public String getAqyszcs() {
+		return aqyszcs;
+	}
+
+	public void setAqyszcs(String aqyszcs) {
+		this.aqyszcs = aqyszcs;
+	}
+
+	public String getAqyszqx() {
+		return aqyszqx;
+	}
+
+	public void setAqyszqx(String aqyszqx) {
+		this.aqyszqx = aqyszqx;
+	}
+
+	public String getAqyszdz() {
+		return aqyszdz;
+	}
+
+	public void setAqyszdz(String aqyszdz) {
+		this.aqyszdz = aqyszdz;
+	}
+
+	public String getAqyjydsf() {
+		return aqyjydsf;
+	}
+
+	public void setAqyjydsf(String aqyjydsf) {
+		this.aqyjydsf = aqyjydsf;
+	}
+
+	public String getAqyjydcs() {
+		return aqyjydcs;
+	}
+
+	public void setAqyjydcs(String aqyjydcs) {
+		this.aqyjydcs = aqyjydcs;
+	}
+
+	public String getAqyjydqx() {
+		return aqyjydqx;
+	}
+
+	public void setAqyjydqx(String aqyjydqx) {
+		this.aqyjydqx = aqyjydqx;
+	}
+
+	public String getAqyjyddz() {
+		return aqyjyddz;
+	}
+
+	public void setAqyjyddz(String aqyjyddz) {
+		this.aqyjyddz = aqyjyddz;
+	}
+
+	public String getBusinessScope() {
+		return businessScope;
+	}
+
+	public void setBusinessScope(String businessScope) {
+		this.businessScope = businessScope;
+	}
+
+	public String getAxsly() {
+		return axsly;
+	}
+
+	public void setAxsly(String axsly) {
+		this.axsly = axsly;
+	}
+
+	public String getCustType() {
+		return custType;
+	}
+
+	public void setCustType(String custType) {
+		this.custType = custType;
+	}
+
+	public String getAzjyxqq() {
+		return azjyxqq;
+	}
+
+	public void setAzjyxqq(String azjyxqq) {
+		this.azjyxqq = azjyxqq;
+	}
+
+	public String getAzjyxqz() {
+		return azjyxqz;
+	}
+
+	public void setAzjyxqz(String azjyxqz) {
+		this.azjyxqz = azjyxqz;
+	}
+
+	public String getAsqnsr() {
+		return asqnsr;
+	}
+
+	public void setAsqnsr(String asqnsr) {
+		this.asqnsr = asqnsr;
+	}
+
+	public String getEthnic1() {
+		return ethnic1;
+	}
+
+	public void setEthnic1(String ethnic1) {
+		this.ethnic1 = ethnic1;
+	}
+
+	public String getEducation1() {
+		return education1;
+	}
+
+	public void setEducation1(String education1) {
+		this.education1 = education1;
+	}
+
+	public String getRegaddr1() {
+		return regaddr1;
+	}
+
+	public void setRegaddr1(String regaddr1) {
+		this.regaddr1 = regaddr1;
+	}
+
+	public String getComptype1() {
+		return comptype1;
+	}
+
+	public void setComptype1(String comptype1) {
+		this.comptype1 = comptype1;
+	}
+
+	public String getWorkyears1() {
+		return workyears1;
+	}
+
+	public void setWorkyears1(String workyears1) {
+		this.workyears1 = workyears1;
+	}
+
+	public BigDecimal getMonthincome1() {
+		return monthincome1;
+	}
+
+	public void setMonthincome1(BigDecimal monthincome1) {
+		this.monthincome1 = monthincome1;
+	}
+
+	/**
+	 * 通过主信息ID获取客户信息
+	 * @param mainId 主信息ID
+	 * @return 
+	 * @author YixinCapital -- wangwenlong
+	 *	       2018年6月8日 下午5:47:54
+	 */
+	public static List<DscSalesApplyCust> getListByParms(String mainId){
+		List<DscSalesApplyCust> applyCustList = Lists.newArrayList();
+		if(StringUtils.isBlank(mainId)){
+			return applyCustList;
+		}
+		return DscSalesApplyCust.findByProperty(DscSalesApplyCust.class, "mainId", mainId);
+	}
+	
+	/**
+	 *通过主信息ID获取客户信息
+	 * @param mainId 主信息ID
+	 * @return 
+	 * @author YixinCapital -- wangwenlong
+	 *	       2018年6月8日 下午3:47:40
+	 */
+	public static DscSalesApplyCust getOneByMainId(String mainId){
+		List<DscSalesApplyCust> listByParms = getListByParms(mainId);
+		return CollectionUtils.isEmpty(listByParms)?null:listByParms.get(0);
+	}
+
+	/**
+	 * 通过订单主表ID删除
+	 * @param mainId
+	 */
+	public static void deleteBymainId(String mainId){
+		List<DscSalesApplyCust> lis = DscSalesApplyCust.findByProperty(DscSalesApplyCust.class, "mainId", mainId);
+		if(lis!=null && !lis.isEmpty()) {
+			for (DscSalesApplyCust att : lis) {
+				att.remove();
+			}
+		}
+	}
+	
+	public static DscSalesApplyCust getApplyCostByMianId(String mainId) {
+		
+		String hql = "SELECT dsac FROM DscSalesApplyCust AS dsac WHERE dsac.mainId = ?1";
+		
+		java.util.List<Object> parameters = new ArrayList<Object>(){{
+			add(mainId);
+		}};
+		return getRepository().createJpqlQuery(hql).setParameters(parameters).singleResult();
+	}
+}

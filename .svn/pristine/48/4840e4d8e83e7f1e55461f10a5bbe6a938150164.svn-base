@@ -1,0 +1,108 @@
+package com.yixin.dsc;
+
+import com.yixin.common.system.ioc.SpringContextUtil;
+import com.yixin.dsc.entity.order.DscSalesApplyMain;
+import com.yixin.kepler.common.enums.BankPhaseEnum;
+import com.yixin.kepler.component.RedisDistributedLock;
+import com.yixin.kepler.core.domain.AsyncTask;
+import com.yixin.kepler.core.domain.cmbc.LastTrialRequestStrategy;
+import com.yixin.kepler.dto.BaseMsgDTO;
+import com.yixin.kepler.dto.OsbAttachmentDTO;
+
+import net.sf.json.JSONObject;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.ApplicationContext;
+import org.springframework.test.context.ContextConfiguration;
+import org.springframework.test.context.junit4.SpringRunner;
+
+import javax.inject.Inject;
+import java.util.concurrent.TimeUnit;
+
+/**
+ * Package : com.dsc.test.service.rule
+ *
+ * @author YixinCapital -- liushuai2
+ *         2018年06月13日 17:35
+ */
+@RunWith(SpringRunner.class)
+@SpringBootTest
+@ContextConfiguration
+public class FileUploadTest {
+
+
+    @Autowired
+    private ApplicationContext ioc;
+
+    @Autowired
+    private AsyncTask asyncTask ;
+
+    /**
+     * 
+     * @throws InterruptedException
+     */
+    
+    
+    
+    @Test
+    public void main4(){
+    	LastTrialRequestStrategy bean = SpringContextUtil.getBean(
+    			"CMBCLastTrialRequestStrategy",LastTrialRequestStrategy.class);
+    	
+    	DscSalesApplyMain salesApplyMain = DscSalesApplyMain.getByApplyNo("201806220156");
+    	
+    	System.out.println("getGpsBasePrice:"+bean.getGpsBasePrice(salesApplyMain));
+    	System.out.println("getGpsAddPrice"+bean.getGpsAddPrice(salesApplyMain));
+    	
+    }
+    
+
+
+
+
+
+
+
+    @Test
+    public void main3() throws InterruptedException{
+		RedisDistributedLock redisDistributedLock = ioc.getBean(RedisDistributedLock.class);
+    	String lockKey = "sukang";
+    	for(int i = 0; i < 100 ; i++){
+    		Boolean lock = redisDistributedLock.lock(lockKey,TimeUnit.SECONDS,5l);
+    		TimeUnit.SECONDS.sleep(1l);
+    		if (lock) {
+    			System.out.println("--------" + i + "---------");
+    			
+    			//redisDistributedLock.unLock(lockKey);
+			}else {
+				System.out.println(lockKey+"获取失败");
+			}
+		}
+
+    	TimeUnit.MINUTES.sleep(1l);	
+
+    }
+
+
+
+    @Test
+    public void main2() throws InterruptedException{
+    	try {
+			OsbAttachmentDTO osbAttachmentDTO = new OsbAttachmentDTO();
+			osbAttachmentDTO.setBzType(BankPhaseEnum.LAST_TRIAL.getPhase());
+			osbAttachmentDTO.setBzId("88888888");
+			asyncTask.uploadAttachment(osbAttachmentDTO);
+
+
+			TimeUnit.MINUTES.sleep(10);
+
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+    }
+
+
+
+}

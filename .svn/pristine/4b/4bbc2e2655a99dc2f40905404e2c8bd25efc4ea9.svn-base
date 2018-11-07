@@ -1,0 +1,175 @@
+package com.yixin.kepler.v1.datapackage.dto.yntrust;
+
+import java.math.BigDecimal;
+import java.util.Date;
+import java.util.List;
+
+import org.apache.commons.collections.CollectionUtils;
+
+import com.alibaba.fastjson.annotation.JSONField;
+import com.yixin.dsc.util.DateUtil;
+import com.yixin.kepler.core.constant.CommonConstant;
+
+/**
+ * 请款回调结果报文
+ * Package : com.yixin.kepler.v1.datapackage.dto.yntrust
+ * 
+ * @author YixinCapital -- wangwenlong
+ *		   2018年9月19日 下午3:53:52
+ *
+ */
+public class YTPaymentResultDTO extends YTCommonResponseDTO {
+
+	private static final long serialVersionUID = -5306576733521620107L;
+
+	private String uniqueId;
+	
+	private List<PaymentDetail> paymentDetails;
+	
+	
+	/**
+	 * 获取放款时间
+	 * @return 
+	 * @author YixinCapital -- wangwenlong
+	 *	       2018年9月20日 上午10:20:11
+	 */
+	public Date getActExcutedTime(){
+		Date actExcutedTime = null;
+		if(CollectionUtils.isNotEmpty(paymentDetails)){
+			for(PaymentDetail paymentDetail:paymentDetails){
+				//处理状态：成功=1,失败=2 
+				if(CommonConstant.ONE.equals(paymentDetail.getProcessStatus())){ //放款成功
+					if(actExcutedTime == null){
+						actExcutedTime = paymentDetail.getActExcutedTime();
+        			} else {
+        				actExcutedTime = actExcutedTime.after(paymentDetail.getActExcutedTime())?actExcutedTime:paymentDetail.getActExcutedTime();
+        			}
+				}
+			}
+		}
+		return actExcutedTime;
+	}
+	
+	
+	static class PaymentDetail {
+		/**
+		 * 放款金额
+		 */
+		private	BigDecimal Amount;
+		/**
+		 * 放款账户号
+		 */
+		private	String AccountNo;
+		/**
+		 * 放款开户名
+		 */
+		private	String Name;
+		/**
+		 * 放款银行流水
+		 */
+		private	String BankSerialNo;
+		/**
+		 * 处理状态：成功=1,失败=2
+		 */
+		private	String ProcessStatus;
+		/**
+		 * 处理状态：成功=1,失败=2
+		 */
+		private	String Result;
+		
+		/**
+		 * 实际放款成功时间 yyyy-MM-dd hh:mm:ss
+		 */
+		@JSONField(format=DateUtil.DEFAULT_DATE_TIME_FORMAT)
+		private	Date ActExcutedTime;
+		
+		/**
+		 * 放款明细编号
+		 */
+		private	String DetailNo;
+
+		public BigDecimal getAmount() {
+			return Amount;
+		}
+
+		public void setAmount(BigDecimal amount) {
+			Amount = amount;
+		}
+
+		public String getAccountNo() {
+			return AccountNo;
+		}
+
+		public void setAccountNo(String accountNo) {
+			AccountNo = accountNo;
+		}
+
+		public String getName() {
+			return Name;
+		}
+
+		public void setName(String name) {
+			Name = name;
+		}
+
+		public String getBankSerialNo() {
+			return BankSerialNo;
+		}
+
+		public void setBankSerialNo(String bankSerialNo) {
+			BankSerialNo = bankSerialNo;
+		}
+
+		public String getProcessStatus() {
+			return ProcessStatus;
+		}
+
+		public void setProcessStatus(String processStatus) {
+			ProcessStatus = processStatus;
+		}
+
+		public String getResult() {
+			return Result;
+		}
+
+		public void setResult(String result) {
+			Result = result;
+		}
+
+		public Date getActExcutedTime() {
+			return ActExcutedTime;
+		}
+
+		public void setActExcutedTime(Date actExcutedTime) {
+			ActExcutedTime = actExcutedTime;
+		}
+
+		public String getDetailNo() {
+			return DetailNo;
+		}
+
+		public void setDetailNo(String detailNo) {
+			DetailNo = detailNo;
+		}
+	}
+
+
+	public String getUniqueId() {
+		return uniqueId;
+	}
+
+
+	public void setUniqueId(String uniqueId) {
+		this.uniqueId = uniqueId;
+	}
+
+
+	public List<PaymentDetail> getPaymentDetails() {
+		return paymentDetails;
+	}
+
+
+	public void setPaymentDetails(List<PaymentDetail> paymentDetails) {
+		this.paymentDetails = paymentDetails;
+	}
+}

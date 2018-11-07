@@ -1,0 +1,108 @@
+package com.yixin.kepler.v1.datapackage.dto.yntrust;
+
+import java.util.Date;
+
+import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
+/**
+ * @author sukang
+ */
+@JsonIgnoreProperties(ignoreUnknown = true)
+public class YTRepaySchedulesDTO {
+
+    /**
+     * 还款计划编号（对手方生成）
+     */
+	@JsonProperty("partnerScheduleNo")
+    private String partnerScheduleNo;
+
+    /**
+     *还款时间
+     */
+	@JsonProperty("RepayDate")
+	@JsonFormat(pattern = "yyyy-MM-dd")
+    private Date repayDate;
+
+    /**
+     * 长度：18  比例：2
+     * 还款本金
+     */
+	@JsonProperty("RepayPrincipal")
+    private String repayPrincipal;
+
+    /**
+     * 还款利息
+     */
+	@JsonProperty("RepayProfit")
+    private String repayProfit;
+
+
+    /**
+     * 技术服务费
+     */
+	@JsonProperty("TechMaintenanceFee")
+    private String techMaintenanceFee;
+
+    /**
+     * 其他费用
+     */
+	@JsonProperty("OtherFee")
+    private String otherFee;
+
+    /**
+     * 贷款服务费
+     */
+	@JsonProperty("LoanServiceFee")
+    private String loanServiceFee;
+
+	public String getPartnerScheduleNo() {
+		return partnerScheduleNo;
+	}
+
+	public void setPartnerScheduleNo(String partnerScheduleNo) {
+		this.partnerScheduleNo = partnerScheduleNo;
+	}
+
+	public Date getRepayDate() {
+		return repayDate;
+	}
+
+	public void setRepayDate(Date repayDate) {
+		this.repayDate = repayDate;
+	}
+
+	public String getRepayPrincipal() {
+		return repayPrincipal;
+	}
+
+	public void setRepayPrincipal(String repayPrincipal) {
+		this.repayPrincipal = repayPrincipal;
+	}
+
+	public String getRepayProfit() {
+		return repayProfit;
+	}
+
+	public void setRepayProfit(String repayProfit) {
+		this.repayProfit = repayProfit;
+	}
+
+	public String getTechMaintenanceFee() {
+		return techMaintenanceFee;
+	}
+
+	public void setTechMaintenanceFee(String techMaintenanceFee) {
+		this.techMaintenanceFee = techMaintenanceFee;
+	}
+
+	public String getOtherFee() {
+		return otherFee;
+	}
+
+	public void setOtherFee(String otherFee) {
+		this.otherFee = otherFee;
+	}
+
+}

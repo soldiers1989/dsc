@@ -1,0 +1,117 @@
+package com.yixin.kepler.v1.service.capital.yntrust;
+
+import javax.annotation.Resource;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
+
+import com.alibaba.fastjson.JSON;
+import com.yixin.dsc.v1.service.capital.yntrust.YTCommonService;
+import com.yixin.kepler.core.constant.CommonConstant;
+import com.yixin.kepler.dto.BaseMsgDTO;
+import com.yixin.kepler.enity.AssetBankTran;
+import com.yixin.kepler.enity.OsbFileLog;
+import com.yixin.kepler.v1.common.constants.BankRequestConstant;
+import com.yixin.kepler.v1.common.core.bankReq.BankRespResultHandle;
+import com.yixin.kepler.v1.datapackage.dto.BankRespResultHandleDTO;
+import com.yixin.kepler.v1.datapackage.dto.yntrust.YTCommonResponseDTO;
+import com.yixin.kepler.v1.datapackage.dto.yntrust.YTCommonStatusDTO;
+import com.yixin.kepler.v1.datapackage.entity.AssetBankRequest;
+
+@Service("YNTRUSTRespResultHandle")
+public class YTRespResultHandle implements BankRespResultHandle {
+	
+	private static final Logger LOGGER = LoggerFactory.getLogger(YTRespResultHandle.class);
+	
+	@Resource
+    private YTCommonService commonService;
+	
+	/**
+	 * 银行响应结果处理
+	 * @param resultDTO
+	 * @return 结果对象
+	 * @author YixinCapital -- chen.lin
+	 *	       2018年9月17日 下午5:28:55
+	 */
+	@Override
+	public BaseMsgDTO respResultHandle(BankRespResultHandleDTO resultDTO) {
+		//获取资产发起银行请求信息
+		AssetBankRequest bankRequest = AssetBankRequest.getById(resultDTO.getBankReqId());
+		String applyNo = bankRequest.getApplyNo();
+		String resultJson = resultDTO.getBankResultJosn(); //接口响应报文
+		LOGGER.info("\n订单号{},云南信托推送还款计划,返回报文为{}",applyNo,resultJson);
+		//获取银行交易记录
+		AssetBankTran bankTran = AssetBankTran.getByTranNo(resultDTO.getTranNo(), CommonConstant.SenderType.YIXIN);
+		
+        String jsonResponse = commonService.parseResponse(resultJson);
+        YTCommonResponseDTO response = null;
+        try {
+			response = JSON.parseObject(jsonResponse, YTCommonResponseDTO.class);
+		} catch (Exception e) {
+			this.updateBankTran(resultJson, null, "云南信托推送还款计划返回报文错误，解析异常", bankTran);
+			LOGGER.error("云南信托推送还款计划返回报文错误，解析异常,等待下次继续推送还款计划,订单编号:{},异常信息:{}",applyNo,e.getMessage(),e);
+			this.retry(bankRequest);
+			return new BaseMsgDTO(CommonConstant.FAILURE, "业务处理失败");
+		}
+        if(response == null || response.getStatus() == null){
+        	this.updateBankTran(resultJson, null, "云南信托推送还款计划返回报文错误，解析为空", bankTran);
+        	LOGGER.error("云南信托推送还款计划返回报文错误，解析为空，等待下次继续推送还款计划,订单编号:{}",applyNo);
+        	this.retry(bankRequest);
+        	return new BaseMsgDTO(CommonConstant.FAILURE, "业务处理失败");
+        }
+        YTCommonStatusDTO status = response.getStatus();
+        this.updateBankTran(resultJson, status.getResponseCode(), status.getResponseMessage(), bankTran);
+        if(status.getIsSuccess()!=null && status.getIsSuccess()){ //请求成功
+        	LOGGER.info("云南信托推送还款计划请求,返回结果成功,订单编号:{}",applyNo);
+        	return new BaseMsgDTO(CommonConstant.SUCCESS,"success");
+        } else if (!CommonConstant.YNTrustErrorCode.SYNC_SUCCESS.equals(status.getResponseCode())){ 
+        	/**
+        	 * 接口返回0000操作成功或者返回0020 操作失败，同时错误码是60200039（联调时注意该情况），代表成功上传，不用重新上传。
+        	 * 如果超时或者返回0040操作异常或者返回0020操作失败，除去60200039外的状态码，重新创建还款计划
+        	 */
+        	this.retry(bankRequest);
+        	return new BaseMsgDTO(CommonConstant.FAILURE, "业务处理失败");
+        } else {
+        	return new BaseMsgDTO(CommonConstant.FAILURE, "业务处理失败");
+        }
+		
+	}
+	
+	public void retry(AssetBankRequest bankRequest){
+		bankRequest.setRepState(BankRequestConstant.RETRY_REQ_BANK);
+		int retryMark = bankRequest.getRetryMark();
+		bankRequest.setRetryMark(retryMark++);
+		bankRequest.update();
+	}
+
+	@Override
+	public String assembleOsb(AssetBankRequest requestDTO, OsbFileLog osbFileLog) {
+		
+		return null;
+	}
+	
+	/**
+	 * 更新银行交易结果
+	 * @param result
+	 * @param code
+	 * @param errorMsg
+	 * @param assetBankTran 
+	 * @author YixinCapital -- wangwenlong
+	 *	       2018年9月19日 下午3:28:05
+	 */
+	private void updateBankTran(String result,String code,String errorMsg,AssetBankTran assetBankTran){
+		assetBankTran.setRepBody(result); //响应报文
+        assetBankTran.setApprovalCode(code); //错误码
+        assetBankTran.setApprovalDesc(errorMsg); //错误描述
+        assetBankTran.update();
+	}
+	
+	
+	public String requestBeforeHandle(AssetBankRequest task){
+		//获取银行交易记录
+		//AssetBankTran bankTran = AssetBankTran.getByTranNo(resultDTO.getTranNo(), CommonConstant.SenderType.YIXIN);
+		return null;
+	};
+
+}

@@ -1,0 +1,302 @@
+package com.yixin.kepler.enity;
+
+import com.yixin.common.system.domain.BZBaseEntiy;
+import com.yixin.common.system.querychannel.ChannelQuery;
+import com.yixin.common.system.util.Label;
+import com.yixin.common.utils.Page;
+import org.apache.commons.collections.CollectionUtils;
+import org.hibernate.validator.constraints.CodePointLength;
+
+import javax.persistence.Column;
+import javax.persistence.Entity;
+import javax.persistence.Table;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * @author sukang
+ */
+@Entity
+@Table(name = "k_asset_contract_task")
+public class AssetContractTask extends BZBaseEntiy{
+
+
+    @Label(name = "申请编号")
+    @Column(name = "apply_no",length = 32)
+    private String applyNo;
+
+    @Label(name = "贷款唯一标识")
+    @Column(name = "venus_apply_no",length = 32)
+    private String venusApplyNo;
+
+    @Label(name = "文件类型")
+    @Column(name = "file_type",length = 50)
+    private String fileType;
+
+    @Label(name = "附件小类")
+    @Column(name = "attach_sub_class",length = 127)
+    private String attachSubClass;
+
+    @Label(name = "源文件名称")
+    @Column(name = "file_name",length = 128)
+    private String fileName;
+
+    @Label(name = "合同文件类型对应的银行code")
+    @Column(name = "bank_file_type",length = 5)
+    private String bankFileType;
+
+    @Label(name = "资产编号")
+    @Column(name = "file_url",length = 32)
+    private String fileUrl;
+
+    @Label(name = "压缩后的文件id")
+    @Column(name = "compress_file_id",length = 64)
+    private String compressFileId;
+
+    @Label(name = "文件上传云信状态 0-1")
+    @Column(name = "compress_file_state",length = 2)
+    private Integer compressFileState;
+
+    @Label(name = "压缩服务流水号")
+    @Column(name = "compress_no",length = 32)
+    private String compressNo;
+
+    @Label(name = "签章后的文件id")
+    @Column(name = "sign_file_id",length = 2)
+    private String signFileId;
+
+    @Label(name = "签章合同的大小")
+    @Column(name = "sign_file_size",length = 11)
+    private String signFileSize;
+
+    @Label(name = "文件的签章状态 0-1 ")
+    @Column(name = "sign_state",length = 11)
+    private Integer signState;
+
+    @Label(name = "是否成功")
+    @Column(name = "is_success", length = 1)
+    private Boolean isSuccess;
+
+    @Label(name = "是否结束")
+    @Column(name = "is_end", length = 1)
+    private Boolean isEnd;
+
+    @Label(name = "执行状态 0-1 ")
+    @Column(name = "exec_state", length = 2)
+    private Integer execState;
+
+    @Label(name = "执行次数")
+    @Column(name = "exec_times", length = 12)
+    private Integer execTimes;
+
+    @Label(name = "保留字段1")
+    @Column(name = "reserve1", length = 12)
+    private String reserve1;
+
+    @Label(name = "保留字段2")
+    @Column(name = "reserve2", length = 12)
+    private String reserve2;
+
+
+    public String getApplyNo() {
+        return applyNo;
+    }
+
+    public void setApplyNo(String applyNo) {
+        this.applyNo = applyNo;
+    }
+
+    public String getVenusApplyNo() {
+        return venusApplyNo;
+    }
+
+    public void setVenusApplyNo(String venusApplyNo) {
+        this.venusApplyNo = venusApplyNo;
+    }
+
+    public String getFileType() {
+        return fileType;
+    }
+
+    public void setFileType(String fileType) {
+        this.fileType = fileType;
+    }
+
+    public String getBankFileType() {
+        return bankFileType;
+    }
+
+    public void setBankFileType(String bankFileType) {
+        this.bankFileType = bankFileType;
+    }
+
+    public String getFileUrl() {
+        return fileUrl;
+    }
+
+    public void setFileUrl(String fileUrl) {
+        this.fileUrl = fileUrl;
+    }
+
+    public String getCompressFileId() {
+        return compressFileId;
+    }
+
+    public void setCompressFileId(String compressFileId) {
+        this.compressFileId = compressFileId;
+    }
+
+    public String getSignFileId() {
+        return signFileId;
+    }
+
+    public void setSignFileId(String signFileId) {
+        this.signFileId = signFileId;
+    }
+
+    public String getSignFileSize() {
+        return signFileSize;
+    }
+
+    public void setSignFileSize(String signFileSize) {
+        this.signFileSize = signFileSize;
+    }
+
+    public Boolean getSuccess() {
+        return isSuccess;
+    }
+
+    public void setSuccess(Boolean success) {
+        isSuccess = success;
+    }
+
+    public Boolean getEnd() {
+        return isEnd;
+    }
+
+    public void setEnd(Boolean end) {
+        isEnd = end;
+    }
+
+    public Integer getExecState() {
+        return execState;
+    }
+
+    public void setExecState(Integer execState) {
+        this.execState = execState;
+    }
+
+    public Integer getExecTimes() {
+        return execTimes;
+    }
+
+    public void setExecTimes(Integer execTimes) {
+        this.execTimes = execTimes;
+    }
+
+    public String getReserve1() {
+        return reserve1;
+    }
+
+    public void setReserve1(String reserve1) {
+        this.reserve1 = reserve1;
+    }
+
+    public String getReserve2() {
+        return reserve2;
+    }
+
+    public void setReserve2(String reserve2) {
+        this.reserve2 = reserve2;
+    }
+
+    public Integer getCompressFileState() {
+        return compressFileState;
+    }
+
+    public void setCompressFileState(Integer compressFileState) {
+        this.compressFileState = compressFileState;
+    }
+
+    public Integer getSignState() {
+        return signState;
+    }
+
+    public void setSignState(Integer signState) {
+        this.signState = signState;
+    }
+
+    public String getAttachSubClass() {
+        return attachSubClass;
+    }
+
+    public void setAttachSubClass(String attachSubClass) {
+        this.attachSubClass = attachSubClass;
+    }
+
+    public String getFileName() {
+        return fileName;
+    }
+
+    public void setFileName(String fileName) {
+        this.fileName = fileName;
+    }
+
+    public String getCompressNo() {
+        return compressNo;
+    }
+
+    public void setCompressNo(String compressNo) {
+        this.compressNo = compressNo;
+    }
+
+    public static AssetContractTask getByVenusNoAndType(
+            String venusApplyNo,String fileType) {
+
+        String hql = " select act from AssetContractTask as act " +
+                " where act.deleted = 0 and act.venusApplyNo = ?1 and act.attachSubClass = ?2";
+
+        List<Object> params = Arrays.asList(venusApplyNo, fileType);
+
+        return getRepository().createJpqlQuery(hql).setParameters(params).singleResult();
+    }
+
+    public static List<AssetContractTask> getCurrentTask(int limit) {
+        String hql = " select act from AssetContractTask as act " +
+                " where act.deleted = 0 and act.isEnd = 0 and act.compressFileState = 1 " +
+                " order by act.createTime desc ";
+
+        Page page = getQueryChannel().createJpqlQuery(hql).setPage(0, limit).pagedList();
+        return page.getData();
+    }
+
+
+    public static List<AssetContractTask> getContractTask(String venusApplyNo){
+        String hql = " select act from AssetContractTask as act " +
+                " where act.deleted = 0 and act.venusApplyNo = ?1" +
+                " order by act.createTime desc ";
+        List<Object> list = Collections.singletonList(venusApplyNo);
+        return getRepository().createJpqlQuery(hql)
+                .setParameters(list).list();
+    }
+
+
+
+
+
+    public void increment(){
+        this.setExecState(1);
+        this.setExecTimes(this.getExecTimes() == null ? 1 : this.getExecTimes() + 1);
+        this.update();
+    }
+
+    public static AssetContractTask getByCompressNo(String compressTranNo) {
+        String hql = " select act from AssetContractTask as act " +
+                " where act.deleted = 0 and act.compressNo = ?1 ";
+        List<Object> list = Collections.singletonList(compressTranNo);
+        return getRepository().createJpqlQuery(hql)
+                .setParameters(list).singleResult();
+    }
+}

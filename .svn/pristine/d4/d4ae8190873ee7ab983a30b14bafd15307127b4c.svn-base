@@ -1,0 +1,132 @@
+package com.yixin.kepler.v1.service.capital.yntrust;
+
+
+import com.alibaba.fastjson.JSON;
+import com.yixin.common.exception.BzException;
+import com.yixin.common.utils.InvokeResult;
+import com.yixin.common.utils.JsonObjectUtils;
+import com.yixin.dsc.util.PropertiesManager;
+import com.yixin.dsc.v1.service.capital.yntrust.YTCommonService;
+import com.yixin.kepler.common.RestTemplateUtil;
+import com.yixin.kepler.common.UrlConstant;
+import com.yixin.kepler.common.enums.AssetBankTransEnum;
+import com.yixin.kepler.core.base.AbstractBaseDealDomain;
+import com.yixin.kepler.core.constant.CommonConstant;
+import com.yixin.kepler.dto.BaseMsgDTO;
+import com.yixin.kepler.enity.AssetBankTran;
+import com.yixin.kepler.enity.AssetContractTask;
+import com.yixin.kepler.enity.AssetMainInfo;
+import com.yixin.kepler.v1.common.enumpackage.YNTSignStatus;
+import com.yixin.kepler.v1.common.enumpackage.YNTrustUrlEnum;
+import com.yixin.kepler.v1.datapackage.dto.yntrust.YTCommonStatusDTO;
+import com.yixin.kepler.v1.datapackage.dto.yntrust.YTConTractFileDTO;
+import com.yixin.kepler.v1.datapackage.dto.yntrust.YTContractRespDTO;
+import net.sf.json.JSONObject;
+import org.apache.commons.lang.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
+
+import javax.annotation.Resource;
+import java.util.Objects;
+
+/**
+ *
+ * //查询合同签章状态和获取签章合同文件
+ * @author sukang
+ */
+@Service(value = "YNTRUSTGetContractFileRequestStrategy")
+public class GetContractFileRequestStrategy extends AbstractBaseDealDomain<AssetContractTask,BaseMsgDTO>{
+
+
+    private final Logger logger = LoggerFactory.getLogger(getClass());
+
+
+    @Resource
+    private PropertiesManager propertiesManager;
+
+    @Resource
+    private YTCommonService commonService;
+
+    private ThreadLocal<YTConTractFileDTO> ytConTractFileDTOThreadLocal = new ThreadLocal<>();
+
+    @Override
+    protected void getData() throws BzException {
+
+        AssetContractTask fileDTO = inputDto.get();
+
+        logger.info("订单{},获取合同参数{}",
+                fileDTO.getApplyNo(), fileDTO.getBankFileType());
+
+        AssetMainInfo mainInfo = AssetMainInfo.getByApplyNo(fileDTO.getApplyNo());
+
+        YTConTractFileDTO ytConTractFileDTO = new YTConTractFileDTO();
+        ytConTractFileDTO.setUrl(YNTrustUrlEnum.LOAN_GET_CONTRACT_FILE.getUrl());
+        ytConTractFileDTO.setRequestId(commonService.getRequestId());
+        ytConTractFileDTO.setIsGetFileContent("1");
+        ytConTractFileDTO.setType(fileDTO.getBankFileType());
+        ytConTractFileDTO.setUniqueId(mainInfo.getVenusApplyNo());
+        ytConTractFileDTOThreadLocal.set(ytConTractFileDTO);
+    }
+
+    @Override
+    protected void assembler() throws BzException {
+
+    }
+
+    @Override
+    protected InvokeResult<BaseMsgDTO> message() throws BzException {
+
+        YTConTractFileDTO ytConTractFileDTO = ytConTractFileDTOThreadLocal.get();
+        AssetContractTask task = inputDto.get();
+
+        inputDto.remove();
+        ytConTractFileDTOThreadLocal.remove();
+
+        AssetBankTran bankTran = new AssetBankTran();
+        bankTran.setApplyNo(task.getApplyNo());
+        bankTran.setPhase(AssetBankTransEnum.YT_GET_CONTRACT_FILE.getPhase());
+        bankTran.setReqBody(JsonObjectUtils.objectToJson(ytConTractFileDTO));
+
+        String url = propertiesManager.getOsbEnvironment()
+                .concat(UrlConstant.OsbSystemUrl.ynTrustInterface);
+
+        bankTran.setReqUrl(url.concat(ytConTractFileDTO.getUrl()));
+        bankTran.setTranNo(ytConTractFileDTO.getRequestId());
+        bankTran.setSender(CommonConstant.SenderType.YIXIN);
+        bankTran.create();
+
+
+        logger.info("\n订单号{}云信获取合同签署状态及内容请求报文为{},请求路径为{}",
+                task.getApplyNo(),bankTran.getReqBody(),url);
+
+        String result = RestTemplateUtil.sendRequest(url,
+                ytConTractFileDTO, CommonConstant.BankName.YNTRUST_BANK);
+        bankTran.setRepBody(result.substring(result.length() - 200));
+        logger.info("\n订单号{}云信获取合同签署状态接口返回报文为{}",
+                task.getApplyNo(),result);
+
+        BaseMsgDTO baseMsgDTO = BaseMsgDTO.processData("签章进行中");
+
+        if (StringUtils.isNotEmpty(result)){
+            YTContractRespDTO ytContractRespDTO = JSON.parseObject(result, YTContractRespDTO.class);
+            YTCommonStatusDTO status = ytContractRespDTO.getStatus();
+            if (status.success()){
+                if (Objects.equals(YNTSignStatus.Sign_Status_4.getCode(),
+                        ytContractRespDTO.getSignStatus())){
+
+                    baseMsgDTO = BaseMsgDTO.successData(
+                            ytContractRespDTO.getContractFile());
+                }
+                bankTran.setApprovalCode(status.getResponseCode());
+                bankTran.setApprovalDesc(YNTSignStatus.getSignStatusMsg(
+                        ytContractRespDTO.getSignStatus()));
+            }else {
+                bankTran.setApprovalCode(status.getResponseCode());
+                bankTran.setApprovalDesc(status.getWarningMessage());
+            }
+        }
+        bankTran.update();
+        return new InvokeResult<>(baseMsgDTO);
+    }
+}

@@ -1,0 +1,145 @@
+package com.yixin.dsc.entity.kepler;
+
+import java.util.UUID;
+
+import javax.persistence.Column;
+import javax.persistence.Entity;
+import javax.persistence.Table;
+
+import org.apache.commons.lang3.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.yixin.common.system.domain.BZBaseEntiy;
+import com.yixin.dsc.enumpackage.OrderTrackTypeEnum;
+
+/**
+ * 订单痕迹表
+ * Package : com.yixin.dsc.entity.kepler
+ * 
+ * @author YixinCapital -- wangwenlong
+ *		   2018年8月24日 下午4:17:19
+ *
+ */
+@Entity
+@Table(name = "dsc_order_track")
+public class DscOrderTrack extends BZBaseEntiy{
+
+	private static final long serialVersionUID = 8739935215333357592L;
+	
+	private final static Logger LOGGER = LoggerFactory.getLogger(DscOrderTrack.class);
+
+	@Column(name = "apply_no", nullable = false,columnDefinition = "varchar(64) comment '订单编号'")
+	private String applyNo;
+	
+	/**
+	 * 参考 OrderTrackTypeEnum
+	 */
+	@Column(name = "track_type", nullable = false,columnDefinition = "varchar(64) comment '类型'")
+	private String trackType;
+	
+	@Column(name = "track_name", nullable = false,columnDefinition = "varchar(64) comment '名称'")
+	private String trackName;
+	
+	@Column(name = "success_flag", nullable = false,columnDefinition = "bit(1) comment '是否成功'")
+	private Boolean successFlag;
+	
+	@Column(name = "message", columnDefinition = "varchar(1024) comment '消息'")
+	private String message;
+	
+	@Column(name = "sign", columnDefinition = "varchar(64) comment '标记'")
+	private String sign;
+	
+	/**
+	 * 记录订单痕迹表
+	 * @param applyNo 订单编号
+	 * @param typeEnum 痕迹类型枚举
+	 * @param sign 标记
+	 * @return 
+	 * @author YixinCapital -- wangwenlong
+	 *	       2018年8月27日 下午6:15:15
+	 */
+	public static String recordTrack(String applyNo,OrderTrackTypeEnum typeEnum,String sign){
+		try {
+			DscOrderTrack track = new DscOrderTrack();
+			track.setApplyNo(applyNo);
+			track.setTrackType(typeEnum.getType());
+			track.setTrackName(typeEnum.getName());
+			track.setSuccessFlag(true);
+			track.setSign(sign);
+			return track.create();
+		} catch (Exception e) {
+			LOGGER.error("记录订单痕迹表异常，订单编号:{},痕迹类型:{}",applyNo,typeEnum.getName(), e);
+			return UUID.randomUUID().toString();
+		}
+	}
+	
+	/**
+	 * 更新痕迹表结果
+	 * @param trackId 痕迹表ID
+	 * @author YixinCapital -- wangwenlong
+	 *	       2018年8月28日 上午10:44:12
+	 */
+	public static void updateTrackSuccessResult(String trackId,String message){
+		if(StringUtils.isNotBlank(trackId)){
+			try {
+				DscOrderTrack track = DscOrderTrack.get(DscOrderTrack.class, trackId);
+				if(track != null){
+					track.setSuccessFlag(true);
+					track.setMessage(message);
+					track.update();
+				}
+			} catch (Exception e) {
+				LOGGER.error("更新订单痕迹表异常，trackId:{}",trackId,e);
+			}
+		}
+	}
+	
+	public String getApplyNo() {
+		return applyNo;
+	}
+
+	public void setApplyNo(String applyNo) {
+		this.applyNo = applyNo;
+	}
+
+	public String getTrackType() {
+		return trackType;
+	}
+
+	public void setTrackType(String trackType) {
+		this.trackType = trackType;
+	}
+
+	public String getTrackName() {
+		return trackName;
+	}
+
+	public void setTrackName(String trackName) {
+		this.trackName = trackName;
+	}
+
+	public Boolean getSuccessFlag() {
+		return successFlag;
+	}
+
+	public void setSuccessFlag(Boolean successFlag) {
+		this.successFlag = successFlag;
+	}
+
+	public String getMessage() {
+		return message;
+	}
+
+	public void setMessage(String message) {
+		this.message = message;
+	}
+
+	public String getSign() {
+		return sign;
+	}
+
+	public void setSign(String sign) {
+		this.sign = sign;
+	}
+}

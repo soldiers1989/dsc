@@ -1,0 +1,389 @@
+package com.yixin.kepler.v1.service.capital.yntrust;
+
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+import java.util.UUID;
+
+import javax.annotation.Resource;
+
+import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
+
+import com.alibaba.fastjson.JSON;
+import com.alibaba.fastjson.JSONObject;
+import com.google.common.collect.Lists;
+import com.yixin.common.exception.BzException;
+import com.yixin.common.utils.JsonObjectUtils;
+import com.yixin.dsc.common.DscContant;
+import com.yixin.dsc.dto.DscLoanRepayDTO;
+import com.yixin.dsc.entity.order.DscRepayPlan;
+import com.yixin.dsc.entity.order.DscSalesApplyMain;
+import com.yixin.dsc.util.PropertiesManager;
+import com.yixin.dsc.v1.service.capital.yntrust.YTCommonService;
+import com.yixin.kepler.common.RestTemplateUtil;
+import com.yixin.kepler.common.UrlConstant;
+import com.yixin.kepler.common.enums.AssetBankTransEnum;
+import com.yixin.kepler.common.enums.BankPhaseEnum;
+import com.yixin.kepler.core.constant.CommonConstant;
+import com.yixin.kepler.dto.BaseMsgDTO;
+import com.yixin.kepler.enity.AssetBankTran;
+import com.yixin.kepler.enity.AssetMainInfo;
+import com.yixin.kepler.v1.common.core.bankReq.BankRequestDataHandle;
+import com.yixin.kepler.v1.common.enumpackage.YNTrustUrlEnum;
+import com.yixin.kepler.v1.datapackage.dto.yntrust.YTCommonResponseDTO;
+import com.yixin.kepler.v1.datapackage.dto.yntrust.YTCommonStatusDTO;
+import com.yixin.kepler.v1.datapackage.dto.yntrust.YTImportProtocolInfoDetailDTO;
+import com.yixin.kepler.v1.datapackage.dto.yntrust.YTImportProtocolRequestDTO;
+import com.yixin.kepler.v1.datapackage.dto.yntrust.YTLoanRepaySchedulesDTO;
+import com.yixin.kepler.v1.datapackage.dto.yntrust.YTPaymentBankResultRequestDTO;
+import com.yixin.kepler.v1.datapackage.dto.yntrust.YTQueryRepayScheduleDTO;
+import com.yixin.kepler.v1.datapackage.dto.yntrust.YTRepaySchedulesDTO;
+import com.yixin.kepler.v1.datapackage.dto.yntrust.YTRepaySchedulesReqDTO;
+
+/**
+ * 还款计划处理类
+ * Package : com.yixin.kepler.v1.service.capital.yntrust
+ * 
+ * @author YixinCapital -- wangwenlong
+ *		   2018年9月27日 下午1:47:46
+ *
+ */
+@Service("YNTRUSTRequestDataHandle")
+public class YTRequestDataHandle implements BankRequestDataHandle {
+
+	private static final Logger LOGGER = LoggerFactory.getLogger(YTRequestDataHandle.class);
+	
+	@Resource
+    private YTCommonService commonService;
+	
+	@Resource
+    private PropertiesManager propertiesManager;
+	
+	/**
+	 *  还款计划处理
+	 * @author YixinCapital -- wangwenlong
+	 *	       2018年9月27日 上午11:43:32
+	 */
+	public void repayPlanHandle(List<DscLoanRepayDTO> repayPlanList,AssetMainInfo assetMainInfo,DscSalesApplyMain saleMain){
+		if(CollectionUtils.isNotEmpty(repayPlanList)){
+			String applyNo = assetMainInfo.getApplyNo(); //订单编号
+			/*AssetBankRequest bankRequestJob = AssetBankRequest.getOnlyApplyOnWay(applyNo, BankPhaseEnum.REPAY_SCHEDULES.getPhase());
+			if(bankRequestJob != null){
+				LOGGER.error("推送还款计划任务还未结束，不可再次同步还款计划,订单编号:{}",applyNo);
+				throw new BzException("推送还款计划任务还未结束，不可再次同步还款计划");
+			}*/
+			//==================== 还款计划处理 开始======================
+			List<YTRepaySchedulesDTO> repaySchedules = Lists.newArrayList(); //云南信托还款计划集合
+	    	YTRepaySchedulesDTO schedulesDTO = null;
+			String uniqueId = assetMainInfo.getVenusApplyNo(); //Venus订单编号
+			DscRepayPlan repayPlan = null;
+			for(DscLoanRepayDTO repayDto:repayPlanList){
+				repayPlan = new DscRepayPlan();
+				//========= 创建还款计划 ==============
+				this.createDscRepayPlan(repayDto, repayPlan, assetMainInfo, saleMain.getId());
+				if(0 == repayDto.getTerm()){ //0期，不推送云信
+					continue;
+				}
+				schedulesDTO = new YTRepaySchedulesDTO();
+				//========= 组装银行侧还款计划 ==============
+				this.assemblerSchedulesDTO(repayPlan, schedulesDTO);
+				repaySchedules.add(schedulesDTO);
+			}
+			//==================== 还款计划处理 结束 ======================
+			
+			//===================== 组装请求报文开始 ===========================
+			YTRepaySchedulesReqDTO requestDTO = new YTRepaySchedulesReqDTO(); //银行请求dto
+	    	requestDTO.setUrl(YNTrustUrlEnum.LOAN_CREATE_REPAY_SCHEDULE.getUrl()); //推送还款计划
+	    	requestDTO.setRequestId(commonService.getRequestId()); //标示请求唯一性的值
+	    	
+	    	String osbUrl = propertiesManager.getOsbEnvironment().concat(UrlConstant.OsbSystemUrl.ynTrustInterface);
+	    	
+	    	LOGGER.info("云南信托推送还款计划创建定时任务k_asset_bank_request===开始组装数据====applyNo={},uniqueId/VenusApplyNo:{}", applyNo,uniqueId);
+	    	if(StringUtils.isBlank(uniqueId)){
+				LOGGER.error("云南信托推送还款计划创建定时任务k_asset_bank_request,订单唯一标识为空,applyNo={}", applyNo);
+				throw new BzException(String.format("云南信托推送还款计划,订单唯一标识为空,订单编号:%s", applyNo));
+			}
+	    	YTLoanRepaySchedulesDTO loanRepaySchedulesDTO = new YTLoanRepaySchedulesDTO(); //还款计划所属合同
+	    	loanRepaySchedulesDTO.setUniqueId(uniqueId); //合同唯一编号
+	    	loanRepaySchedulesDTO.setRepaySchedules(repaySchedules); //还款计划集合
+	    	
+	        requestDTO.setLoanRepaySchedules(Lists.newArrayList(loanRepaySchedulesDTO)); //还款计划所属合同集合
+	        
+	        String requestBody = JsonObjectUtils.objectToJson(requestDTO); //请求报文
+	        //===================== 组装请求报文结束 ===========================
+	        //============= 添加银行交互记录 ===============================
+	        AssetBankTran bankTran = new AssetBankTran();
+	        bankTran.setApplyNo(applyNo); //订单编号
+	        bankTran.setAssetId(assetMainInfo.getId());
+	        bankTran.setPhase(BankPhaseEnum.REPAY_SCHEDULES_HANDLE.getPhase()); //还款计划推送
+	        bankTran.setReqBody(requestBody); //请求报文
+	        bankTran.setReqUrl(osbUrl);  //请求URL
+	        bankTran.setApiCode(requestDTO.getUrl());
+	        bankTran.setTranNo(requestDTO.getRequestId()); //请求唯一标识
+	        bankTran.setBankOrderNo(uniqueId); //Venus 申请编号
+	        bankTran.setSender(CommonConstant.SenderType.YIXIN); 
+	        bankTran.create();
+	        
+	        LOGGER.info("云南信托推送还款计划,请求资方开始,订单编号:{},请求参数为:{}",applyNo,requestBody);
+	        String result = RestTemplateUtil.sendRequest(osbUrl, requestBody, CommonConstant.BankName.YNTRUST_BANK);
+	        LOGGER.info("云南信托推送还款计划,请求资方结束,订单编号:{},返回参数为:{}",applyNo,result);
+	        
+	        if(StringUtils.isBlank(result)){
+				this.updateBankTran(result, null, "云南信托推送还款计划返回结果为空", bankTran);
+				LOGGER.error("云南信托推送还款计划返回结果为空，订单编号:{}",assetMainInfo.getApplyNo());
+				throw new BzException("同步还款计划失败");
+			}
+	        String jsonResponse = commonService.parseResponse(result);
+	        
+	        YTCommonResponseDTO response = null;
+	        try {
+				response = JSON.parseObject(jsonResponse, YTCommonResponseDTO.class);
+			} catch (Exception e) {
+				this.updateBankTran(result, null, "云南信托推送还款计划返回报文错误，解析异常", bankTran);
+				LOGGER.error("云南信托推送还款计划返回报文错误，解析异常,订单编号:{},异常信息:{}",applyNo,e.getMessage(),e);
+				throw new BzException("同步还款计划失败");
+			}
+	        
+	        if(response == null || response.getStatus() == null){
+	        	this.updateBankTran(result, null, "云南信托推送还款计划返回报文错误，解析为空", bankTran);
+	        	LOGGER.error("云南信托推送还款计划返回报文错误，解析为空，订单编号:{}",assetMainInfo.getApplyNo());
+	        	throw new BzException("同步还款计划失败");
+	        }
+	        YTCommonStatusDTO status = response.getStatus();
+	        this.updateBankTran(result, status.getResponseCode(), status.getResponseMessage(), bankTran);
+	        if(status.getIsSuccess()!=null && status.getIsSuccess()){ //请求成功
+	        	LOGGER.info("云南信托推送还款计划请求,返回结果成功,订单编号:{}",applyNo);
+	        } else if (!CommonConstant.YNTrustErrorCode.SYNC_SUCCESS.equals(status.getResponseCode())){ 
+	        	/**
+	        	 * 接口返回0000操作成功或者返回0020 操作失败，同时错误码是60200039（联调时注意该情况），代表成功上传，不用重新上传。
+	        	 * 如果超时或者返回0040操作异常或者返回0020操作失败，除去60200039外的状态码，重新创建还款计划
+	        	 */
+	        	throw new BzException("同步还款计划失败,请重试");
+	        } else {
+	        	throw new BzException("同步还款计划失败");
+	        }
+	        
+	        // ================== 创建定时任务 ===============================
+	        /*bankRequestJob = new AssetBankRequest(); //定时任务
+	        bankRequestJob.setApplyNo(applyNo); //订单编号
+	        bankRequestJob.setBankOrderNo(uniqueId);//银行申请编号
+	        bankRequestJob.setTranNo(requestDTO.getRequestId());//流水号
+	        bankRequestJob.setAssetNo(assetMainInfo.getFinancialCode());//资产编号
+	        bankRequestJob.setAssetReqBody(requestBody);//资管请求报文
+	        bankRequestJob.setOsbState(BankRequestConstant.OSB_SUCCESS); //osb状态默认为成功
+	        bankRequestJob.setPhase(BankPhaseEnum.REPAY_SCHEDULES.getPhase());//所属阶段 - 还款计划
+	        bankRequestJob.setReqUrl(osbUrl);//请求的url地址
+	        bankRequestJob.setRepState(BankRequestConstant.UN_REQ_BANK);//向银行发起请求状态 0-未发起
+	        bankRequestJob.setRetryMark(BankRequestConstant.RETRY_INIT_COUNT);//请求重试标记初始化
+
+	        bankRequestJob.create();*/
+	      //==================== 创建定时任务 结束 ======================
+		}
+	};
+	
+	
+	/**
+	 * 创建还款计划记录
+	 * @param repayDto
+	 * @param repayPlan
+	 * @param assetMainInfo
+	 * @param mainId
+	 * @return 
+	 * @author YixinCapital -- wangwenlong
+	 *	       2018年9月27日 下午2:21:03
+	 */
+	private DscRepayPlan createDscRepayPlan(DscLoanRepayDTO repayDto,DscRepayPlan repayPlan,
+			AssetMainInfo assetMainInfo,String mainId){
+		repayPlan.setApplyNo(assetMainInfo.getApplyNo());//订单编号
+		repayPlan.setMainId(mainId); //业务主表ID
+		repayPlan.setCapitalCode(assetMainInfo.getFinancialCode()); //资方CODE
+		repayPlan.setBelongCapitalCode(CommonConstant.BankName.YX); //所属资方code
+		repayPlan.setCreateTime(new Date()); //创建时间
+		repayPlan.setTerm(repayDto.getTerm()); //期数
+		repayPlan.setRepayAmount(repayDto.getRepayAmount()); //还款金额
+		repayPlan.setRepayDate(repayDto.getRepayDate()); //还款日期
+		repayPlan.setRepayPrincipal(repayDto.getRepayPrincipal()); //还款本金
+		repayPlan.setRepayProfit(repayDto.getRepayProfit()); //还款利息
+		repayPlan.setLoanServiceFee(repayDto.getLoanServiceFee()); //贷款服务费
+		repayPlan.setTechMaintenanceFee(repayDto.getTechMaintenanceFee()); //技术服务费
+		repayPlan.setOtherFee(repayDto.getOtherFee()); //其他费用
+		
+		/**
+		 * 每期还款计划的唯一标识,和贷后系统约定的规则
+		 * UniqueID&下划线&期数（01，02等两位数字）
+		 */
+		repayPlan.setScheduleNo(assetMainInfo.getVenusApplyNo().concat("_").concat(String.format("%02d", repayPlan.getTerm()))); //还款计划唯一标识
+		repayPlan.create();
+		
+		return repayPlan;
+	}
+	
+	/**
+	 * 组装银行还款计划
+	 * @param repayPlan
+	 * @param schedulesDTO
+	 * @return 
+	 * @author YixinCapital -- wangwenlong
+	 *	       2018年9月27日 下午2:25:56
+	 */
+	private YTRepaySchedulesDTO assemblerSchedulesDTO(DscRepayPlan repayPlan,YTRepaySchedulesDTO schedulesDTO){
+		schedulesDTO.setPartnerScheduleNo(repayPlan.getScheduleNo()); //每期还款计划的唯一标识
+		schedulesDTO.setRepayDate(repayPlan.getRepayDate()); //还款日期
+		schedulesDTO.setRepayPrincipal(convertBigDecimal(repayPlan.getRepayPrincipal())); //还款本金
+		schedulesDTO.setRepayProfit(convertBigDecimal(repayPlan.getRepayProfit())); //还款利息
+		return schedulesDTO;
+	}
+	
+	private String convertBigDecimal(BigDecimal source){
+    	return source.setScale(2, BigDecimal.ROUND_HALF_UP).toString();
+    }
+	
+	
+	/**
+	 * 查询云南信托还款计划
+	 * @param mainInfo
+	 * @return 
+	 * @author YixinCapital -- wangwenlong
+	 *	       2018年9月27日 下午8:58:01
+	 */
+	public List<YTRepaySchedulesDTO> queryRepanPlan(AssetMainInfo mainInfo){
+		YTPaymentBankResultRequestDTO requestDto = new YTPaymentBankResultRequestDTO();
+		requestDto.setUrl(YNTrustUrlEnum.QUERY_REPAY_SCHEDULE.getUrl()); //查询最新还款计划
+		requestDto.setUniqueId(mainInfo.getVenusApplyNo());//云南信托唯一标识
+		requestDto.setRequestId(commonService.getRequestId()); //标示请求唯一性的值,不能为空和重复的值，可以防止重复请求和追踪和排查问题。
+		
+		String osbUrl = this.propertiesManager.getOsbEnvironment() + UrlConstant.OsbSystemUrl.ynTrustInterface;
+		//=========== 银行交互 ========================
+		AssetBankTran assetBankTran = new AssetBankTran();
+		assetBankTran.setReqBody(JsonObjectUtils.objectToJson(requestDto));
+		assetBankTran.setApplyNo(mainInfo.getApplyNo());
+		assetBankTran.setAssetId(mainInfo.getId());
+		assetBankTran.setPhase(BankPhaseEnum.REPAY_SCHEDULES_QUERY.getPhase());
+		assetBankTran.setReqUrl(osbUrl);
+		assetBankTran.setApiCode(requestDto.getUrl());
+		assetBankTran.setSender(CommonConstant.SenderType.YIXIN);
+		assetBankTran.setTranNo(requestDto.getRequestId());
+		assetBankTran.setBankOrderNo(mainInfo.getVenusApplyNo());
+		assetBankTran.create();
+		
+		//发送银行请求并获取返回结果json
+		LOGGER.info("\n云南信托查询还款计划,申请编号:{},请求参数为{}", mainInfo.getApplyNo(), assetBankTran.getReqBody());
+		String result = RestTemplateUtil.sendRequest(osbUrl, requestDto, CommonConstant.BankName.YNTRUST_BANK);
+		LOGGER.info("\n云南信托查询还款计划,申请编号:{},返回结果为{}", mainInfo.getApplyNo(), result);
+
+		if (StringUtils.isBlank(result)) {
+			this.updateBankTran(result, null, "云南信托查询还款计划返回结果为空", assetBankTran);
+			throw new BzException("云南信托查询还款计划失败");
+		}
+		
+		String resultJson = commonService.parseResponse(result);
+		YTQueryRepayScheduleDTO queryRepayDto = (YTQueryRepayScheduleDTO) JsonObjectUtils.jsonToObject(resultJson, new YTQueryRepayScheduleDTO());
+		if (queryRepayDto  == null || queryRepayDto.getStatus() == null) {
+			this.updateBankTran(result, null, "云南信托查询还款计划返回结果为空", assetBankTran);
+			throw new BzException("云南信托查询还款计划失败");
+		}
+		if(Boolean.FALSE.equals(queryRepayDto.getStatus().getIsSuccess())){
+        	this.updateBankTran(result, null, "云南信托查询还款计划接口返回错误", assetBankTran);
+        	throw new BzException("云南信托查询还款计划接口返回错误");
+        }
+		this.updateBankTran(result, queryRepayDto.getStatus().getResponseCode(), queryRepayDto.getStatus().getResponseMessage(), assetBankTran);
+		return queryRepayDto.getRepaySchedules();
+	}
+	
+	/**
+	 * 更新银行交易结果
+	 * @param result
+	 * @param code
+	 * @param errorMsg
+	 * @param assetBankTran 
+	 * @author YixinCapital -- wangwenlong
+	 *	       2018年9月19日 下午3:28:05
+	 */
+	private void updateBankTran(String result,String code,String errorMsg,AssetBankTran assetBankTran){
+		assetBankTran.setRepBody(result); //响应报文
+        assetBankTran.setApprovalCode(code); //错误码
+        assetBankTran.setApprovalDesc(errorMsg); //错误描述
+        assetBankTran.update();
+	}
+	
+	/**
+	 * 签约导入前置准备
+	 * @param applyNo 申请编号
+	 * @return 导入结果
+	 * @author YixinCapital -- chenjiacheng
+	 *             2018/9/26 11:40
+	 */
+	public BaseMsgDTO importProtocol(AssetMainInfo mainInfo) {
+		try {
+			YTImportProtocolRequestDTO importProtocolDTO = prepareData(mainInfo);
+			String osbUrl = this.propertiesManager.getOsbEnvironment() + UrlConstant.OsbSystemUrl.ynTrustInterface;
+			//==============记录银行交互 ==================
+			AssetBankTran assetBankTran = new AssetBankTran();
+			assetBankTran.setReqBody(JsonObjectUtils.objectToJson(importProtocolDTO));
+			assetBankTran.setApplyNo(mainInfo.getApplyNo());
+			assetBankTran.setAssetId(mainInfo.getId());
+			assetBankTran.setPhase(AssetBankTransEnum.YT_IMPORT_PROTOCOL.getPhase());
+			assetBankTran.setReqUrl(osbUrl);
+			assetBankTran.setApiCode(importProtocolDTO.getUrl());
+			assetBankTran.setSender(CommonConstant.SenderType.YIXIN);
+			assetBankTran.setTranNo(importProtocolDTO.getRequestId());
+			assetBankTran.setBankOrderNo(mainInfo.getVenusApplyNo());
+			assetBankTran.create();
+
+			//发送银行请求并获取返回结果json
+			LOGGER.info("\n云南信托签约导入开始,申请编号:{},请求参数为{}", mainInfo.getApplyNo(), assetBankTran.getReqBody());
+			String result = RestTemplateUtil.sendRequest(osbUrl, importProtocolDTO, CommonConstant.BankName.YNTRUST_BANK);
+			LOGGER.info("\n云南信托签约导入结束,申请编号:{},返回结果为{}", mainInfo.getApplyNo(), result);
+
+			if (StringUtils.isBlank(result)) {
+				this.updateBankTran(result, null, "云南信托签约导入返回结果为空", assetBankTran);
+				return new BaseMsgDTO(DscContant.KeplerCode.FAILD, "签约导入失败");
+			}
+
+			YTCommonResponseDTO responseDTO = JSONObject.parseObject(commonService.parseResponse(result), YTCommonResponseDTO.class);
+			if (responseDTO == null || responseDTO.getStatus() == null ) {
+				this.updateBankTran(result, null, "云南信托签约导入接口返回错误", assetBankTran);
+				return new BaseMsgDTO(DscContant.KeplerCode.FAILD, "签约导入失败");
+			}
+			YTCommonStatusDTO status = responseDTO.getStatus();
+			this.updateBankTran(result, status.getResponseCode(), status.getResponseMessage(), assetBankTran);
+			if(status.getIsSuccess() == null || Boolean.FALSE.equals(status.getIsSuccess())){
+	        	throw new BzException("云南信托查询还款计划接口返回错误");
+	        }
+		} catch (Exception e) {
+			LOGGER.error("云信签约接口异常,applyNo={}", mainInfo.getApplyNo(), e);
+			return new BaseMsgDTO(DscContant.KeplerCode.FAILD, "签约导入失败");
+		}
+		return new BaseMsgDTO(CommonConstant.PreposeResultCode.NORMAL, "正常流转");
+	
+	}
+	
+	private YTImportProtocolRequestDTO prepareData(AssetMainInfo mainInfo) {
+		DscSalesApplyMain main = DscSalesApplyMain.getByApplyNo(mainInfo.getApplyNo());
+		YTImportProtocolRequestDTO importProtocolDTO = new YTImportProtocolRequestDTO();
+		List<YTImportProtocolInfoDetailDTO> protocolInfoDetailDTOList = new ArrayList<>();
+		YTImportProtocolInfoDetailDTO protocolInfoDetailDTO = new YTImportProtocolInfoDetailDTO();
+		protocolInfoDetailDTOList.add(protocolInfoDetailDTO);
+		importProtocolDTO.setProtocolInfoDetails(protocolInfoDetailDTOList);
+		//主信息
+		importProtocolDTO.setRequestId(commonService.getRequestId());
+		importProtocolDTO.setUrl(YNTrustUrlEnum.IMPORT_PROTOCOL_INFO.getUrl());
+		importProtocolDTO.setBatchNo(UUID.randomUUID().toString());//批次号
+		importProtocolDTO.setProductCode(mainInfo.getAssetNo()); //产品编号
+		//协议明细
+		protocolInfoDetailDTO.setChannel(CommonConstant.YTChannelCode.TONGLIAN); //网关，默认通联
+		protocolInfoDetailDTO.setSignNo(main.getSignNo()); //签约协议编号
+		protocolInfoDetailDTO.setIdCardNO(main.getAckrzjhm()); //身份证号
+		protocolInfoDetailDTO.setTelephoneNo(main.getAckrsjhm()); //手机号
+		protocolInfoDetailDTO.setName(main.getAhkrkhm()); //姓名
+		protocolInfoDetailDTO.setAccountNo(main.getAhkrjjkzh()); //还款卡号
+		protocolInfoDetailDTO.setBankCode(commonService.parseBankCode(main.getBankCode()).get("bankCode"));
+
+		return importProtocolDTO;
+	}
+}

@@ -1,0 +1,61 @@
+package com.yixin.dsc.enumpackage;
+
+import java.util.Arrays;
+import java.util.stream.Collectors;
+
+/**
+ * Created by xuejingtao on 2018/6/7.
+ */
+public enum BankCostRateEnum {
+    // -------------------工行银行成本费率(考虑以后扩展如其他银行，新车与二手车拆分开)
+    //    新车、二手车（12 24 36 ） （3.5   6.35  9）
+    ICBC_NEW_CAR_12("ICBC", "1", "12", "3.5"), //工行-新车-12-3.5
+    ICBC_NEW_CAR_24("ICBC", "1", "24", "6.35"), //工行-新车-24-6.35
+    ICBC_NEW_CAR_36("ICBC", "1", "36", "9"), //工行-新车-36-9
+
+    ICBC_USED_CAR_12("ICBC", "2", "12", "3.68"), //工行-新车-12-3.5
+    ICBC_USED_CAR_24("ICBC", "2", "24", "6.67"), //工行-新车-24-6.35
+    ICBC_USED_CAR_36("ICBC", "2", "36", "9.45"); //工行-新车-36-9
+
+    // 银行编号
+    private String bankCode;
+
+    // 车辆类型"新车-Y;二手车-N"
+    private String isNewCar;
+
+    // 融资期限
+    private String arzqx;
+
+    // 银行成本费率
+    private String bankCostRate;
+
+    // 此方法可能会返回null，需注意
+    public static BankCostRateEnum getByParams(String bankCode, String isNewCar, String arzqx){
+        return Arrays.stream(values()).filter(bankCostRateEnum ->
+                bankCostRateEnum.getBankCode().equals(bankCode) && bankCostRateEnum.getIsNewCar().equals(isNewCar) && bankCostRateEnum.getArzqx().equals(arzqx)
+        ).findFirst().orElse(null);
+    }
+
+    BankCostRateEnum(String bankCode, String isNewCar, String arzqx, String bankCostRate) {
+        this.bankCode = bankCode;
+        this.isNewCar = isNewCar;
+        this.arzqx = arzqx;
+        this.bankCostRate = bankCostRate;
+    }
+
+    public String getBankCode() {
+        return bankCode;
+    }
+
+    public String getIsNewCar() {
+        return isNewCar;
+    }
+
+    public String getBankCostRate() {
+        return bankCostRate;
+    }
+
+    public String getArzqx() {
+        return arzqx;
+    }
+}

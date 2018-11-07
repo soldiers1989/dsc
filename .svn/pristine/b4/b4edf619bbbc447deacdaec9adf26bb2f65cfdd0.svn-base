@@ -1,0 +1,137 @@
+package com.yixin.kepler.v1.service.capital.yillion;
+
+import com.yixin.common.exception.BzException;
+import com.yixin.common.utils.InvokeResult;
+import com.yixin.common.utils.JsonObjectUtils;
+import com.yixin.dsc.entity.order.DscSalesApplyCost;
+import com.yixin.dsc.entity.order.DscSalesApplyMain;
+import com.yixin.dsc.util.PropertiesManager;
+import com.yixin.kepler.common.UrlConstant;
+import com.yixin.kepler.common.enums.AssetStateEnum;
+import com.yixin.kepler.common.enums.BankPhaseEnum;
+import com.yixin.kepler.core.constant.CommonConstant;
+import com.yixin.kepler.core.domain.SysDIcMapped;
+import com.yixin.kepler.dto.BaseMsgDTO;
+import com.yixin.kepler.enity.AssetMainInfo;
+import com.yixin.kepler.v1.common.constants.BankRequestConstant;
+import com.yixin.kepler.v1.common.enumpackage.YILLIONUrlEnum;
+import com.yixin.kepler.v1.common.util.SerialNumberUtil;
+import com.yixin.kepler.v1.datapackage.dto.icbc.ICBCRequestFundsDTO;
+import com.yixin.kepler.v1.datapackage.dto.yillion.YILLIONPaymentDTO;
+import com.yixin.kepler.v1.datapackage.entity.AssetBankRequest;
+import com.yixin.kepler.v1.service.capital.icbc.CommonRequest4Icbc;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
+
+import javax.annotation.Resource;
+import java.math.BigDecimal;
+
+/**
+ * @description:
+ * @date: 2018-11-04 16:24
+ */
+@Service("YILLIONPaymentRequestStrategy")
+public class PaymentRequestStrategy extends CommonRequest4Icbc<ICBCRequestFundsDTO> {
+
+    private final Logger logger = LoggerFactory.getLogger(getClass());
+
+    private ThreadLocal<YILLIONPaymentDTO> paymentDataThreadLocal = new ThreadLocal<>();
+
+    private ThreadLocal<AssetMainInfo> mainInfoThreadLocal = new ThreadLocal<>();
+
+    @Resource
+    private SerialNumberUtil serialNumberUtil;
+    @Resource
+    private SysDIcMapped sysDIcMapped;
+    @Resource
+    private PropertiesManager propertiesManager;
+
+    @Override
+    protected void getData() throws BzException {
+        String applyNo = (String) inputDto.get();
+
+        logger.info("申请单号为{},开始封装银行请求参数", applyNo);
+        DscSalesApplyMain applyMain = DscSalesApplyMain.getByApplyNo(applyNo);
+        if (applyMain == null) {
+            logger.error("申请单号为{},申请编号错误，申请信息表", applyNo);
+            throw new BzException("申请编号错误，申请信息不存在");
+        }
+
+
+        AssetMainInfo mainInfo = AssetMainInfo.getByApplyNo(applyNo);
+        String bankOrderNo = mainInfo.getBankOrderNo();
+
+        YILLIONPaymentDTO paymentInfo = new YILLIONPaymentDTO();
+        paymentDataThreadLocal.set(paymentInfo);
+
+        DscSalesApplyMain applyMainInfo = DscSalesApplyMain.getByApplyNo(applyNo);
+        String payType = applyMainInfo.getAhkfs();
+        String loanPriod = applyMain.getArzqx();
+
+        String mainId = applyMainInfo.getId();
+        DscSalesApplyCost applyCost = DscSalesApplyCost.getByMainId(mainId);
+        BigDecimal loanAmount = applyCost.getFrze();
+
+        paymentInfo.setOrder_no(bankOrderNo);
+        paymentInfo.setLoanamt(loanAmount);
+
+        //todo set字段
+
+    }
+
+    @Override
+    protected InvokeResult<BaseMsgDTO> message() throws BzException {
+
+        AssetMainInfo mainInfo = mainInfoThreadLocal.get();
+        YILLIONPaymentDTO paymentInfo = paymentDataThreadLocal.get();
+
+        inputDto.remove();
+        mainInfoThreadLocal.remove();
+        paymentDataThreadLocal.remove();
+
+        //订单编号
+        String applyNo = mainInfo.getApplyNo();
+        String osbUrl = propertiesManager.getOsbEnvironment() + UrlConstant.OsbSystemUrl.yillionInterface + YILLIONUrlEnum.LOAN_APPLY.getUrl();
+
+        logger.info("亿联(请款)组装报文创建任务记录开始,申请编号:{}", applyNo);
+        AssetBankRequest request = new AssetBankRequest();
+        //申请编号
+        request.setApplyNo(applyNo);
+        //银行申请编号
+        request.setBankOrderNo(paymentInfo.getOrder_no());
+        //资方编号
+        request.setAssetNo(mainInfo.getFinancialCode());
+        //资管请求报文
+        request.setAssetReqBody(JsonObjectUtils.objectToJson(paymentInfo));
+        //所属阶段-信审
+        request.setPhase(BankPhaseEnum.PAYMENT.getPhase());
+        //请求的url地址
+        request.setReqUrl(osbUrl);
+        //向银行发起请求状态 0-未发起
+        request.setReqState(BankRequestConstant.UN_REQ_BANK);
+        //请求重试标记初始化
+        request.setRetryMark(BankRequestConstant.RETRY_INIT_COUNT);
+        request.setBzId(mainInfo.getId());
+        String taskId = request.create();
+        logger.info("亿联发起请款任务记录结束,申请编号:{},任务表ID:{}", applyNo, taskId);
+        //终审进行中
+        mainInfo.setPaymentState(AssetStateEnum.DOING.getState());
+        mainInfo.update();
+        logger.info("亿联发起请款创建任务记录成功后更新终审状态为处理中,申请编号:{}", applyNo);
+        return new InvokeResult<>(new BaseMsgDTO(CommonConstant.SUCCESS, "SUCCESS"));
+    }
+
+
+    @Override
+    protected void assembler() throws BzException {
+
+    }
+
+    @Override
+    protected void setTxtCode() {
+
+    }
+
+
+}

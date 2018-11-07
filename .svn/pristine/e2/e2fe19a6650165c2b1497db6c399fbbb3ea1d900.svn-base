@@ -1,0 +1,564 @@
+package com.yixin.kepler.core.domain.webank;
+
+import com.alibaba.fastjson.JSON;
+import com.yixin.common.exception.BzException;
+import com.yixin.common.utils.DateUitls;
+import com.yixin.common.utils.InvokeResult;
+import com.yixin.common.utils.JsonObjectUtils;
+import com.yixin.dsc.dto.DscFlowResultForAlixDto;
+import com.yixin.dsc.entity.order.*;
+import com.yixin.dsc.enumpackage.DscAlixLinkEnum;
+import com.yixin.dsc.service.common.DscWbCommonService;
+import com.yixin.dsc.util.PropertiesManager;
+import com.yixin.kepler.common.RestTemplateUtil;
+import com.yixin.kepler.common.UrlConstant;
+import com.yixin.kepler.common.enums.AssetStateEnum;
+import com.yixin.kepler.common.enums.BankPhaseEnum;
+import com.yixin.kepler.common.enums.CreditfrontResultEnum;
+import com.yixin.kepler.common.enums.WBTransCodeEnum;
+import com.yixin.kepler.core.base.AbstractBaseDealDomain;
+import com.yixin.kepler.core.constant.CommonConstant;
+import com.yixin.kepler.core.domain.SysDIcMapped;
+import com.yixin.kepler.core.listener.ResultNotifyEvent;
+import com.yixin.kepler.dto.BaseMsgDTO;
+import com.yixin.kepler.dto.webank.*;
+import com.yixin.kepler.enity.AssetBankTran;
+import com.yixin.kepler.enity.AssetMainInfo;
+import com.yixin.kepler.enity.SysDict;
+import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.assertj.core.util.Lists;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationContext;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.stereotype.Service;
+
+import javax.annotation.Resource;
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.List;
+
+/**
+ * 请求银行终审/二审/复审 策略类 --微众  贷款申请接口
+ * Package : com.yixin.kepler.core.domain.webank
+ *
+ * @author YixinCapital -- wangwenlong
+ *		   2018年7月9日 下午4:51:07
+ *
+ */
+@Service("WeBankLastTrialRequestStrategy")
+public class LastTrialRequestStrategy extends AbstractBaseDealDomain<Object, BaseMsgDTO>{
+
+	public static final Logger logger = LoggerFactory.getLogger(LastTrialRequestStrategy.class);
+
+	@Resource
+	private PropertiesManager propertiesManager;
+
+	private static final String DEFAULT_NETWORK_LICENSES = "000000000000000000";
+
+	@Resource
+	private DscWbCommonService commonService;
+
+	@Resource
+    private SysDIcMapped sysDIcMapped;
+
+	@Autowired
+	private MongoTemplate mongoTemplate;
+
+	@Autowired
+	private ApplicationContext ioc;
+
+    private ThreadLocal<AssetMainInfo> assetMainInfoThreadLocal = new ThreadLocal<>();
+
+	@Override
+	protected void getData() throws BzException {
+
+	}
+
+	@Override
+	protected void assembler() throws BzException {
+		String applyNo = String.valueOf(inputDto.get());
+        logger.info("申请单号为{},开始封装银行请求参数",applyNo);
+        DscSalesApplyMain mainInfo = DscSalesApplyMain.getByApplyNo(applyNo);
+        if(mainInfo == null){
+        	logger.info("申请单号为{},申请编号错误，查询不到订单信息",applyNo);
+        	throw new BzException("申请编号错误，查询不到订单信息");
+        }
+        AssetMainInfo assetMainInfo = AssetMainInfo.getByApplyNo(applyNo);
+        if(assetMainInfo == null){
+        	logger.info("申请单号为{},订单还未发起信审",applyNo);
+        	throw new BzException("订单还未发起信审");
+        }
+        assetMainInfoThreadLocal.set(assetMainInfo);
+
+        DscSalesApplyCust applyCust = DscSalesApplyCust.getOneByMainId(mainInfo.getId());
+        if(applyCust == null){
+        	throw new BzException("客户信息不存在");
+        }
+        DscSalesApplyCar applyCar = DscSalesApplyCar.getBymainId(mainInfo.getId());
+        if(applyCar == null){
+        	throw new BzException("车辆信息不存在");
+        }
+
+        DscSalesApplyCost applyCost = DscSalesApplyCost.getByMainId(mainInfo.getId());
+        if(applyCost == null){
+        	throw new BzException("费用信息不存在");
+        }
+
+        List<DscSalesApplyBondsman> bondsmanList = DscSalesApplyBondsman.getListByParms(mainInfo.getId());
+
+        WBLastRequestDTO requestDto = new WBLastRequestDTO();
+        //===============请求头信息 开始=====================
+        requestDto.setMerchantId(commonService.getMerchantIdByCompanyCode(mainInfo.getRentingCompanyCode())); //平台ID 微众分配的固定值
+        requestDto.setTxnId(WBTransCodeEnum.LAST_TRIAL.getTransCode()); //交易服务码 90032
+        requestDto.setOpId(mainInfo.getTlrNo()); //操作员号
+        requestDto.setChannel(commonService.getWbChannelByOrderSource(mainInfo.getOrderSource())); //渠道
+        requestDto.setReqTime(new Date()); //请求时间
+        //===============请求头信息 结束=====================
+        //===============申请人基本信息域 开始=====================
+        requestDto.setAzjhm(applyCust.getAzjhm()); //用户平台id/身份证号码
+        requestDto.setAppNo(assetMainInfo.getAssetNo()); //申请编号 / 申请书编号 二审回传关联一审异步回调的APP_NO
+        requestDto.setAkhxm(applyCust.getAkhxm()); //姓名--申请人姓名
+        requestDto.setAzjlx(codeConvert("azjlx", applyCust.getAzjlx())); //证件提交类型/证件类型
+        requestDto.setAzjhm2(applyCust.getAzjhm()); //用户平台id 填合作方平台系统中的客户唯一编号，如无则填写身份证号码/身份证号码
+        requestDto.setAkhxb(codeConvert("akhxb", applyCust.getAkhxb())); //性别 / 申请人性别
+        requestDto.setResidenceTypeDesc(applyCust.getResidenceTypeDesc()); //户口类别  本市农业/本市非农业/非本市农业/非本市非农业
+        requestDto.setAhjszcs(applyCust.getAhjszcs()); //户籍所在城市  / 户籍地城市 中文
+        requestDto.setAsqrxl(codeConvert("asqrxl", applyCust.getAsqrxl())); //申请人学历
+        requestDto.setAhyzk(codeConvert("ahyzk", applyCust.getAhyzk())); //婚姻
+        //===============申请人基本信息域 结束=====================
+
+        //============ 联系人信息数组 =============
+        this.initContactList(mainInfo.getId(), requestDto, applyCust, bondsmanList);
+        //============ 联系人信息数组 =============
+        //============ 申请人补充信息单位开始 ========================
+        requestDto.setAdwmc(StringUtils.isBlank(applyCust.getAdwmc())?"无":applyCust.getAdwmc()); //单位名称
+        requestDto.setAdwxxdh(StringUtils.isBlank(applyCust.getAdwxxdh())?"无":applyCust.getAdwxxdh()); //单位联系电话
+        requestDto.setAdwxxdz(StringUtils.isBlank(applyCust.getAdwxxdz())?"无":applyCust.getAdwxxdz()); //单位联系地址
+
+        requestDto.setResidentCity(getResidentCity(applyCust.getAxjzdsf(),applyCust.getAxjzdcs())); //居住地址城市  现居住地省份 现居住地城市   中文
+        requestDto.setAxjzddz(applyCust.getAxjzddz()); //现居住地详细地址
+        //============ 申请人补充信息单位结束 ========================
+        //=============== 车贷二审回传信息域开始 ========================
+        requestDto.setAsqrzy(codeConvert("asqrzy", applyCust.getAsqrzy())); //申请人职业
+        requestDto.setAsqrzw(applyCust.getAsqrzw()); //申请人职务
+        requestDto.setFshnx(convertBigDecimal(applyCust.getFshnx(),"fshnx")); //月均收入水平 /税后年薪(万元)/12
+
+        requestDto.setIsGuarantor(isGuarantor(bondsmanList)); //有无担保人或共申人 联合贷根据alix是否传担保人信息判断有无
+        requestDto.setAjzzk(codeConvert("ajzzk", applyCust.getAjzzk())); //房产信息 / 居住状况
+        requestDto.setCarPrice(convertBigDecimal(applyCar.getFxsj(),"")); //车辆评估价格 / 新车实际销售价/二手车评估价
+        requestDto.setAssessTime(applyCar.getAssessTime()); //车辆评估时间 /alix拿到评估报告的时间
+        requestDto.setAssessClass("Y".equalsIgnoreCase(applyCar.getIsNewCar())?"无":"A"); //车辆检测级别 新车无、二手车传A
+        //=============== 车贷二审回传信息域 结束=====================
+        //=============== 费用 开始=====================
+        this.initFeeList(mainInfo, requestDto);
+        //=============== 费用 结束=====================
+        //=============== 首付成分 开始=====================
+        this.initDownPaymentList(applyCost, requestDto);
+        //=============== 首付成分 结束=====================
+        //================ 借款信息域 开始 ============================
+        requestDto.setFrze(convertBigDecimal(applyCost.getFrze(),"")); //客户融资额
+        requestDto.setArzqx(mainInfo.getArzqx()); //融资期限
+        requestDto.setFkhll(convertBigDecimal(applyCost.getFkhll(),CommonConstant.TO_POIOT_FOUR)); // 年化利率/客户利率
+        requestDto.setFjsll(convertBigDecimal(applyCost.getFjsll(),CommonConstant.TO_POIOT_FOUR)); // 贴息前利率 / 结算利率
+        requestDto.setFtxze(convertBigDecimal(applyCost.getFtxze(), "")); //贴息总金额 / 贴息总金额
+        //================ 借款信息域 结束 ============================
+        //================ 订单信息域开始 ============================
+        requestDto.setApplyNo(mainInfo.getApplyNo()); //平台订单号 / 合作方的订单编号
+        requestDto.setMerOrderBuildDate(new Date()); //订单生成时间
+        requestDto.setPsCode(commonService.getPsCodeByApplyNo(applyNo)); //产品结构编号
+        requestDto.setDealerChannelProvince(mainInfo.getAsfName()); //车商省份/经销商渠道所在省
+        requestDto.setDealerChannelCity(mainInfo.getAcsName()); //车商城市/经销商渠道所在市
+        requestDto.setDealerChannelDetailedAddress(mainInfo.getAdmdz()); //车商地址/经销商渠道详细地址
+        requestDto.setNetworkLicenses(StringUtils.isBlank(mainInfo.getDealerChannelCode())?DEFAULT_NETWORK_LICENSES:mainInfo.getDealerChannelCode()); //网点/车商营业执照号/ 组织机构号 alix存量，联合贷补充默认值
+        requestDto.setAppName(applyCar.getAppName()); //品牌
+        requestDto.setAcxName(applyCar.getAcxName()); //车辆名称/车型描述 / 车型
+        requestDto.setCarId(commonService.getSpiltCarId(applyCar.getCarId())); //车辆ID/sku
+        requestDto.setAcjh(applyCar.getAcjh()); //车架号/VIN
+        requestDto.setAfdjh(applyCar.getAfdjh()); //发动机号
+        requestDto.setAcllx(applyCar.getIsNewCar()); //是否新车 新车-Y 二手车-N
+        requestDto.setDesccdrq(applyCar.getDesccdrq()); //上牌日期 二手车（IS_NEW_CAR=N）必填：首次上牌日期YYYYMMDD
+        requestDto.setCoty(getCoty(applyCar.getDesccdrq(),applyCar.getIsNewCar())); //车龄 系统日期-初登日期 车龄以年为单位
+        requestDto.setFescgls(getFescgls(applyCar.getFescgls(),applyCar.getIsNewCar())); // 行驶里程 新车传0，里程以公里为单位 /  公里数(万公里)需要转化单位
+        requestDto.setXfrTimes(getBankXfrTimes(applyCar.getXfrTimes(),applyCar.getIsNewCar())); //过户次数
+        requestDto.setFzdj(convertBigDecimal(applyCar.getFzdj(),"")); // 厂商指导价格 / 新车（IS_NEW_CAR=Y）必填 新车指导价
+        requestDto.setFxsj(convertBigDecimal(applyCar.getFxsj(),"")); //车辆实际成交价  车辆销售价（车辆发票价，如为二手车，则为车辆实际成交价格） / 实际销售价
+        requestDto.setFxsj2(convertBigDecimal(applyCar.getFxsj(),"")); //车辆实际成交价  车辆销售价（车辆发票价，如为二手车，则为车辆实际成交价格） / 实际销售价\
+        requestDto.setFsfje(convertBigDecimal(applyCost.getFsfje(),"")); //首付总金额
+        /*
+         * modify wangwenlong on 2018-08-13 由于alix传入 ayjspcsName 传入的是码值会超出银行规定的 5个字符长度
+         * 因为银行接口文档该字段未非必填，所以注释，今天alix已做更改，他们可能随8月16号版本上
+         */
+        //requestDto.setAyjspcsName(applyCar.getAyjspcsName()); //上牌地点 / 预计上牌城市
+        requestDto.setVehiclePro(applyCar.getVehiclePro()); //车辆性质
+        requestDto.setDealerChannelCityName(mainInfo.getAcsName()); //车辆交易城市 / 经销商渠道所在市名称
+        /**
+    	 * 放款提交类型   新车-1  二手车-4
+    	 * 0-票前放款
+    	 * 1-票后放款
+    	 * 2-抵押后放款
+    	 * 3-过户前放款
+    	 * 4-过户后放款
+    	 */
+        requestDto.setOrderType(getOrderType(applyCar.getIsNewCar()));
+        requestDto.setTelVerification(mainInfo.getTelVerification()); //是否电核标记  Y-是  N-否
+        requestDto.setCopChannelType(codeConvert("admsx", mainInfo.getAdmsx())); //合作主要渠道类型  /合作渠道一级科目
+        //================ 订单信息域 结束 ============================
+        //===============销售人员信息域 开始=====================
+        requestDto.setSalesDomainAccount(mainInfo.getTlrNo()); //销售人员ID / 提报人域账号
+        requestDto.setFinancialManagerName(applyCar.getFinancialManagerName()); //销售人员姓名 / 分公司金融经理
+        requestDto.setSalesPhone(mainInfo.getPhone()); //销售人员手机号 / 提报人电话
+        //===============销售人员信息域 结束=====================
+        //===============金融专员信息域 开始=====================
+        requestDto.setSalesDomainAccount2(mainInfo.getTlrNo()); //金融专员人员ID / 提报人域账号
+        //===============金融专员信息 结束=====================
+        requestDto.setMerBizNo(mainInfo.getApplyNo()); //平台流水 / 申请单号
+
+        inputDto.set(requestDto);
+	}
+
+	private String codeConvert(String code,String value){
+		return sysDIcMapped.getMappingValue(code,value, CommonConstant.BankName.WB_BANK);
+	}
+
+	private void initDownPaymentList(DscSalesApplyCost applyCost,WBLastRequestDTO requestDto){
+		List<WBDownPaymentDTO> downPaymentList = Lists.newArrayList();
+        WBDownPaymentDTO paymentDto = new WBDownPaymentDTO();
+        paymentDto.setComponentName("应收首付车款");
+        paymentDto.setComponentAmount(convertBigDecimal(applyCost.getFsfje(), "")); //首付金额
+        paymentDto.setDownPaymentRatio(convertBigDecimal(applyCost.getFsfbl(),CommonConstant.TO_POIOT_TWO)); //首付比例
+        downPaymentList.add(paymentDto);
+
+        requestDto.setDownPaymentList(downPaymentList);
+	}
+
+	private void initFeeList(DscSalesApplyMain main,WBLastRequestDTO requestDto){
+		List<DscSalesApplyFinancing> financingList = DscSalesApplyFinancing.getByMainId(main.getId());
+		if (CollectionUtils.isEmpty(financingList)) {
+		   logger.error("根据申请主表id查找融资项失败,融资项为空,applyNo={},mainId={}", main.getApplyNo(), main.getId());
+		   throw new BzException("融资信息为空");
+		}
+		List<WBPaymentFeeDTO> feeDTOList = new ArrayList<>();
+		List<SysDict> dictList = SysDict.getFinanceCode(CommonConstant.BankName.WB_BANK,"finance");
+		DscSalesApplyCost applyCost = DscSalesApplyCost.getByMainId(main.getId());
+		if (CollectionUtils.isNotEmpty(dictList)) {
+			BigDecimal insAmount = BigDecimal.ZERO;
+			for (DscSalesApplyFinancing financing : financingList) {
+				//过滤融资额小于等于0的融资项
+				if (financing.getFkhrzje().compareTo(BigDecimal.ZERO) > 0 ) {
+					for (SysDict dict : dictList) {
+						if (financing.getArzxmid().equals(dict.getDicCode())) {
+							if (CommonConstant.FinanceType.F010.equals(dict.getDicCode())) {
+								WBPaymentFeeDTO feeDTO = new WBPaymentFeeDTO();
+								feeDTO.setFeeType(dict.getBankCode());
+								feeDTO.setFeeAmt(financing.getFkhrzje().subtract(new BigDecimal(convertBigDecimal(applyCost.getFsfje(),"")))); //alix传过来的车款不是融资金额，而是车的总价
+								feeDTOList.add(feeDTO);
+							} else if (CommonConstant.FinanceType.F091.equals(financing.getArzxmid()) || CommonConstant.FinanceType.F101.equals((financing.getArzxmid()))
+									|| CommonConstant.FinanceType.F121.equals(financing.getArzxmid())){
+								insAmount = insAmount.add(financing.getFkhrzje());
+							} else if (CommonConstant.FinanceType.F011.equals(dict.getDicCode())) {
+								//账户管理费
+								WBPaymentFeeDTO feeDTO = new WBPaymentFeeDTO();
+								feeDTO.setFeeType(dict.getBankCode());
+								feeDTO.setFeeAmt(financing.getFkhrzje());
+								feeDTOList.add(feeDTO);
+							} else {
+								WBPaymentFeeDTO feeDTO = new WBPaymentFeeDTO();
+								feeDTO.setFeeType(dict.getBankCode());
+								feeDTO.setFeeAmt(financing.getFkhrzje());
+								feeDTOList.add(feeDTO);
+							}
+							break;
+						}
+					}
+				}
+			}
+			if (insAmount.compareTo(BigDecimal.ZERO) > 0) {
+				WBPaymentFeeDTO feeDTO = new WBPaymentFeeDTO();
+				feeDTO.setFeeType(CommonConstant.FinanceType.INS);
+				feeDTO.setFeeAmt(insAmount);
+				feeDTOList.add(feeDTO);
+			}
+
+		} else {
+			logger.info("申请编号:{},获取alix与银行的融资项对应关系失败！！！", main.getApplyNo());
+		}
+
+		requestDto.setFeeList(feeDTOList);
+	}
+
+	private String getResidentCity(String axjzdsf,String axjzdcs){
+		String proName = sysDIcMapped.getProName(axjzdsf);
+		String cityName = sysDIcMapped.getCityName(axjzdcs);
+		proName = proName == null?"":proName;
+		cityName = cityName == null?"":cityName;
+		return proName + cityName;
+	}
+
+	private void initContactList(String mainId,WBLastRequestDTO requestDto,DscSalesApplyCust cust,List<DscSalesApplyBondsman> bondsmanList){
+		List<DscSalesApplyContact> contactList = DscSalesApplyContact.getListByParms(mainId);
+		if(CollectionUtils.isNotEmpty(contactList)){
+			List<WBContactDTO> bankContactList = Lists.newArrayList();
+			WBContactDTO wbContactDTO = null;
+			for(DscSalesApplyContact contact :contactList){
+				wbContactDTO = new WBContactDTO();
+				wbContactDTO.setAysqrgx(codeConvert("ayjkrgx",contact.getAyjkrgx())); //联系人关系/与申请人关系
+				wbContactDTO.setApoxm(contact.getAlxrxm()); //联系人姓名/姓名
+				wbContactDTO.setAposjhm(contact.getAsjhm()); //联系人手机号
+				wbContactDTO.setApozjhm(null); //联系人证件号码
+				bankContactList.add(wbContactDTO);
+			}
+			//modify by wangwenlong on 2018-09-27 由于婚姻状况码值错返，原0 已婚，实际 1为已婚，现改正，预计今晚（2018-09-27）上线
+		    if("1".equals(cust.getAhyzk())){ //已婚,传配偶
+		    	wbContactDTO = new WBContactDTO();
+		    	wbContactDTO.setAysqrgx("MA"); //已婚 关系
+				wbContactDTO.setApoxm(cust.getApoxm()); //联系人姓名/配偶姓名
+				wbContactDTO.setAposjhm(cust.getAposjhm()); //配偶手机号
+				wbContactDTO.setApozjhm(cust.getApozjhm()); //配偶证件号码
+				bankContactList.add(wbContactDTO);
+		    }
+		    if(CollectionUtils.isNotEmpty(bondsmanList)){ //担保人不为空
+		    	for(DscSalesApplyBondsman bondsman:bondsmanList){
+		    		wbContactDTO = new WBContactDTO();
+		    		wbContactDTO.setAysqrgx("GR"); //担保人 关系
+		    		wbContactDTO.setApoxm(bondsman.getAxm()); //联系人姓名/担保人姓名
+		    		wbContactDTO.setAposjhm(bondsman.getAsj()); //担保人手机号
+		    		wbContactDTO.setApozjhm(bondsman.getAzjhm()); //担保人证件号码
+		    		bankContactList.add(wbContactDTO);
+		    	}
+		    }
+		    requestDto.setContactList(bankContactList);
+		}
+	}
+	private String getCoty(Date desccdrq,String isNewCar){
+		if("Y".equalsIgnoreCase(isNewCar)){  //新车
+			return "0";
+		}
+        Calendar now = Calendar.getInstance();
+        Calendar desccdrqCalendar = Calendar.getInstance();
+        desccdrqCalendar.setTime(desccdrq);
+		return String.valueOf(now.get(Calendar.YEAR) - desccdrqCalendar.get(Calendar.YEAR));
+	}
+
+	private String getFescgls(BigDecimal fescgls,String isNewCar){
+		if("Y".equalsIgnoreCase(isNewCar)){  //新车
+			return "0";
+		} else {
+			if(fescgls == null){
+				return null;
+			}
+			//万公里 转换成 公里
+			return fescgls.multiply(new BigDecimal(10000)).setScale(0, BigDecimal.ROUND_HALF_UP).toString();
+		}
+	}
+
+	private String getBankXfrTimes(Integer xfrTimes,String isNewCar){
+		if("Y".equalsIgnoreCase(isNewCar)){  //新车
+			return "0";
+		} else {
+			return xfrTimes == null?"0":String.valueOf(xfrTimes);
+		}
+	}
+	private String getOrderType(String isNewCar){
+		if("Y".equalsIgnoreCase(isNewCar)){  //新车
+			return "1";
+		} else {
+			return "4";
+		}
+	}
+
+	private String isGuarantor(List<DscSalesApplyBondsman> bondsmanList){
+		return CollectionUtils.isEmpty(bondsmanList)? "N":"Y";
+	}
+
+	@Override
+	protected InvokeResult<BaseMsgDTO> message() throws BzException {
+
+        //获取参数
+		WBLastRequestDTO requestDto = (WBLastRequestDTO) inputDto.get();
+        AssetMainInfo assetMainInfo = assetMainInfoThreadLocal.get();
+        assetMainInfoThreadLocal.remove();
+        inputDto.remove();
+        String osbUrl = this.propertiesManager.getOsbEnvironment() + UrlConstant.OsbSystemUrl.weBankInterface + requestDto.getTxnId();
+        //添加银行交易信息
+        AssetBankTran assetBankTran = new AssetBankTran();
+        assetBankTran.setReqBody(JsonObjectUtils.objectToJson(requestDto));
+        assetBankTran.setApplyNo(assetMainInfo.getApplyNo());
+        assetBankTran.setAssetId(assetMainInfo.getId());
+
+        assetBankTran.setPhase(BankPhaseEnum.LAST_TRIAL.getPhase());
+        assetBankTran.setReqUrl(osbUrl);
+        assetBankTran.setApiCode(requestDto.getTxnId());
+        assetBankTran.setSender(CommonConstant.SenderType.YIXIN);
+        assetBankTran.create();
+
+        //发送银行请求并获取返回结果json
+        logger.info("\n开始请求银行复审/二审处理,申请编号:{},请求参数为{}",assetMainInfo.getApplyNo(),assetBankTran.getReqBody());
+        String result = RestTemplateUtil.sendRequest(osbUrl, requestDto,CommonConstant.BankName.WB_BANK);
+        logger.info("\n开始请求银行复审/二审处理,申请编号:{},返回结果为{}",assetMainInfo.getApplyNo(),result);
+
+        if(StringUtils.isBlank(result)){
+        	return new InvokeResult<>(new BaseMsgDTO(CommonConstant.FAILURE,"二审/复审失败"));
+        }
+        String jsonResponse = commonService.parseResponse(result);
+
+        WBLastResponseDTO response = (WBLastResponseDTO) JsonObjectUtils.jsonToObject(jsonResponse, new WBLastResponseDTO());
+
+        assetBankTran.setRepBody(result);
+        assetBankTran.setApprovalCode(response.getCode()); //错误码
+        assetBankTran.setApprovalDesc(response.getDesc()); //错误描述
+        assetBankTran.setTranNo(response.getNbsOrderNo()); //微众订单号
+        assetBankTran.update();
+
+        boolean notifyAlix = true;
+        WBMongoDTO mongoDto = null;
+		try {
+			Query query = new Query();
+			query.addCriteria(Criteria.where("applyNo").is(assetMainInfo.getApplyNo()));
+			List<WBMongoDTO> mongoDTOList = mongoTemplate.find(query, WBMongoDTO.class);
+			if(CollectionUtils.isEmpty(mongoDTOList)){
+				mongoDto = new WBMongoDTO();
+			} else {
+				mongoDto = mongoDTOList.get(0);
+			}
+			logger.info("微众银行复审/二审,申请编号:{},获取mongo信息：{}",assetMainInfo.getApplyNo(),JSON.toJSONString(mongoDTOList));
+			if(CommonConstant.TRUE.equals(mongoDto.getSkipToLast())){ //是否直接跳转二审
+				logger.info("微众银行复审/二审,申请编号:{},直接跳转到二审",assetMainInfo.getApplyNo());
+				notifyAlix = true;
+			} else {
+				notifyAlix = false;
+			}
+		} catch (Exception e) {
+			logger.error("微众银行复审/二审,判断是否直接跳转二审异常：{}",assetMainInfo.getApplyNo(),e);
+		}
+		logger.info("微众银行复审/二审，判断是否向alix发送结果通知,申请编号:{},notifyAlix：{}",assetMainInfo.getApplyNo(),notifyAlix);
+
+        /**
+         * 一审提交
+         * 0000	申请提交成功
+         * 0002	未满足接口输入要求
+         * 0113	数据规则检查不过
+         * 1004	申请提交受理失败
+         * 1303	年龄校验不过
+         * 1037	用户平台id占用
+         * 0111	合同版本号校验失败
+         * 1017	公安实名认证失败
+         */
+	      //如果银行信审申请成功
+	      if (response.getCode().contains(CommonConstant.WB_RESP_CODE)) {
+	    	  assetMainInfo.setLastState(AssetStateEnum.SUCCESS.getState()); //成功
+	    	  assetMainInfo.setBankOrderNo(response.getNbsOrderNo()); //微众订单号
+	    	  assetMainInfo.update();
+
+	    	  this.saveMongoInfo(assetMainInfo,mongoDto);
+	    	  if(notifyAlix){
+	    		  logger.info("微众银行复审/二审，判断是否向alix发送结果通知,申请编号:{},notifyAlix：{},发送 100000/信审通过",assetMainInfo.getApplyNo(),notifyAlix);
+	    		  ioc.publishEvent(new ResultNotifyEvent(this.createForAliDto(assetMainInfo.getApplyNo(), CreditfrontResultEnum.SUCCESS)));
+	    	  }
+	          return new InvokeResult<>(new BaseMsgDTO(CommonConstant.SUCCESS,"SUCCESS"));
+	      } else if (response.getCode().contains(CommonConstant.WeBankErrorCode.VIN)){ //复审驳回 返回码1034，VIN码格式错误
+	    	  if(notifyAlix){
+	    		  DscFlowResultForAlixDto alidto = DscFlowResultForAlixDto.createCreditfrontResult(assetMainInfo.getApplyNo(), CreditfrontResultEnum.REJECT, CreditfrontResultEnum.REJECT_BANK_VIN);
+	    		  logger.info("微众银行复审/二审，判断是否向alix发送结果通知,申请编号:{},notifyAlix：{},发送 {}",assetMainInfo.getApplyNo(),notifyAlix,JSON.toJSONString(alidto));
+	    		  ioc.publishEvent(new ResultNotifyEvent(alidto));
+	    	  } else {
+	    		  return new InvokeResult<>(new BaseMsgDTO(CommonConstant.WeBankErrorCode.VIN,CommonConstant.WeBankErrorCode.VIN));
+	    	  }
+	      } else if (response.getCode().contains(CommonConstant.WeBankErrorCode.MONEY)){ //复审驳回  返回码1036，开户拒绝-负债收入比不准入
+	    	  if(notifyAlix){
+	    		  DscFlowResultForAlixDto alidto = DscFlowResultForAlixDto.createCreditfrontResult(assetMainInfo.getApplyNo(), CreditfrontResultEnum.REJECT, CreditfrontResultEnum.REJECT_BANK_MONEY);
+	    		  logger.info("微众银行复审/二审，判断是否向alix发送结果通知,申请编号:{},notifyAlix：{},发送 {}",assetMainInfo.getApplyNo(),notifyAlix,JSON.toJSONString(alidto));
+	    		  ioc.publishEvent(new ResultNotifyEvent(alidto));
+	    	  } else {
+	    		  return new InvokeResult<>(new BaseMsgDTO(CommonConstant.WeBankErrorCode.MONEY,CommonConstant.WeBankErrorCode.MONEY));
+	    	  }
+	      }else {
+	    	  assetMainInfo.setLastState(AssetStateEnum.FAILD.getState()); //失败
+	    	  assetMainInfo.update();
+	    	  if(notifyAlix){
+	    		  logger.info("微众银行复审/二审，判断是否向alix发送结果通知,申请编号:{},notifyAlix：{},发送 100001/信审拒绝",assetMainInfo.getApplyNo(),notifyAlix);
+	    		  ioc.publishEvent(new ResultNotifyEvent(this.createForAliDto(assetMainInfo.getApplyNo(), CreditfrontResultEnum.REFUSE)));
+	    	  }
+	      }
+        return new InvokeResult<>(new BaseMsgDTO(CommonConstant.FAILURE,"复审失败"));
+    }
+
+	private DscFlowResultForAlixDto createForAliDto(String applyNo,CreditfrontResultEnum resultEnum) {
+
+		DscFlowResultForAlixDto alixDto = new DscFlowResultForAlixDto();
+		alixDto.setApplyNo(applyNo);
+		alixDto.setCode(resultEnum.getCode());
+		alixDto.setLink(DscAlixLinkEnum.CREDITFRONT.getCode());
+		alixDto.setMessage(resultEnum.getMsg());
+		return alixDto;
+	}
+
+	private void saveMongoInfo(AssetMainInfo assetMainInfo,WBMongoDTO mongoDto){
+		 try {
+			 mongoDto.setLastState(AssetStateEnum.SUCCESS.getState()); //二审成功
+			 mongoDto.setLastSuccessTime(DateUitls.dateToStr(new Date(), "yyyy-MM-dd_HH:mm:SS")); //二审成功时间
+			 mongoDto.setSign(DateUitls.dateToStr(new Date(), "yyyy-MM-dd_HH:mm:SS")); //时间标识
+			 mongoDto.setApplyNo(assetMainInfo.getApplyNo()); //申请编号
+			 mongoDto.setAppNo(assetMainInfo.getAssetNo()); //微众申请编号
+			 mongoDto.setNbsOrderNo(assetMainInfo.getBankOrderNo()); //微众订单编号
+
+			 //往mogo里存放一审的请求信息保存到MongoDB中，用户再次信审时，校验四要素信息
+			 Query query = new Query();
+			 query.addCriteria(Criteria.where("applyNo").is(assetMainInfo.getApplyNo()));
+			 this.mongoTemplate.remove(query, WBMongoDTO.class);
+			 this.mongoTemplate.save(mongoDto);
+			 logger.info("微众银行复审/二审成功后，订单编号:{},向mongo中保存信息:{}",assetMainInfo.getApplyNo(),JSON.toJSONString(mongoDto));
+		} catch (Exception e) {
+			logger.error("微众复审成功，保存MongoDB信息异常，订单编号:{}",assetMainInfo.getApplyNo(), e);
+		}
+	}
+
+	/**
+	 * 转换数字
+	 * @param source
+	 * @param type
+	 * @return
+	 * @author YixinCapital -- wangwenlong
+	 *	       2018年7月9日 下午6:29:34
+	 */
+	private String convertBigDecimal(BigDecimal source,String type){
+		String target = "";
+		/**
+		 * 月均收入范围	MONTHLY_INCOME_RANGE
+		 * R01--3000以下
+		 * R02--3000~5000(含3000)
+		 * R03--5000~8000
+		 * R04--8000~12000
+		 * R05--12000~20000
+		 * R06--20000以上
+		 */
+
+		switch (type) {
+			case "fshnx": //月均收入水平
+				if (source == null) {
+					throw new BzException("月均收入水平为空");
+				}
+				target = source.divide(new BigDecimal("12"), 2, BigDecimal.ROUND_HALF_UP).multiply(new BigDecimal("10000")).toString();
+				break;
+			case CommonConstant.TO_POIOT_FOUR: //转换成小数模式 eg:0.1234
+				if (source == null) throw new BzException("数据为空");
+				target = source.setScale(4, BigDecimal.ROUND_HALF_UP).divide(new BigDecimal("100"),BigDecimal.ROUND_HALF_UP).toString();
+				break;
+			case CommonConstant.TO_POIOT_TWO:
+				if (source == null) throw new BzException("数据为空");
+				target = source.setScale(2, BigDecimal.ROUND_HALF_UP).divide(new BigDecimal("100"),BigDecimal.ROUND_HALF_UP).toString();
+				break;
+			default:
+				target = source.setScale(2, BigDecimal.ROUND_HALF_UP).toString();
+		}
+
+		return target;
+	}
+
+}

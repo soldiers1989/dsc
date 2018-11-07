@@ -1,0 +1,192 @@
+package com.yixin.kepler.v1.service.capital.icbc;
+
+import java.util.Date;
+import java.util.Map;
+
+import javax.annotation.Resource;
+
+import com.yixin.kepler.common.JacksonUtil;
+import org.apache.commons.lang3.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
+
+import com.alibaba.fastjson.JSON;
+import com.yixin.common.exception.BzException;
+import com.yixin.common.utils.DateUitls;
+import com.yixin.common.utils.InvokeResult;
+import com.yixin.common.utils.JsonObjectUtils;
+import com.yixin.dsc.entity.order.DscSalesApplyCust;
+import com.yixin.dsc.entity.order.DscSalesApplyFinancing;
+import com.yixin.dsc.entity.order.DscSalesApplyMain;
+import com.yixin.dsc.util.PropertiesManager;
+import com.yixin.kepler.common.RestTemplateUtil;
+import com.yixin.kepler.core.base.AbstractBaseDealDomain;
+import com.yixin.kepler.core.constant.CommonConstant;
+import com.yixin.kepler.dto.BaseMsgDTO;
+import com.yixin.kepler.enity.AssetBankTran;
+import com.yixin.kepler.enity.AssetMainInfo;
+import com.yixin.kepler.v1.common.constants.IcbcConstant;
+import com.yixin.kepler.v1.common.enumpackage.BankPhaseEnum;
+import com.yixin.kepler.v1.common.util.SerialNumberUtil;
+import com.yixin.kepler.v1.datapackage.dto.icbc.IcbcAckDataDTO;
+import com.yixin.kepler.v1.datapackage.dto.icbc.IcbcApplyDTO;
+import com.yixin.kepler.v1.datapackage.dto.icbc.IcbcCommonDTO;
+import com.yixin.kepler.v1.datapackage.dto.icbc.IcbcYxCheckRsDataDTO;
+import com.yixin.kepler.v1.utils.JacksonUtils;
+
+
+/**
+ * 取消订单
+ * Package : com.yixin.kapler_v1.service.capital.icbc
+ *
+ * @author YixinCapital -- gumanxue
+ * 2018/9/13 18:28
+ */
+@Service
+public class IcbcOrderCancelRequest extends AbstractBaseDealDomain<Object, BaseMsgDTO> {
+
+    public static final Logger logger = LoggerFactory.getLogger(IcbcOrderCancelRequest.class);
+    private ThreadLocal<AssetMainInfo> assetMainInfoThreadLocal = new ThreadLocal<>();
+    private ThreadLocal<DscSalesApplyMain> applyMainInfoThreadLocal = new ThreadLocal<>();
+    protected ThreadLocal<IcbcApplyDTO<IcbcYxCheckRsDataDTO>> dataThreadLocal = new ThreadLocal<>();//工行申请传输
+
+    protected ThreadLocal<String> checkRs = new ThreadLocal<>();
+    @Resource
+    private SerialNumberUtil serialNumberUtil;
+    @Resource
+    private PropertiesManager propertiesManager;
+    @Override
+    protected void assembler() throws BzException {
+    }
+    @Override
+    protected void getData() throws BzException {
+        String applyNo = String.valueOf(inputDto.get());
+        logger.info("申请单号为{},开始封装银行请求参数",applyNo);
+        DscSalesApplyMain mainInfo = DscSalesApplyMain.getByApplyNo(applyNo);
+        if(mainInfo == null){
+            logger.error("申请单号为{},申请编号错误，查询不到订单信息",applyNo);
+            throw new BzException("申请编号错误，查询不到订单信息");
+        }
+        logger.info("申请单号为{},获取银行交互主表",applyNo);
+        AssetMainInfo assetMainInfo = AssetMainInfo.getByApplyNo(applyNo);
+        if(assetMainInfo == null){
+            logger.error("申请单号为{},申请编号错误，查询不到订单信息",applyNo);
+            throw new BzException("申请编号错误，查询不到订单信息");
+        }
+        DscSalesApplyCust applyCust = DscSalesApplyCust.getOneByMainId(mainInfo.getId());
+        if(applyCust == null){
+            logger.error("申请单号为{},申请编号错误，客户信息不存在",applyNo);
+            throw new BzException("申请编号错误，客户信息不存在");
+        }
+        Map<String, DscSalesApplyFinancing> itemMap  = DscSalesApplyFinancing.get(mainInfo.getId());
+        IcbcApplyDTO<IcbcYxCheckRsDataDTO> data = new IcbcApplyDTO<>();
+        dataThreadLocal.set(data);
+        IcbcCommonDTO commonDataDTO = new IcbcCommonDTO();// 组装common域
+
+        //===============请求头信息 开始=====================
+        // 合作机构代码
+        commonDataDTO.setUnitcode(IcbcConstant.UNITCODE);
+        // 业务编号
+        commonDataDTO.setOrderno(assetMainInfo.getVenusApplyNo());
+        // 发送时间
+        commonDataDTO.setSendtime(DateUitls.dateToStr(new Date(), "yyyyMMdd HH:mm:ss"));
+        // 交易流水
+        commonDataDTO.setSendserno(serialNumberUtil.getTranNo4Idfactory(IcbcConstant.TRAN_BIZCODE, IcbcConstant.TRAN_SYSCODE));
+        // 业务发起渠道
+        commonDataDTO.setChannel(IcbcConstant.CHANNEL_PC);
+        // 请求方标识码
+        commonDataDTO.setSendcode(IcbcConstant.SENDCODE_YXCD);
+        // 数字签名域
+        commonDataDTO.setSigncode(IcbcConstant.SIGNCODE);
+        commonDataDTO.setTrxcode(IcbcConstant.TRXCODE_20101);
+
+        final IcbcYxCheckRsDataDTO dataDTO = new IcbcYxCheckRsDataDTO();
+        //===============申请人基本信息域 开始=====================
+        //业务订单号
+        dataDTO.setOrderno(assetMainInfo.getVenusApplyNo());
+        //姓名
+        dataDTO.setName(applyCust.getAkhxm());
+        //风控审批结果
+        dataDTO.setChkstatus(IcbcConstant.ICBC_CHECK_RESULT_ALLSTATUS_DE);
+        //说明
+        dataDTO.setReason("取消订单");
+        this.dataThreadLocal.get().setComm(commonDataDTO);
+        this.dataThreadLocal.get().setData(dataDTO);//组装申请的DTO
+        //检测必输项
+        check(dataDTO);
+    }
+    /**
+     * 校验工行请款必输项
+     */
+    public static void check(IcbcYxCheckRsDataDTO data){
+        if (!org.apache.shiro.util.StringUtils.hasText(data.getOrderno())){
+            logger.error("<<<<<审核业务订单号查询为空>>>>>");
+            throw new BzException("<<<<<审核业务订单号为空>>>>>");
+        }
+        if (!org.apache.shiro.util.StringUtils.hasText(data.getName())){
+            logger.error("<<<<<审核姓名查询为空>>>>>");
+            throw new BzException("<<<<<审核姓名为空>>>>>");
+        }
+        if (!org.apache.shiro.util.StringUtils.hasText(data.getChkstatus())){
+            logger.error("<<<<审核风控电核结果查询为空>>>>>");
+            throw new BzException("<<<<<审核风控电核结果为空>>>>>");
+        }
+        if (!org.apache.shiro.util.StringUtils.hasText(data.getReason())){
+            logger.error("<<<<审核结果说明查询为空>>>>>");
+            throw new BzException("<<<<<审核结果说明为空>>>>>");
+        }
+
+    }
+    @Override
+    protected InvokeResult<BaseMsgDTO> message() throws BzException {
+        final IcbcApplyDTO<IcbcYxCheckRsDataDTO> requestDto = this.dataThreadLocal.get();
+        //添加银行交易信息
+        String osbUrl = this.propertiesManager.getOsbIcbcUrl() + com.yixin.kepler.v1.common.constants.UrlConstant.OsbSystemUrl.icbcBankInterface;
+        AssetMainInfo assetMainInfo = AssetMainInfo.getByApplyNo(inputDto.get().toString());
+        if (assetMainInfo == null) {
+            logger.info("申请单号为{}，订单还未发起信审", inputDto.get().toString());
+            throw new BzException("订单还未发起信审");
+        }
+        //-------------存储上送银行报文
+        AssetBankTran assetBankTran = new AssetBankTran();
+        assetBankTran.setReqBody(JsonObjectUtils.objectToJson(requestDto));
+        assetBankTran.setApplyNo(assetMainInfo.getApplyNo());
+        assetBankTran.setBankOrderNo(assetMainInfo.getVenusApplyNo());
+        assetBankTran.setTranNo(requestDto.getComm().getSendserno()); //交易流水号
+        assetBankTran.setAssetId(assetMainInfo.getId());
+
+        assetMainInfo.setAssetPhase(BankPhaseEnum.ORDER_CANCEL.getPhase());
+        assetMainInfo.setAssetNo(requestDto.getComm().getSendserno()); //交易流水号
+        assetBankTran.setReqUrl(osbUrl);
+        assetBankTran.setSender(CommonConstant.SenderType.YIXIN);
+        assetBankTran.create();
+        assetMainInfo.update();
+        //发送银行请求并获取返回结果json
+        logger.info("[工行银行]开始请求订单撤销银行处理，申请编号:{}，osbUrl:{},请求参数为{}", assetMainInfo.getApplyNo(), osbUrl,assetBankTran.getReqBody());
+        String result = RestTemplateUtil.sendRequest(osbUrl, JacksonUtil.fromObjectToJson(requestDto), CommonConstant.BankName.ICBC_BANK);
+        logger.info("[工行银行]开始请求订单撤销银行处理，申请编号:{}，返回结果为{}", assetMainInfo.getApplyNo(), JSON.toJSONString(result));
+        if (StringUtils.isBlank(result)) {
+            assetBankTran.setApprovalCode(""); //错误码
+            assetBankTran.setApprovalDesc("银行未返回信息"); //错误描述
+            assetBankTran.update();
+            new InvokeResult<>(new BaseMsgDTO(CommonConstant.FAILURE, "工行撤销订单失败"));
+        }
+        //存储银行实时收妥报文
+        IcbcApplyDTO<IcbcAckDataDTO> response = null;
+        response = (IcbcApplyDTO<IcbcAckDataDTO>) JacksonUtils.getObjectFromJson(result, IcbcApplyDTO.class, IcbcAckDataDTO.class);
+        assetBankTran.setRepBody(result);
+        assetBankTran.setApprovalCode(response.getData().getProcflag()); //交易结果码值
+        assetBankTran.setApprovalDesc(response.getData().getErrmsg()); //交易结果码值
+        assetBankTran.setTranNo(response.getComm().getSendserno()); //交易流水号
+        assetBankTran.update();
+        if(response.getData().getProcflag().contains(IcbcConstant.APPROVAL_CODE_SUCCESS)){
+           return new InvokeResult<>(new BaseMsgDTO(CommonConstant.SUCCESS,response.getData().getErrmsg()));
+        }
+        return new InvokeResult<>(new BaseMsgDTO(CommonConstant.FAILURE,response.getData().getErrmsg()));
+    }
+    public void setCheckRs(String checkRs) {
+        this.checkRs.set(checkRs) ;
+    }
+
+}

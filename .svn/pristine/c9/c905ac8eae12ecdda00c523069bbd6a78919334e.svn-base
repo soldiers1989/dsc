@@ -1,0 +1,261 @@
+package com.yixin.web.service.impl;
+
+import com.yixin.common.utils.InvokeResult;
+import com.yixin.common.utils.Page;
+import com.yixin.kepler.common.enums.BankPhaseEnum;
+import com.yixin.kepler.core.listener.SettleOrderEvent;
+import com.yixin.kepler.enity.AssetBankTran;
+import com.yixin.web.common.ConditionConstant;
+import com.yixin.web.dto.AttachmentConditionDto;
+import com.yixin.web.dto.ConditionBaseDto;
+import com.yixin.web.service.BankTransLogService;
+import com.yixin.web.service.base.BaseService;
+import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationContext;
+import org.springframework.stereotype.Service;
+
+import java.util.*;
+import java.util.stream.Collectors;
+
+/**
+ * @author sukang
+ */
+
+@Service
+public class BankTransLogServiceImpl extends BaseService implements BankTransLogService{
+
+    private final Logger logger = LoggerFactory.getLogger(getClass());
+
+
+
+
+    private ApplicationContext ioc;
+
+    @Autowired
+    public BankTransLogServiceImpl(ApplicationContext applicationContext) {
+        this.ioc = applicationContext;
+    }
+
+    @Override
+    public Page<Map<String, Object>> getBankTransList(AttachmentConditionDto aConditionDto) {
+
+
+        ArrayList<Object> parameters = new ArrayList<>(4);
+
+        StringBuilder hql = new StringBuilder(
+                " SELECT new map(abt.applyNo as applyNo,"
+                        + " DATE_FORMAT(abt.createTime,'%Y-%m-%d %H:%i:%s') as createTime, "
+                        + " abt.phase AS phase, "
+                        + " abt.approvalCode as approvalCode,abt.approvalDesc as approvalDesc,"
+                        + " abt.reqBody as reqBody,abt.repBody as repBody)"
+                        + " FROM AssetBankTran as abt WHERE 1=1");
+        int index = 0;
+        if (StringUtils.isNotBlank(aConditionDto.getApplyNo())) {
+            hql.append(" and abt.applyNo = ?".concat(String.valueOf(++index)));
+            parameters.add(aConditionDto.getApplyNo());
+        }
+        if (StringUtils.isNotBlank(aConditionDto.getPhase())) {
+            hql.append(" and abt.phase = ?".concat(String.valueOf(++index)));
+            parameters.add(aConditionDto.getPhase());
+        }
+        hql.append(" ORDER BY abt.createTime DESC");
+        String sql = hql.toString();
+        logger.debug("查询银行交易记录sql为{}",sql);
+
+        @SuppressWarnings({ "unchecked" })
+        Page<Map<String, Object>> pagedList = queryChannel.createJpqlQuery(sql)
+                .setParameters(parameters)
+                .setPage(aConditionDto.getCurrentPage(),10)
+                .pagedList();
+        return pagedList;
+    }
+
+    @Override
+    public Page<Map<String, Object>> getSettleFailure(ConditionBaseDto conditionBaseDto) {
+        ArrayList<Object> parameters = new ArrayList<>(4);
+        StringBuilder hql = new StringBuilder(
+                " SELECT new map(abt.applyNo as applyNo,"
+                        + " DATE_FORMAT(abt.createTime,'%Y-%m-%d %H:%i:%s') as createTime,"
+                        + " CASE WHEN abt.approvalCode = 'true' THEN 'success' ELSE 'failure' END as status,"
+                        + " abt.approvalDesc as msgInfo)"
+                        + " FROM AssetBankTran AS abt WHERE abt.deleted = false "
+                        + " AND abt.phase = 'push_file' ");
+
+        int index = 0;
+        if (StringUtils.isNotEmpty(conditionBaseDto.getApplyNo())) {
+            hql.append(" AND abt.applyNo = ?".concat(String.valueOf(++index)));
+            parameters.add(conditionBaseDto.getApplyNo());
+        }
+        //状态1成功 2 失败
+        if (StringUtils.isNotEmpty(conditionBaseDto.getStatus())) {
+            if (ConditionConstant.SETTLE_PUSH_STATUS_SUCCESS.equals(conditionBaseDto.getStatus())) {
+                hql.append(" AND abt.approvalCode = 'true' ");
+            }else if (ConditionConstant.SETTLE_PUSH_STATUS_FAILURE.equals(conditionBaseDto.getStatus())) {
+                hql.append(" AND abt.approvalCode IS NULL OR abt.approvalCode = 'false' ");
+            }
+        }
+
+        if (conditionBaseDto.getStartDate() != null) {
+            hql.append(" AND abt.createTime >= ?".concat(String.valueOf(++index)));
+            parameters.add(conditionBaseDto.getStartDate());
+        }
+        if (conditionBaseDto.getEndDate() != null) {
+            hql.append(" AND abt.createTime <= ?".concat(String.valueOf(++index)));
+            parameters.add(conditionBaseDto.getEndDate());
+        }
+
+        hql.append(" ORDER BY abt.createTime DESC");
+        String sql = hql.toString();
+        logger.debug("获取结算推送记录的sql为{}",sql);
+
+        @SuppressWarnings("unchecked")
+        Page<Map<String,Object>> pagedList = queryChannel.createJpqlQuery(sql)
+                .setParameters(parameters)
+                .setPage(conditionBaseDto.getCurrentPage(),10)
+                .pagedList();
+        return pagedList;
+    }
+
+    @Override
+    public Page<Map<String, Object>> getSettleFailureV1(ConditionBaseDto conditionBaseDto){
+        StringBuilder sqlder = new StringBuilder( "SELECT "
+                +"	a.apply_no applyNo, "
+                +"	DATE_FORMAT(a.create_time,'%Y-%m-%d %H:%i:%s') createTime, "
+                +"	CASE "
+                +"WHEN a.approval_code = 'true' THEN "
+                +"	'成功' "
+                +"ELSE "
+                +"	'失败' "
+                +"END status, "
+                +" a.approval_desc msgInfo, "
+                +" CASE "
+                +"WHEN b.id IS NULL THEN "
+                +"	'0' "
+                +"ELSE "
+                +"	'1' "
+                +"END retry "
+                +"FROM "
+                +"	k_asset_bank_tran a "
+                +"LEFT JOIN ( "
+                +"	SELECT "
+                +"		b.id "
+                +"	FROM "
+                +"		k_asset_bank_tran b "
+                +"	WHERE "
+                +"		b.is_deleted = '0' "
+                +"	AND b.phase = 'push_file' "
+                +"	AND NOt EXISTS ( "
+                +"		SELECT "
+                +"			1 "
+                +"		FROM "
+                +"			k_asset_bank_tran c "
+                +"		WHERE "
+                +"			c.is_deleted = '0' "
+                +"		AND c.phase = 'push_file' "
+                +"		AND c.approval_code = 'true' "
+                +"	) "
+                +") b ON a.id = b.id "
+                +"WHERE "
+                +"	a.is_deleted = '0' "
+                +"AND a.phase = 'push_file' ");
+        int index = 0;
+        ArrayList<Object> parameters = new ArrayList<>(4);
+        if (StringUtils.isNotEmpty(conditionBaseDto.getApplyNo())) {
+            sqlder.append(" AND a.apply_no = ?".concat(String.valueOf(++index)));
+            parameters.add(conditionBaseDto.getApplyNo().trim());
+        }
+        //状态1成功 2 失败
+        if (StringUtils.isNotEmpty(conditionBaseDto.getStatus())) {
+            if (ConditionConstant.SETTLE_PUSH_STATUS_SUCCESS.equals(conditionBaseDto.getStatus())) {
+                sqlder.append(" AND a.approval_code = 'true' ");
+            }else if (ConditionConstant.SETTLE_PUSH_STATUS_FAILURE.equals(conditionBaseDto.getStatus())) {
+                sqlder.append(" AND (a.approval_code IS NULL OR a.approval_code = 'false') ");
+            }
+        }
+
+        if (conditionBaseDto.getStartDate() != null) {
+            sqlder.append(" AND a.create_time >= ?".concat(String.valueOf(++index)));
+            parameters.add(conditionBaseDto.getStartDate());
+        }
+        if (conditionBaseDto.getEndDate() != null) {
+            sqlder.append(" AND a.create_time <= ?".concat(String.valueOf(++index)));
+            parameters.add(conditionBaseDto.getEndDate());
+        }
+
+        sqlder.append(" ORDER BY a.create_time DESC");
+
+        logger.info("获取结算推送记录的sql为{}",sqlder.toString());
+        Page<Object[]> page = queryChannel.createSqlQuery(sqlder.toString())
+                                            .setParameters(parameters)
+                                            .setPage(conditionBaseDto.getCurrentPage(),10)
+                                            .pagedList();
+        List<Object[]> data = page.getData();
+        Page<Map<String, Object>> mapPage = new Page<Map<String, Object>>();
+        List<Map<String, Object>> data1 = mapPage.getData();
+        for (Object[] datum : data) {
+            HashMap<String, Object> map = new HashMap<>();
+            map.put("applyNo",datum[0]);
+            map.put("createTime",datum[1]);
+            map.put("status",datum[2]);
+            map.put("msgInfo","null".equals(datum[3])?null:datum[3]);
+            map.put("retry",datum[4]);
+            data1.add(map);
+        }
+        data1.sort(new Comparator<Map<String, Object>>() {
+            @Override
+            public int compare(Map<String, Object> o1, Map<String, Object> o2) {
+                int e = ((String) o1.get("applyNo")).compareTo((String) o2.get("applyNo"));
+                return e==0?((String)o2.get("createTime")).compareTo((String)o1.get("createTime")):e;
+            }
+        });
+        String canone = "retry";
+        for (Map<String, Object> map : data1) {
+            if(!canone.equals(map.get("applyNo")) && "失败".equals((String)map.get("status")) && "0".equals((String)map.get("retry"))){
+                map.put("retry",true);
+                canone=(String)map.get("applyNo");
+            }else{
+                map.put("retry",false);
+            }
+
+        }
+        data1.sort(new Comparator<Map<String, Object>>() {
+            @Override
+            public int compare(Map<String, Object> o1, Map<String, Object> o2) {
+                int e = ((String) o2.get("createTime")).compareTo((String) o1.get("createTime"));
+                return e;
+            }
+        });
+        return mapPage;
+    }
+
+    @Override
+    public InvokeResult<Boolean> pushSettle(String applyNo) {
+        InvokeResult<Boolean> result = new InvokeResult<>();
+
+        List<AssetBankTran> assetBankTrans = AssetBankTran.getByApplyNo(applyNo,
+                BankPhaseEnum.PAYMENT.getPhase());
+
+        if (CollectionUtils.isEmpty(assetBankTrans)) {
+            return result.failure("订单还未请款");
+        }
+        List<AssetBankTran> pushFiles = AssetBankTran.getByApplyNo(applyNo,
+                BankPhaseEnum.PUSHFILE.getPhase());
+
+        if (CollectionUtils.isNotEmpty(pushFiles)) {
+            List<AssetBankTran> collect = pushFiles
+                    .stream()
+                    .filter(t -> "true".equals(t.getApprovalCode()))
+                    .collect(Collectors.toList());
+            if (CollectionUtils.isNotEmpty(collect)) {
+                return result.failure("该订单已推送成功");
+            }
+        }
+        //调用监听推送数据
+        ioc.publishEvent(new SettleOrderEvent(applyNo));
+        return result.success();
+    }
+}

@@ -1,0 +1,68 @@
+package com.yixin.kepler.v1.datapackage.dto.yntrust;
+
+
+
+import java.util.List;
+
+/**
+ * 文件上传
+ * @author sukang
+ */
+public class YTFileUploadRequestDTO extends YTCommonRequestDTO{
+
+
+    private String IDCardNo;
+
+    private String LicenseNo;
+
+    private String UniqueId;
+
+    private List<YTImageContentDTO> ImageContent;
+
+    private String Remark;
+
+
+
+    public String getIDCardNo() {
+        return IDCardNo;
+    }
+
+    public void setIDCardNo(String IDCardNo) {
+        this.IDCardNo = IDCardNo;
+    }
+
+    public String getLicenseNo() {
+        return LicenseNo;
+    }
+
+    public void setLicenseNo(String licenseNo) {
+        LicenseNo = licenseNo;
+    }
+
+    public String getUniqueId() {
+        return UniqueId;
+    }
+
+    public void setUniqueId(String uniqueId) {
+        UniqueId = uniqueId;
+    }
+
+    
+
+    public List<YTImageContentDTO> getImageContent() {
+		return ImageContent;
+	}
+
+	public void setImageContent(List<YTImageContentDTO> imageContent) {
+		ImageContent = imageContent;
+	}
+
+	public String getRemark() {
+        return Remark;
+    }
+
+    public void setRemark(String remark) {
+        Remark = remark;
+    }
+
+}

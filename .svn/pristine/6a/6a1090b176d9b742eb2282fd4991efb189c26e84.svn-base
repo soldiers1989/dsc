@@ -1,0 +1,203 @@
+package com.yixin.kepler.core.domain;
+
+import javax.annotation.Resource;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.scheduling.annotation.Async;
+import org.springframework.stereotype.Component;
+
+import com.alibaba.fastjson.JSON;
+import com.yixin.common.exception.BzException;
+import com.yixin.common.utils.InvokeResult;
+import com.yixin.dsc.dto.DscSupplyDto;
+import com.yixin.dsc.enumpackage.RequestPreposeEnum;
+import com.yixin.kepler.common.enums.BankPhaseEnum;
+import com.yixin.kepler.core.attachment.AttachmentDomain;
+import com.yixin.kepler.core.base.IDealDomain;
+import com.yixin.kepler.core.constant.CommonConstant;
+import com.yixin.kepler.dto.BaseMsgDTO;
+import com.yixin.kepler.dto.OsbAttachmentDTO;
+import com.yixin.kepler.dto.PretrialDTO;
+import com.yixin.kepler.enity.AssetMainInfo;
+
+import net.sf.json.JSONObject;
+
+/**
+ * 异步任务处理类
+ *
+ * @author sukang
+ * @date 2018-06-09 17:17:25
+ */
+@Component
+public class AsyncTask {
+
+    private final Logger logger = LoggerFactory.getLogger(getClass());
+
+    @Resource
+    private BankReqDomainFactory bankReqDomainFactory;
+    
+    @Resource
+    private AttachmentUploadFactory attachmentUploadFactory;
+    
+    /**
+     * 申请银行方法 通过申请编号和申请阶段
+     *
+     * @param applyNo       申请编号
+     * @param bankPhaseEnum 申请阶段
+     * @return 
+     */
+
+    @SuppressWarnings("unchecked")
+	public InvokeResult<BaseMsgDTO> requestBank(String applyNo, BankPhaseEnum bankPhaseEnum) throws BzException {
+
+        logger.info("开始执行银行异步任务申请编号为{},申请阶段为{}",
+                applyNo, bankPhaseEnum.toString());
+
+        AssetMainInfo assetMainInfo = AssetMainInfo.getByApplyNo(applyNo);
+
+		IDealDomain<String, ?> dealDomain = bankReqDomainFactory.getDealDomain(
+                assetMainInfo.getFinancialCode(), bankPhaseEnum);
+
+        InvokeResult<?> doIt = dealDomain.doIt(applyNo);
+
+        logger.info("订单号{}执行银行异步任务获取的结果为{}", applyNo, JSONObject.fromObject(doIt));
+        return (InvokeResult<BaseMsgDTO>) doIt;
+    }
+    
+    
+    /**
+     * 申请银行方法 通过申请编号和申请阶段
+     *
+     * @param applyNo       申请编号
+     * @param bankPhaseEnum 申请阶段
+     * @return 
+     */
+
+    @SuppressWarnings("unchecked")
+	public InvokeResult<BaseMsgDTO> requestBank(String applyNo, String financialCode,BankPhaseEnum bankPhaseEnum) throws BzException {
+
+        logger.info("开始执行银行异步任务申请编号为{},资方code:{},申请阶段为{}",applyNo,financialCode, bankPhaseEnum.toString());
+
+		IDealDomain<String, ?> dealDomain = bankReqDomainFactory.getDealDomain(financialCode, bankPhaseEnum);
+		
+		if(dealDomain == null){
+			return new InvokeResult<BaseMsgDTO>(BaseMsgDTO.successData("默认处理成功")).success();
+		}
+        InvokeResult<?> doIt = dealDomain.doIt(applyNo);
+
+        logger.info("订单号{}执行银行异步任务获取的结果为{}", applyNo, JSONObject.fromObject(doIt));
+        return (InvokeResult<BaseMsgDTO>) doIt;
+    }
+
+
+    public InvokeResult<BaseMsgDTO> preTrialReq(PretrialDTO pretrialDTO) throws BzException {
+
+        logger.info("发起银行预审任务， ApplyNo_{}", pretrialDTO.getApplyNo());
+
+        IDealDomain dealDomain = bankReqDomainFactory.
+                getDealDomain("CMBC", BankPhaseEnum.PRE_TRIAL);
+
+        return dealDomain.doIt(pretrialDTO);
+    }
+    
+    
+    /**
+     * 异步文件上传
+     * @param osbAttachmentDTO
+     */
+    @Async
+    public void uploadAttachment(OsbAttachmentDTO osbAttachmentDTO){
+    	
+    	AttachmentDomain attachmentDomain = attachmentUploadFactory.getAttachmentDomain(osbAttachmentDTO);
+    	logger.info("订单号{},申请文件上传任务,处理类为{}",osbAttachmentDTO.getBzId(),
+    			attachmentDomain.getClass().getName());
+    	attachmentDomain.doIt(osbAttachmentDTO);
+    }
+    
+    /**
+     * 文件规则校验
+     * @param osbAttachmentDTO
+     * @return
+     */
+    public InvokeResult<DscSupplyDto> checkAttachmentFile(OsbAttachmentDTO osbAttachmentDTO){
+    	AttachmentDomain attachmentDomain = attachmentUploadFactory.getAttachmentDomain(osbAttachmentDTO);
+    	logger.info("订单号{},文件校验,处理类为{}",osbAttachmentDTO.getBzId(),
+    			attachmentDomain.getClass().getName());
+    	return attachmentDomain.checkAttachmentFile(osbAttachmentDTO);
+    }
+
+
+    /**
+     * 银行请求前置
+     * @param applyNo		申请编号
+     * @param financialCode 资方编码
+     * @param bankPhaseEnum 申请阶段
+     * @return
+     * @throws BzException 
+     * @author YixinCapital -- wangwenlong
+     *	       2018年7月16日 下午7:20:29
+     */
+    @SuppressWarnings("unchecked")
+	public BaseMsgDTO requestPrepose(String applyNo, String financialCode,RequestPreposeEnum preposeEnum) throws BzException {
+
+        logger.info("银行请求前置 申请编号为{},资方code:{},申请阶段为{}",applyNo,financialCode, preposeEnum.toString());
+
+		IDealDomain<String, ?> dealDomain = bankReqDomainFactory.getRequestPreposeDomain(financialCode, preposeEnum);
+
+		if(dealDomain == null){
+			logger.info("银行请求前置 申请编号为{},资方code:{},申请阶段为{},没有对应实现，正常流转",applyNo,financialCode, preposeEnum.toString());
+			return new BaseMsgDTO(CommonConstant.PreposeResultCode.NORMAL, "正常流转");
+		}
+        BaseMsgDTO preposeMsg = dealDomain.requestPrepose(applyNo, financialCode);
+
+        logger.info("银行请求前置 申请编号为{},资方code:{},申请阶段为{},处理结果：{}",applyNo,financialCode, preposeEnum.toString(),JSON.toJSONString(preposeMsg));
+        return preposeMsg;
+    }
+    /**
+     * 银行请求初审
+     * @param applyNo		申请编号
+     * @param financialCode 资方编码
+     * @param bankPhaseEnum 申请阶段
+     * @return
+     * @throws BzException
+     * @author YixinCapital -- wangwenlong
+     *	       2018年7月16日 下午7:20:29
+     */
+    @SuppressWarnings("unchecked")
+    public BaseMsgDTO requestFrist(String applyNo, String financialCode,BankPhaseEnum bankPhaseEnum) throws BzException {
+
+        logger.info("银行请求前置 申请编号为{},资方code:{},申请阶段为{}",applyNo,financialCode, bankPhaseEnum.toString());
+
+        IDealDomain<String, ?> dealDomain = bankReqDomainFactory.getDealDomain(financialCode, bankPhaseEnum);
+
+        if(dealDomain == null){
+            logger.info("银行请求前置 申请编号为{},资方code:{},申请阶段为{},没有对应实现，跳转",applyNo,financialCode, bankPhaseEnum.toString());
+            return new BaseMsgDTO(CommonConstant.PreposeResultCode.SKIP, "跳转");
+        }
+        BaseMsgDTO preposeMsg = dealDomain.requestPrepose(applyNo, financialCode);
+
+        logger.info("银行请求前置 申请编号为{},资方code:{},申请阶段为{},处理结果：{}",applyNo,financialCode, bankPhaseEnum.toString(),JSON.toJSONString(preposeMsg));
+        return preposeMsg;
+    }
+    /**
+     * 申请银行方法 通过申请编号和申请阶段
+     *
+     * @param applyNo       申请编号
+     * @param bankPhaseEnum 申请阶段
+     * @return
+     */
+
+    @SuppressWarnings("unchecked")
+    public InvokeResult<BaseMsgDTO> commonRequestBank(String applyNo, String financialCode,BankPhaseEnum bankPhaseEnum) throws BzException {
+
+        logger.info("开始执行银行异步任务申请编号为{},资方code:{},申请阶段为{}",applyNo,financialCode, bankPhaseEnum.toString());
+
+        IDealDomain<String, ?> dealDomain = bankReqDomainFactory.getDealDomain(financialCode, bankPhaseEnum);
+
+        InvokeResult<?> doIt = dealDomain.doIt(applyNo);
+
+        logger.info("订单号{}执行银行异步任务获取的结果为{}", applyNo, JSONObject.fromObject(doIt));
+        return (InvokeResult<BaseMsgDTO>) doIt;
+    }
+}

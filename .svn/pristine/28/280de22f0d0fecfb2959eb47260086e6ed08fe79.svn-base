@@ -1,0 +1,131 @@
+package com.yixin.kepler.core.domain;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+import org.springframework.util.Assert;
+
+import com.yixin.dsc.entity.order.DscSalesApplyFinancing;
+import com.yixin.kepler.common.RedisClientUtil;
+import com.yixin.kepler.component.RedisCacheUtil;
+import com.yixin.kepler.core.constant.CommonConstant;
+import com.yixin.kepler.enity.SysDict;
+
+
+@Component
+public class SysDIcMapped {
+	
+	private Logger logger = LoggerFactory.getLogger(getClass());
+	
+	
+	private ThreadLocal<Map<String, String>> financingThreadLocal = new ThreadLocal<>();
+	
+	@Autowired
+	private RedisClientUtil redisClientUtil;
+	
+	@Autowired
+	private RedisCacheUtil redisCacheUtil;
+	
+	public String getCmbcMappingValue(String code,String value){
+		 return getMappingValue(code, value, CommonConstant.BankName.CMBC);
+	}
+	 
+	 
+	 
+	public String getMappingValue(String code,String value,String financialCode){
+		Exception exception = null;
+		String fieldValue = null;
+		try {
+			String hashKey = RedisCacheUtil.SysDictKey.concat(financialCode);
+			
+			if (!redisClientUtil.isExits(hashKey)) {
+				logger.info("{}在缓存中不存在",hashKey);
+				redisCacheUtil.initSysDictData();
+			}
+			
+			fieldValue = redisClientUtil.getFieldValue(hashKey,
+					 code.concat("-").concat(value));
+		} catch (Exception e) {
+			logger.error("从redis未获取到字典映射数据异常",e);
+			exception = e;
+		}
+		
+		if (exception != null || fieldValue == null) {
+			return getMappingValueFromDb(code, value, financialCode);
+		}
+		return fieldValue;
+	 }
+	 
+	public void removeFinancing(){
+		financingThreadLocal.remove();
+	}
+	 
+	public String getDscApplyFinancing(String code,String mainId){
+		 
+		if (financingThreadLocal.get() == null) {
+			setFifinancingThreadLocal(mainId);
+		}
+		String amount = financingThreadLocal.get().get(code);
+		return amount == null ? "0" : amount;
+	}
+	 
+	 private void setFifinancingThreadLocal(String mainId) {
+		 List<DscSalesApplyFinancing> byMainId = DscSalesApplyFinancing.getByMainId(mainId);
+		 Map<String, String> data = new HashMap<>(byMainId.size());
+		 byMainId.forEach(t -> {
+			 data.put(t.getArzxmid(), String.valueOf(t.getFkhrzje()));
+		 });
+		financingThreadLocal.set(data);
+	 }
+	 
+	 /**
+		 * @author YixinCapital -- wangwenlong
+		 * 2018年7月11日 上午9:30:26
+		 */
+		private String getMappingValueFromDb(String code,String value,String financialCode){
+			logger.info("从redis未获取到字典映射数据code:{},value:{},bankCode:{}",code,value,financialCode);
+			SysDict sysDic = SysDict.getFinancialSysDic(code,value, financialCode);
+			Assert.notNull(sysDic,"银行"+financialCode+"未找到"+code+"的对应的映射值" + value);
+			return sysDic.getBankCode();
+		}
+
+
+
+	/**
+	 * 获取城市名称
+	 * @param cityCode
+	 * @return 
+	 * @author YixinCapital -- wangwenlong
+	 *	       2018年10月17日 下午4:30:17
+	 */
+	 public String getCityName(String cityCode){
+		 return SysDict.getCityPro(cityCode, "2");
+	 }
+	 
+	/**
+	 * 获取省份名称
+	 * @param cityCode
+	 * @return 
+	 * @author YixinCapital -- wangwenlong
+	 *	       2018年10月17日 下午4:30:17
+	 */
+	 public String getProName(String proCode){
+		 return SysDict.getCityPro(proCode, "1");
+	 }
+	 
+	 /**
+	 * 获取城市标准码值
+	 * @param cityCode
+	 * @return 
+	 * @author YixinCapital -- wangwenlong
+	 *	       2018年10月17日 下午4:30:54
+	 */
+	public String getCityStandardCode(String cityCode){
+		 return SysDict.getStandardCode(cityCode, "2");
+	 }
+}

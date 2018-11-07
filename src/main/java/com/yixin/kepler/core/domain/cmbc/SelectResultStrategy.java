@@ -1,0 +1,241 @@
+package com.yixin.kepler.core.domain.cmbc;
+
+
+import java.util.Date;
+
+import com.yixin.web.common.enums.OrderOperate;
+import com.yixin.web.service.monitor.OrderOperateService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+
+import com.yixin.common.exception.BzException;
+import com.yixin.common.utils.DateUitls;
+import com.yixin.common.utils.InvokeResult;
+import com.yixin.dsc.util.DateUtil;
+import com.yixin.kepler.common.RestTemplateUtil;
+import com.yixin.kepler.common.enums.BankPhaseEnum;
+import com.yixin.kepler.common.enums.CMBCTransCodeEnum;
+import com.yixin.kepler.core.base.AbstractBaseDealDomain;
+import com.yixin.kepler.core.config.CMBCConfig;
+import com.yixin.kepler.core.constant.CommonConstant;
+import com.yixin.kepler.core.domain.cmbc.util.CMBCUtil;
+import com.yixin.kepler.dto.BaseMsgDTO;
+import com.yixin.kepler.dto.cmbc.CMBCReceiveMsgDTO;
+import com.yixin.kepler.dto.cmbc.CMBCRequestDTO;
+import com.yixin.kepler.dto.cmbc.CMBCResultSelectDTO;
+import com.yixin.kepler.enity.AssetBankTran;
+import com.yixin.kepler.enity.AssetMainInfo;
+import com.yixin.kepler.enity.AssetOrderFlow;
+import com.yixin.kepler.enity.AssetResultTask;
+import com.yixin.kepler.enity.AssetResultTaskLog;
+
+import net.sf.json.JSONObject;
+
+import javax.annotation.Resource;
+
+/**
+ * 执行银行结果查询策略
+ * @author sukang
+ * @date 2018-06-12 14:40:11
+ */
+@Component
+public class SelectResultStrategy  extends AbstractBaseDealDomain<Object,BaseMsgDTO>{
+	
+	private  final Logger logger = LoggerFactory.getLogger(getClass());
+	
+	 /**
+     * cmbc相关配置类
+     */
+    @Autowired
+    private CMBCConfig cmbcConfig;
+
+    @Resource
+    private OrderOperateService orderOperateService;
+    
+
+	@Override
+	protected void getData() throws BzException {
+		
+	}
+
+	@Override
+	protected void assembler() throws BzException {
+		
+	}
+
+	@Override
+	protected InvokeResult<BaseMsgDTO> message() throws BzException {
+		//获取交易流水号，用于查询交易流水号的执行结果
+		AssetResultTask assetResultTask = (AssetResultTask)inputDto.get();
+		inputDto.remove();
+		
+		
+		//获取该订单的银行交易记录
+		AssetBankTran assetBankTranById = AssetBankTran.get(AssetBankTran.class,
+				assetResultTask.getTranId());
+		
+		//记录银行交易日志
+		AssetBankTran assetBankTran = new AssetBankTran();
+		CMBCRequestDTO cmbcRequestDTO = null;
+		if (BankPhaseEnum.LAST_TRIAL.getPhase().equals(assetBankTranById.getPhase())) {
+			cmbcRequestDTO = createCmbcReqData(
+					assetResultTask.getTranNo(),CMBCTransCodeEnum.LAST_TRIAL_RESULT);
+			assetBankTran.setPhase(BankPhaseEnum.LAST_TRIAL.getPhase()+"_select");
+		}else if (BankPhaseEnum.PAYMENT.getPhase().equals(assetBankTranById.getPhase())) {
+			cmbcRequestDTO = createCmbcReqData(
+					assetResultTask.getAssetNo(),CMBCTransCodeEnum.PAYMENT_RESULT);
+			assetBankTran.setPhase(BankPhaseEnum.PAYMENT.getPhase()+"_select");
+		}else {
+			return new InvokeResult<>(new BaseMsgDTO(CommonConstant.FAILURE,"未找到阶段类型"));
+		}
+		
+		String reqData = JSONObject.fromObject(cmbcRequestDTO).toString();
+		assetBankTran.setReqBody(reqData);
+		//资产编号对应银行交易流水
+		assetBankTran.setAssetNo(assetResultTask.getAssetNo());
+		assetBankTran.setApplyNo(assetResultTask.getApplyNo());
+		assetBankTran.setReqUrl(cmbcConfig.getOsbReqUrl());
+		assetBankTran.setTranNo("");
+		assetBankTran.setSender(1);
+		assetBankTran.create();
+		
+		logger.info("\n开始执行银行结果查询接口请求参数为{}",reqData);
+		//发送银行请求开始
+		String result = RestTemplateUtil.sendRequestV2(cmbcConfig.getOsbReqUrl(),
+				cmbcRequestDTO);
+		
+		logger.info("\n银行结果查询返回参数为{}",result);
+		assetBankTran.setRepBody(result);
+		
+		
+		JSONObject resultBody = null;
+		if (result != null && (resultBody = JSONObject.fromObject(result))
+				.containsKey("body")) {
+			JSONObject body = JSONObject.fromObject(resultBody.getString("body"));
+			JSONObject returnMsg = body.getJSONObject("returnMg");
+			
+		    assetBankTran.setApprovalCode(returnMsg.getString("rtnCode"));
+		    assetBankTran.setApprovalDesc(returnMsg.getString("rtnSts"));
+		    assetBankTran.update();
+			//记录task执行日志
+			AssetResultTaskLog resultTaskLog = new AssetResultTaskLog();
+			resultTaskLog.setApplyNo(assetResultTask.getApplyNo());
+			resultTaskLog.setAssetNo(assetResultTask.getAssetNo());
+			resultTaskLog.setCreateTime(new Date());
+			resultTaskLog.setReqBody(reqData);
+			resultTaskLog.setRepBody(result);
+			resultTaskLog.setReqUrl(cmbcConfig.getOsbReqUrl());
+			resultTaskLog.setTranId(assetBankTran.getId());
+			resultTaskLog.setTranNo(assetBankTran.getTranNo());
+			resultTaskLog.setEnd(true);
+			resultTaskLog.create();
+			
+			AssetMainInfo assetMainInfo = AssetMainInfo.getByApplyNo(assetResultTask.getApplyNo());
+			
+			//终审的返回值处理
+			if (BankPhaseEnum.LAST_TRIAL.getPhase().equals(
+					assetBankTranById.getPhase())) {
+				//返回值status包含0失败，1成功，3进行中，2表示接口问题非业务报错
+				int status = 2;
+				if (body.containsKey("applySts")) {
+					status = CMBCUtil.getStatus(body.getString("applySts"));
+				}
+				
+				if ("S".equals(returnMsg.getString("rtnSts"))
+						&& status == 1) {
+					assetMainInfo.setLastState(1);
+					assetMainInfo.setCmbcLoanNo(body.getString("loanNo"));
+					assetMainInfo.update();
+					orderOperateService.recordOrderOperate(assetResultTask.getApplyNo(), OrderOperate.REC_BANK_AUDIT_RESULT, null);
+					return new InvokeResult<>(new BaseMsgDTO(CommonConstant.SUCCESS,"success"));
+				}
+				
+				if (status == 3) {
+					return new InvokeResult<>(new BaseMsgDTO(CommonConstant.PROCESSING, "processing"));
+				}
+				
+				if ("E".equals(returnMsg.getString("rtnSts")) 
+						&& status != 2) {
+					assetMainInfo.setLastState(2);
+					assetMainInfo.update();
+					String errorMsg = body.containsKey("applySts")
+							? CMBCUtil.getStatusMsg(body.getString("applySts"))
+									: returnMsg.getString("rtnMsg");
+					orderOperateService.recordOrderOperate(assetResultTask.getApplyNo(), OrderOperate.REC_BANK_AUDIT_RESULT, null);
+
+					return new InvokeResult<>(new BaseMsgDTO(CommonConstant.FAILURE,errorMsg));
+				}
+				//请款的返回值处理
+			}else {
+				String loanResult = body.getString("loanResult");
+				if ("S".equals(returnMsg.getString("rtnSts"))
+						&& "01".equals(loanResult)) {
+					try {
+						String intStartDate = body.getString("intStartDate");
+						String loanNo = body.getString("loanNo");
+						logger.info("【民生银行】查询放款状态，记录放款时间，订单编号：{},放款时间：{},借据列表：{}",assetMainInfo.getApplyNo(),intStartDate,loanNo);
+						AssetOrderFlow.recordLoanInfo(assetMainInfo.getApplyNo(), loanNo, DateUtil.StringToDate(intStartDate, DateUtil.DEFAULT_DATE_SMALL));
+					} catch (Exception e) {
+						logger.error("【民生银行】查询放款状态，记录放款时间异常，订单编号：{}",e);
+					}
+		    		
+					assetMainInfo.setPaymentState(1);
+					assetMainInfo.update();
+					return new InvokeResult<>(new BaseMsgDTO(CommonConstant.SUCCESS,"success"));
+				}else if ("R".equals(returnMsg.getString("rtnSts"))) {
+					assetMainInfo.setPaymentState(3);
+					assetMainInfo.update();
+					return new InvokeResult<>(new BaseMsgDTO(CommonConstant.PROCESSING, "processing"));
+				}else {
+					assetMainInfo.setPaymentState(2);
+					assetMainInfo.update();
+					return new InvokeResult<>(new BaseMsgDTO(CommonConstant.FAILURE,"请款失败"));
+				}
+			}
+		}
+		return new InvokeResult<>(new BaseMsgDTO(CommonConstant.PROCESSING, "processing"));
+	}
+	
+	
+	
+	/**
+	 * 组装CMBCRequestDTO
+	 * @param tranNo
+	 * @param transCodeEnum
+	 * @return
+	 */
+	
+	private CMBCRequestDTO createCmbcReqData(String tranNo,
+			CMBCTransCodeEnum transCodeEnum) {
+		
+		CMBCResultSelectDTO cmbcSelectDTO = createCmbcSelectDTO(tranNo);
+		CMBCRequestDTO cmbcInstance = CMBCRequestDTO.getCMBCInstance(transCodeEnum);
+		cmbcInstance.setMerchantNum(cmbcConfig.getMerchantNum());
+        cmbcInstance.setSystemCode(cmbcConfig.getSystemCode());
+        cmbcInstance.setTransType("000010");
+        cmbcInstance.setReqSeq(CMBCUtil.createReqSeq());
+		cmbcInstance.setBody(JSONObject.fromObject(cmbcSelectDTO).toString());
+		return cmbcInstance;
+	}
+
+	/**
+	 * 组装CMBCResultSelectDTO
+	 * @param transNo
+	 * @return
+	 */
+	private CMBCResultSelectDTO createCmbcSelectDTO(String transNo) {
+		CMBCResultSelectDTO cmbcResultSelectDTO = new CMBCResultSelectDTO();
+		cmbcResultSelectDTO.setChannelJnlNo(transNo);
+		CMBCReceiveMsgDTO cmbcReceiveMsgDTO = new CMBCReceiveMsgDTO();
+		cmbcReceiveMsgDTO.setTxDt(DateUitls.dateToStr(new Date(),"yyyyMMdd"));
+		cmbcReceiveMsgDTO.setTxTm(DateUtil.dateToString(new Date(), "HHmmss"));
+	    cmbcReceiveMsgDTO.setChnlTxNo(CMBCUtil.getTradeNo()); 
+	    
+	    cmbcResultSelectDTO.setReceiveMg(
+	    		JSONObject.fromObject(cmbcReceiveMsgDTO).toString());
+		return cmbcResultSelectDTO;
+	}
+
+}

@@ -1,0 +1,63 @@
+package com.yixin.kepler.v1.service.capital.yntrust;
+
+import com.yixin.common.exception.BzException;
+import com.yixin.common.utils.InvokeResult;
+import com.yixin.dsc.common.DscContant;
+import com.yixin.dsc.entity.order.DscSalesApplyMain;
+import com.yixin.kepler.common.enums.AssetPhaseEnum;
+import com.yixin.kepler.common.enums.AssetStateEnum;
+import com.yixin.kepler.core.base.AbstractBaseDealDomain;
+import com.yixin.kepler.core.constant.CommonConstant;
+import com.yixin.kepler.dto.BaseMsgDTO;
+import com.yixin.kepler.enity.AssetMainInfo;
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.stereotype.Service;
+
+/**
+ * @author YixinCapital -- chenjiacheng
+ *         2018年09月21日 15:40
+ **/
+@Service("YNTRUSTFirstTrialRequestPrepose")
+public class FirstTrialRequestPrepose extends AbstractBaseDealDomain<Object, BaseMsgDTO> {
+	@Override
+	protected void getData() throws BzException {
+
+	}
+
+	@Override
+	protected void assembler() throws BzException {
+
+	}
+
+	@Override
+	protected InvokeResult<BaseMsgDTO> message() throws BzException {
+		return null;
+	}
+
+	@Override
+	public BaseMsgDTO requestPrepose(String applyNo, String financeCode) {
+		//四要素验证判断
+		DscSalesApplyMain main = DscSalesApplyMain.getByApplyNo(applyNo);
+		if(main == null){
+			return new BaseMsgDTO(DscContant.KeplerCode.FAILD, "订单信息不存在，请确认是否已数据同步");
+		}
+		if (StringUtils.isBlank(main.getSignNo())) {
+			return new BaseMsgDTO(DscContant.KeplerCode.FAILD, "订单协议编号未同步");
+		}
+
+		AssetMainInfo mainInfo = AssetMainInfo.getByApplyNo(applyNo);
+		if (mainInfo != null) {
+			if (AssetPhaseEnum.TRIAL.getPhase().equals(mainInfo.getAssetPhase())
+					|| AssetStateEnum.DOING.getState().equals(mainInfo.getLastState())) {
+				return new BaseMsgDTO(DscContant.KeplerCode.FAILD, "正在信审中");
+			}
+			if(AssetStateEnum.SUCCESS.getState().equals(mainInfo.getLastState())){ 
+				return new BaseMsgDTO(DscContant.KeplerCode.FAILD, "信审已完成,不可重复提交信审");
+			}
+			if(AssetPhaseEnum.PAYMENT_TRIAL.getPhase().equals(mainInfo.getAssetPhase())){ //请款阶段
+				return new BaseMsgDTO(DscContant.KeplerCode.FAILD, "已完成信审,不可再次发起信审请求");
+			}
+		}
+		return new BaseMsgDTO(CommonConstant.PreposeResultCode.SKIP, "跳转至终审");
+	}
+}

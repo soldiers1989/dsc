@@ -1,0 +1,159 @@
+package com.yixin.web.service.monitor.impl;
+
+import com.yixin.dsc.util.StrUtil;
+import com.yixin.web.common.constant.NoticeConst;
+import com.yixin.web.dto.monitor.InterfaceMonitorInfoDto;
+import com.yixin.web.runnable.BzErrorNoticeRunnable;
+import com.yixin.web.service.message.EmailSendService;
+import com.yixin.web.service.monitor.NoticeRuleService;
+import com.yixin.web.service.monitor.NoticeService;
+import org.assertj.core.util.Lists;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+
+import javax.annotation.Resource;
+import java.util.List;
+import java.util.concurrent.Executor;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+
+/**
+ * @description:
+ * @date: 2018-10-08 17:16
+ */
+@Service("noticeService")
+public class NoticeServiceImpl implements NoticeService {
+    private Logger logger = LoggerFactory.getLogger(getClass());
+
+
+    @Resource
+    private EmailSendService emailSendService;
+
+    @Resource
+    private NoticeRuleService noticeRuleService;
+
+
+    @Value("${spring.notice.mail.to}")
+    private String mailTo;
+    @Value("${spring.subject_prefix}")
+    private String subjectPrefix;
+
+
+    private Executor executor = new ThreadPoolExecutor(10, 10, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<Runnable>());
+
+
+    public static boolean BZ_ERROR_NOTICE_SWITCH = true;
+
+    /**
+     * 业务异常预警通知
+     *
+     * @param interfaceName
+     * @param bzId
+     * @param message
+     * @param e
+     */
+    @Override
+    public void noticeBzError(String interfaceName, String bzId, String message, Throwable e) {
+
+        logger.info("bz error notice, interface name:{}, bz id:{}, message:{}", interfaceName, bzId, message);
+
+        if (!BZ_ERROR_NOTICE_SWITCH) {
+            logger.info("bz error notice switch off.");
+            return;
+        }
+
+        try {
+
+            executor.execute(new BzErrorNoticeRunnable(mailTo, interfaceName, bzId, message, e));
+
+        } catch (Exception ex) {
+            logger.error("bz error notice error", ex);
+        }
+    }
+
+
+    /**
+     * 接口异常预警通知
+     *
+     * @param monitorInfo
+     */
+    @Override
+    public void noticeInterfaceError(InterfaceMonitorInfoDto monitorInfo) {
+        String className = monitorInfo.getClassName();
+        String methodName = monitorInfo.getMethodName();
+        String interfaceName = buildInterfaceName(className, methodName);
+        String errorMessage = monitorInfo.getMessage();
+
+        Boolean needNotice = noticeRuleService.judgeNeedNotice(interfaceName + "_interface_error", errorMessage);
+        logger.info("interface error notice,judge need notice, interface name:{}, result:{}", interfaceName, needNotice);
+        if (needNotice != null && !needNotice) {
+            logger.warn("interface error notice, need not notice, interface name :{}", interfaceName);
+            return;
+        }
+
+        List<String> emailValues = Lists.newArrayList();
+        emailValues.add(monitorInfo.getServerHost());
+        emailValues.add(interfaceName);
+        emailValues.add(monitorInfo.getKeyParametersStr());
+        emailValues.add(monitorInfo.getStartTime());
+        emailValues.add(monitorInfo.getEndTime());
+        emailValues.add(StrUtil.fixNull(monitorInfo.getTimeConsumed()));
+        emailValues.add(monitorInfo.getMessage());
+        emailValues.add(StrUtil.fixNull(monitorInfo.geteStackTrace()));
+
+
+        emailSendService.sendEmail(mailTo, NoticeConst.INTERFACE_ERROR_SUBJECT, NoticeConst.INTERFACE_ERROR_TEMPLATE, emailValues.toArray());
+    }
+
+    /**
+     * 接口耗时超长预警通知
+     *
+     * @param monitorInfo
+     */
+    @Override
+    public void noticeTimeConsumed(InterfaceMonitorInfoDto monitorInfo) {
+        String className = monitorInfo.getClassName();
+        String methodName = monitorInfo.getMethodName();
+        String interfaceName = buildInterfaceName(className, methodName);
+
+        Boolean needNotice = noticeRuleService.judgeNeedNotice(interfaceName + "_time_consume", null);
+        logger.info("interface error notice,judge need notice, interface name:{}, result:{}", interfaceName, needNotice);
+        if (needNotice != null && !needNotice) {
+            logger.warn("interface error notice, need not notice, interface name :{}", interfaceName);
+            return;
+        }
+
+        List<String> emailValues = Lists.newArrayList();
+        emailValues.add(monitorInfo.getServerHost());
+        emailValues.add(interfaceName);
+        emailValues.add(monitorInfo.getKeyParametersStr());
+        emailValues.add(monitorInfo.getStartTime());
+        emailValues.add(monitorInfo.getEndTime());
+        emailValues.add(StrUtil.fixNull(monitorInfo.getTimeConsumed()));
+
+
+        emailSendService.sendEmail(mailTo, NoticeConst.TIME_CONSUMED_SUBJECT, NoticeConst.TIME_CONSUMED_TEMPLATE, emailValues.toArray());
+    }
+
+    @Override
+    public void noticeOrderDurationStatistics(String content1, String content2, String content3) {
+
+        List<String> emailValues = Lists.newArrayList();
+
+        emailValues.add(content1);
+        emailValues.add(content2);
+        emailValues.add(content3);
+
+
+        emailSendService.sendEmail(mailTo, NoticeConst.ORDER_DURATION_SUBJTCT, NoticeConst.ORDER_DURATION_TEMPLATE, emailValues.toArray());
+    }
+
+
+    private String buildInterfaceName(String className, String methodName) {
+        return className + "/" + methodName;
+    }
+
+}

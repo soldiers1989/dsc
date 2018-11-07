@@ -1,0 +1,562 @@
+package com.yixin.kepler.core.domain.cmbc;
+
+
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.Date;
+
+import javax.annotation.Resource;
+
+import com.yixin.kepler.common.enums.AssetPhaseEnum;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationContext;
+import org.springframework.stereotype.Service;
+
+import com.yixin.common.exception.BzException;
+import com.yixin.common.utils.DateUitls;
+import com.yixin.common.utils.InvokeResult;
+import com.yixin.dsc.entity.order.DscSalesApplyCar;
+import com.yixin.dsc.entity.order.DscSalesApplyCost;
+import com.yixin.dsc.entity.order.DscSalesApplyCust;
+import com.yixin.dsc.entity.order.DscSalesApplyMain;
+import com.yixin.dsc.util.DateUtil;
+import com.yixin.kepler.common.RestTemplateUtil;
+import com.yixin.kepler.common.enums.BankPhaseEnum;
+import com.yixin.kepler.common.enums.CMBCTransCodeEnum;
+import com.yixin.kepler.core.base.AbstractBaseDealDomain;
+import com.yixin.kepler.core.config.CMBCConfig;
+import com.yixin.kepler.core.constant.CommonConstant;
+import com.yixin.kepler.core.domain.SysDIcMapped;
+import com.yixin.kepler.core.domain.cmbc.util.CMBCUtil;
+import com.yixin.kepler.dto.BaseMsgDTO;
+import com.yixin.kepler.dto.cmbc.CMBCLastTrialBodyDTO;
+import com.yixin.kepler.dto.cmbc.CMBCLastTrialReserveDTO;
+import com.yixin.kepler.dto.cmbc.CMBCReceiveMsgDTO;
+import com.yixin.kepler.dto.cmbc.CMBCRequestDTO;
+import com.yixin.kepler.enity.AssetBankTran;
+import com.yixin.kepler.enity.AssetMainInfo;
+import com.yixin.kepler.enity.AssetResultTask;
+import com.yixin.kepler.enity.OsbFileLog;
+
+import net.sf.json.JSONObject;
+
+
+/**
+ * 请求银行终审策略类 --民生 贷款申请接口
+ *
+ * @author sukang
+ * @date 2018-06-09 15:52:53
+ */
+@Service("CMBCLastTrialRequestStrategy")
+public class LastTrialRequestStrategy extends AbstractBaseDealDomain<Object, BaseMsgDTO> {
+    public static final Logger logger = LoggerFactory.getLogger(LastTrialRequestStrategy.class);
+    /**
+     * cmbc相关配置类
+     */
+    @Autowired
+    private CMBCConfig cmbcConfig;
+    
+    @Resource 
+    private SysDIcMapped sysDIcMapped;
+    
+    @Autowired
+	private ApplicationContext ioc;
+
+    private ThreadLocal<AssetMainInfo> assetMainInfoThreadLocal = new ThreadLocal<>();
+
+    @Override
+    protected void getData() throws BzException {
+        String applyNo = String.valueOf(inputDto.get());
+
+        logger.info("申请单号为{},开始封装银行请求参数,获取的银行配置信息为{}",
+                applyNo, JSONObject.fromObject(cmbcConfig).toString());
+
+        DscSalesApplyMain salesApplyMain = DscSalesApplyMain.getByApplyNo(applyNo);
+        AssetMainInfo assetMainInfo = AssetMainInfo.getByApplyNo(applyNo);
+        
+        /**
+         * 组装银行请求参数
+         */
+        CMBCRequestDTO cmbcInstance = CMBCRequestDTO.getCMBCInstance(CMBCTransCodeEnum.LAST_TRIAL);
+        cmbcInstance.setMerchantNum(cmbcConfig.getMerchantNum());
+        cmbcInstance.setSystemCode(cmbcConfig.getSystemCode());
+        cmbcInstance.setTransType("000010");
+        cmbcInstance.setReqSeq(CMBCUtil.createReqSeq());
+        cmbcInstance.setBody(getLastTrialBody(salesApplyMain,assetMainInfo));
+
+        inputDto.set(cmbcInstance);
+        assetMainInfoThreadLocal.set(assetMainInfo);
+    }
+
+   
+
+	@Override
+    protected void assembler() throws BzException {
+        logger.info("开始处理本地与银行的对应信息");
+
+    }
+
+    @Override
+    protected InvokeResult<BaseMsgDTO> message() throws BzException {
+       
+        //获取参数
+        CMBCRequestDTO reqData = (CMBCRequestDTO) inputDto.get();
+        AssetMainInfo assetMainInfo = assetMainInfoThreadLocal.get();
+        assetMainInfoThreadLocal.remove();
+        inputDto.remove();
+        sysDIcMapped.removeFinancing();
+        
+        //民生银行验证金额参数
+        String chekMsg = null;
+        if ((chekMsg = checkTransAmt(reqData)) != null) {
+            return new InvokeResult<>(new BaseMsgDTO(
+            		CommonConstant.FAILURE,chekMsg));
+        }
+
+        //添加银行交易信息
+        AssetBankTran assetBankTran = new AssetBankTran();
+        assetBankTran.setReqBody(JSONObject.fromObject(reqData).toString());
+        assetBankTran.setApplyNo(assetMainInfo.getApplyNo());
+        assetBankTran.setAssetId(assetMainInfo.getId());
+
+        //资产编号对应银行交易流水
+        assetBankTran.setAssetNo(assetMainInfo.getAssetNo());
+        assetBankTran.setPhase(BankPhaseEnum.LAST_TRIAL.getPhase());
+        assetBankTran.setReqUrl(cmbcConfig.getOsbReqUrl());
+        assetBankTran.setTranNo(CMBCUtil.getTradeNo());
+        assetBankTran.setSender(1);
+        assetBankTran.create();
+
+        //发送银行请求并获取返回结果json
+        logger.info("\n开始请求银行终审处理,单号{},请求参数为{}",assetMainInfo.getApplyNo(),
+        		assetBankTran.getReqBody());
+        String result = RestTemplateUtil.sendRequestV2(cmbcConfig.getOsbReqUrl(), reqData);
+		logger.info("请求银行终审处理返回报文:{}",result);
+        JSONObject body = null;
+        assetBankTran.setRepBody(result);
+        if (result != null && (body = JSONObject.fromObject(result))
+        		.containsKey("body")) {
+        	
+        	  JSONObject returnMsg = JSONObject.fromObject(body.getString("body")).getJSONObject("returnMg");
+              assetBankTran.setApprovalCode(returnMsg.getString("rtnCode"));
+              assetBankTran.setApprovalDesc(returnMsg.getString("rtnSts"));
+              assetBankTran.update();
+			  assetMainInfo.setAssetPhase(AssetPhaseEnum.TRIAL.getPhase());
+              //如果银行信审申请成功,添加查询任务。
+              if ("S".equals(returnMsg.getString("rtnSts"))) {
+            	  assetMainInfo.setLastState(3);
+            	  assetMainInfo.update();
+
+                  //添加银行结果查询任务
+                  AssetResultTask assetResultTask = new AssetResultTask();
+                  assetResultTask.setBzId(BankPhaseEnum.LAST_TRIAL.getPhase());
+                  assetResultTask.setApplyNo(assetMainInfo.getApplyNo());
+                  assetResultTask.setAssetNo(assetMainInfo.getAssetNo());
+                  assetResultTask.setTranNo(assetMainInfo.getAssetNo());
+                  assetResultTask.setTranId(assetBankTran.getId());
+                  assetResultTask.setExecState(0);
+                  assetResultTask.setExecTimes(0);
+                  assetResultTask.setNextTime(new Date());
+                  assetResultTask.setIsEnd(0);
+                  assetResultTask.create();
+                  return new InvokeResult<>(new BaseMsgDTO(CommonConstant.SUCCESS,"SUCCESS"));
+              }else {
+            	  assetMainInfo.setLastState(2);
+            	  assetMainInfo.update();
+              }
+		}
+        return new InvokeResult<>(new BaseMsgDTO(CommonConstant.FAILURE,"终审失败"));
+    }
+    
+    
+    
+    private String checkTransAmt(CMBCRequestDTO reqData) {
+    	
+    	CMBCLastTrialBodyDTO body = (CMBCLastTrialBodyDTO) reqData.getBody();
+    	
+    	BigDecimal applyAmt = new BigDecimal(body.getApplyAmt());
+    	
+    	JSONObject reserve1 = JSONObject.fromObject(body.getReserve1());
+    	
+    	BigDecimal tranAm = new BigDecimal(reserve1.getString("tranAm"));
+    	BigDecimal fckrze = new BigDecimal(reserve1.getString("fckrze"));
+    	BigDecimal dpayAm = new BigDecimal(reserve1.getString("dpayAm"));
+    	
+    	BigDecimal fbxrze = new BigDecimal(reserve1.getString("fbxrze"));
+    	BigDecimal fgzsrze = new BigDecimal(reserve1.getString("fgzsrze"));
+    	BigDecimal decoAmt = new BigDecimal(reserve1.getString("decoAmt"));
+    	BigDecimal gpsbaseprice = new BigDecimal(reserve1.getString("gpsbaseprice"));
+    	BigDecimal gpsaddprice = new BigDecimal(reserve1.getString("gpsaddprice"));
+    	BigDecimal fee = new BigDecimal(reserve1.getString("fee"));
+    	
+    	
+    	
+    	if (dpayAm.add(fckrze).compareTo(tranAm) != 0) {
+			return String.format("首付款金额(%s)+车辆尾款(%s) 不等于 车辆成交价(%s)",
+					decoAmt.toString(),fckrze.toString(),tranAm.toString());
+		}
+    	
+    	if (applyAmt.compareTo(tranAm) > 0) {
+			return String.format("申请金额(%s)大于车辆成交价(%s)",
+					applyAmt.toString(),tranAm.toString());
+		}
+    	
+    	if (fckrze.add(fbxrze).add(fgzsrze).add(decoAmt)
+    			.add(gpsaddprice).add(gpsbaseprice).add(fee).compareTo(applyAmt) != 0) {
+			return String.format("车辆尾款(%s)+保险融资额(%s)+购置税融资额(%s)"
+					+ "+加装费(%s)+gps基础价(%s)+gps加价(%s)+服务费(%s) 不等于 申请金额(%s)"
+					,fckrze.toString(),fbxrze.toString(),fgzsrze.toString(),decoAmt.toString(),
+					gpsbaseprice.toString(),gpsaddprice.toString(),fee.toString(),applyAmt.toString());
+		}
+    	
+		return null;
+	}
+
+
+
+	private Object getLastTrialBody(DscSalesApplyMain salesApplyMain,
+    		AssetMainInfo assetMainInfo) {
+    	CMBCLastTrialBodyDTO bodyDTO = new CMBCLastTrialBodyDTO();
+    	
+    	DscSalesApplyCust dscSalesApplyCust = DscSalesApplyCust.getApplyCostByMianId(
+                salesApplyMain.getId());
+    	DscSalesApplyCost salesApplyCost = DscSalesApplyCost.getByMainId(salesApplyMain.getId());
+    	
+
+        //申请人信息
+        bodyDTO.setIntStartDt(DateUitls.dateToStr(new Date(),"yyyyMMdd"));
+        bodyDTO.setCooprProdType(salesApplyMain.getAcplx());
+        bodyDTO.setIdType(sysDIcMapped.getCmbcMappingValue("azjlx",
+        		dscSalesApplyCust.getAzjlx()));
+        
+        bodyDTO.setIdNo(dscSalesApplyCust.getAzjhm());
+        bodyDTO.setCustName(dscSalesApplyCust.getAkhxm());
+        bodyDTO.setSex(sysDIcMapped.getCmbcMappingValue("akhxb",
+        		dscSalesApplyCust.getAkhxb()));
+        
+        bodyDTO.setDtOfBirth(
+                DateUitls.dateToStr(dscSalesApplyCust.getDcsrq(), "yyyyMMdd"));
+        
+        bodyDTO.setMaritalStatus(sysDIcMapped.getCmbcMappingValue("ahyzk",
+        		dscSalesApplyCust.getAhyzk()));
+        
+        bodyDTO.setEducationalLevel(
+        		sysDIcMapped.getCmbcMappingValue("asqrxl",
+        		dscSalesApplyCust.getAsqrxl()));
+        bodyDTO.setYearIncome(String.valueOf(salesApplyCost.getAsqnsr() == null ? 
+                		"0":salesApplyCost.getAsqnsr()));
+        
+        bodyDTO.setFamilySts(sysDIcMapped.getCmbcMappingValue("ajzzk",
+        		dscSalesApplyCust.getAjzzk()));
+        
+        bodyDTO.setFamilyYear(dscSalesApplyCust.getIxjzdjznx());
+        bodyDTO.setHomeAddr(dscSalesApplyCust.getAxjzddz());
+        
+        bodyDTO.setEmprProp(sysDIcMapped.getCmbcMappingValue("adwqyxz",
+        		dscSalesApplyCust.getAdwqyxz()));
+        bodyDTO.setWorkCorpName(dscSalesApplyCust.getAdwmc());
+        
+        bodyDTO.setPost(sysDIcMapped.getCmbcMappingValue("asqrzw", 
+        		dscSalesApplyCust.getAsqrzw()));
+        
+        bodyDTO.setOccupation(sysDIcMapped.getCmbcMappingValue("asqrzy",
+        		dscSalesApplyCust.getAsqrzy()));
+        
+        bodyDTO.setCropAddress(dscSalesApplyCust.getAdwxxdz());
+        
+        bodyDTO.setPhoneNo(dscSalesApplyCust.getAsjhm());
+        bodyDTO.setTacNo(salesApplyMain.getAhkrjjkzh());
+        //bodyDTO.setHomePhoneNo(dscSalesApplyCust.getAxjzddh());
+        //bodyDTO.setWorkPhoneNo(dscSalesApplyCust.getAqylxdh());
+        bodyDTO.setApplyCurrency("RMB");
+        bodyDTO.setApplyAmt(String.valueOf(salesApplyCost.getFrze()));
+        bodyDTO.setApplyDate(
+        		DateUitls.dateToStr(new Date(), "yyyyMMdd"));
+        
+        bodyDTO.setPaymTyp(salesApplyMain.getAhkfs());
+        bodyDTO.setAtrsDueDay("01");
+        bodyDTO.setLoanPurpost("13");
+
+        bodyDTO.setIdValidStart(DateUitls.dateToStr(salesApplyCost.getAzjyxqq(), "yyyyMMdd"));
+        bodyDTO.setIdValidEnd(DateUitls.dateToStr(salesApplyCost.getAzjyxqz(),"yyyyMMdd"));
+        bodyDTO.setIssCtry("CN");
+        bodyDTO.setHasFile("Y");
+        bodyDTO.setApplNosInst(salesApplyMain.getArzqx());
+
+    	bodyDTO.setReceiveMg(getReceiveMg(assetMainInfo));
+    	
+    	bodyDTO.setReserve1(getReceive1(salesApplyMain,assetMainInfo));
+    	
+		return bodyDTO;
+	}
+    
+    
+ 
+
+
+	private CMBCReceiveMsgDTO getReceiveMg(AssetMainInfo assetMainInfo) {
+    	CMBCReceiveMsgDTO cmbcLastTrialDTO = new CMBCReceiveMsgDTO();
+        cmbcLastTrialDTO.setTxDt(DateUitls.dateToStr(new Date(),"yyyyMMdd"));
+        cmbcLastTrialDTO.setTxTm(DateUtil.dateToString(new Date(), "HHmmss"));
+        cmbcLastTrialDTO.setChnlTxNo(assetMainInfo.getAssetNo());
+        return cmbcLastTrialDTO;
+    }
+    
+    
+    /**
+     * 根据是否是二手车进行组装receive1参数
+     * @param salesApplyMain 
+     * @param assetMainInfo 
+     * @return
+     */
+	private String getReceive1(DscSalesApplyMain salesApplyMain,
+			AssetMainInfo assetMainInfo) {
+		
+		
+		DscSalesApplyCost salesApplyCost = DscSalesApplyCost.getByMainId(salesApplyMain.getId());
+		DscSalesApplyCar salesApplyCar = DscSalesApplyCar.getBymainId(salesApplyMain.getId());
+		
+		OsbFileLog osbFileLog = OsbFileLog.getOsbFilesByApplyNoAndRequestType(salesApplyMain.getApplyNo(),
+				BankPhaseEnum.LAST_TRIAL.getPhase());
+		
+		CMBCLastTrialReserveDTO reserveDTO = new CMBCLastTrialReserveDTO();
+		reserveDTO.setMktProdType("A202008-FIR");
+		reserveDTO.setApplyNo(assetMainInfo.getCmbcApplyNo());
+		reserveDTO.setFileName(osbFileLog.getCompressName().concat(".").concat(
+				osbFileLog.getCompressFormat()));
+		reserveDTO.setFileDate(DateUitls.dateToStr(osbFileLog.getCreateTime(),
+				"yyyyMMdd")); 
+		reserveDTO.setTranAm(String.valueOf(salesApplyCar.getFxsj()));
+		reserveDTO.setFpayRt(CMBCUtil.formatAmt("0", salesApplyCost.getFsfbl()));
+		reserveDTO.setDpayAm(String.valueOf(salesApplyCost.getFsfje()));
+		reserveDTO.setRepyFq("月");
+		reserveDTO.setUsesTp("1");
+		
+		boolean isNew = "1".equals(salesApplyCar.getAcllx());
+		
+		reserveDTO.setVehcTp(isNew?"N":"S");
+		reserveDTO.setIsLCV(salesApplyCar.getIsLCV());
+		reserveDTO.setCarGenre("N");
+		reserveDTO.setSeating(String.valueOf(salesApplyCar.getIzws()));
+		reserveDTO.setMainBd(salesApplyCar.getAzcs());
+		reserveDTO.setBrands(salesApplyCar.getAppName());
+		reserveDTO.setCarlne(salesApplyCar.getAcxiName());
+		reserveDTO.setCarAge(String.valueOf((int)(salesApplyCar.getIcl()/12)));
+		reserveDTO.setCarTp(salesApplyCar.getAcxName());
+		//二手车必填字段
+		if (!isNew) {
+			reserveDTO.setTripartiteEv(String.valueOf(
+					salesApplyCar.getAppraisalprice()));
+			reserveDTO.setMileAg(
+					String.valueOf(salesApplyCar.getFescgls()));
+			reserveDTO.setVefaNo(salesApplyCar.getAcjh());
+			//reserveDTO.setEngiNo(salesApplyCar.getAfdjh());
+		}else {
+			reserveDTO.setSealAm(
+					String.valueOf(salesApplyCar.getFzdj()));
+		}
+		
+		reserveDTO.setAsqbh(salesApplyMain.getApplyNo());
+		reserveDTO.setTransTime(DateUitls.dateToStr(new Date(), "HHmmss"));
+		reserveDTO.setAtbddm(salesApplyMain.getDealerChannelCode());
+		reserveDTO.setAsqdmmc(salesApplyMain.getDealerChannelName());
+		reserveDTO.setSpChannelName("");
+		reserveDTO.setSpChannelNo("");
+		
+		//融资信息
+		reserveDTO.setAcpmc(salesApplyMain.getProductNo());
+		
+		//车款融资额
+		reserveDTO.setFckrze(getFckrze(salesApplyMain,
+				new BigDecimal(reserveDTO.getDpayAm())));
+		
+		//服务费
+		reserveDTO.setFee(sysDIcMapped.getDscApplyFinancing("F013",
+				salesApplyMain.getId()));
+		//客户融资额
+		reserveDTO.setFizze(String.valueOf(salesApplyCost.getFrze()));
+		
+		//gps基础价
+		reserveDTO.setGpsbaseprice(getGpsBasePrice(salesApplyMain));
+		//gps加价
+		reserveDTO.setGpsaddprice(getGpsAddPrice(salesApplyMain));
+		
+		//保险融资额
+		reserveDTO.setFbxrze(getFbxrze(salesApplyMain.getId()));
+		
+		//购置税融资额
+		reserveDTO.setFgzsrze(sysDIcMapped.getDscApplyFinancing("F050",
+				salesApplyMain.getId()));
+		//精品加装
+		reserveDTO.setDecoAmt(getDecoAmt(salesApplyMain));
+		
+		
+		reserveDTO.setRentCompNo(salesApplyMain.getRentingCompanyCode());
+		reserveDTO.setDealerType(sysDIcMapped.getCmbcMappingValue("admsx", 
+				salesApplyMain.getAdmsx()));
+		
+		return com.alibaba.fastjson.JSONObject.toJSONString(reserveDTO);
+	}
+	
+	
+	
+	
+	/**
+	 * gpsWhetherPrivate＝1 ( GPS方案是否对私 0/否 1/是)
+	 *  (asfrzxb是否融责信宝)
+	 *  
+	 *  asfrzxb＝1时，gps加价gpsaddprice＝F014+F015+F016+F017－450＋F011
+		asfrzxb＝0时，gps加价gpsaddprice＝F011
+		
+		
+		gpsWhetherPrivate＝0
+		asfrzxb＝1时，gps加价gpsaddprice＝F0602＋F014+F015+F016+F017－450＋F011
+		asfrzxb＝0时，gps加价gpsaddprice＝F0602＋F011
+		
+	 */
+	
+	public String getGpsAddPrice(DscSalesApplyMain salesApplyMain) {
+		
+		String mainId = salesApplyMain.getId();
+		BigDecimal f011 = new BigDecimal(sysDIcMapped.getDscApplyFinancing("F011",mainId));
+		BigDecimal result = BigDecimal.ZERO;
+		
+		if ("1".equals(salesApplyMain.getGpsWhetherPrivate())) {
+			if ("1".equals(salesApplyMain.getAsfrzxb())) {
+				result = f011.add(getGpsAddPriceCommon(salesApplyMain)).subtract(
+						new BigDecimal(450));
+			}else {
+				result = f011;
+			}
+		}else {
+			BigDecimal f0602 = new BigDecimal(sysDIcMapped.getDscApplyFinancing("F0602",mainId));
+			if ("1".equals(salesApplyMain.getAsfrzxb())) {
+				
+				 result = f0602.add(f011).add(getGpsAddPriceCommon(salesApplyMain))
+						 .subtract(new BigDecimal(450));
+			}else {
+				result = f0602.add(f011);
+			}
+		}
+		return String.valueOf(result);
+	}
+	
+	
+	private BigDecimal getGpsAddPriceCommon(DscSalesApplyMain salesApplyMain){
+		String mainId = salesApplyMain.getId();
+		BigDecimal f014 = new BigDecimal(sysDIcMapped.getDscApplyFinancing("F014",
+				mainId));
+		BigDecimal f015 = new BigDecimal(sysDIcMapped.getDscApplyFinancing("F015",
+				mainId));
+		BigDecimal f016 = new BigDecimal(sysDIcMapped.getDscApplyFinancing("F016",
+				mainId));
+		BigDecimal f017 = new BigDecimal(sysDIcMapped.getDscApplyFinancing("F017",
+				mainId));
+		return f014.add(f015).add(f016).add(f017);
+	}
+
+	
+	
+	/**
+	 *  gpsWhetherPrivate＝1 ( GPS方案是否对私 0/否 1/是)
+	 *  (asfrzxb是否融责信宝)
+		asfrzxb＝1时，gps基础价gpsbaseprice＝F0601＋450+ F0602 
+		asfrzxb＝0时，gps基础价gpsbaseprice＝F0601+ F0602
+
+		gpsWhetherPrivate＝0
+		asfrzxb＝1时，gps基础价gpsbaseprice＝F0601＋450
+		asfrzxb＝0时，gps基础价gpsbaseprice＝F0601
+	 */
+
+	public String getGpsBasePrice(DscSalesApplyMain salesApplyMain) {
+		
+		String f0601 = sysDIcMapped.getDscApplyFinancing("F0601",
+				salesApplyMain.getId());
+		
+		BigDecimal result = new BigDecimal(f0601).add(
+				"1".equals(salesApplyMain.getAsfrzxb()) ?
+						new BigDecimal(450):BigDecimal.ZERO);
+		
+		if ("1".equals(salesApplyMain.getGpsWhetherPrivate())) {
+			String f0602 = sysDIcMapped.getDscApplyFinancing("F0602",
+					salesApplyMain.getId());
+			return String.valueOf(result.add(new BigDecimal(f0602)));
+		}else {
+			return String.valueOf(result);
+		}
+	}
+
+
+
+	/**
+	 * 精品加装费
+	 * @param salesApplyMain
+	 * @return
+	 */
+	private String getDecoAmt(DscSalesApplyMain salesApplyMain) {
+		
+		String f012 = sysDIcMapped.getDscApplyFinancing("F012", salesApplyMain.getId());
+		String f099 = sysDIcMapped.getDscApplyFinancing("F099", salesApplyMain.getId());
+		
+		return String.valueOf(new BigDecimal(f012).add(new BigDecimal(f099)));
+	}
+
+
+
+	/**
+	 * 
+	 * @param salesApplyMain
+	 * @param sfje
+	 * @return
+	 */
+	private String getFckrze(DscSalesApplyMain salesApplyMain,BigDecimal sfje) {
+		String f010 = sysDIcMapped.getDscApplyFinancing("F010",
+				salesApplyMain.getId());
+		return String.valueOf(new BigDecimal(f010).subtract(sfje));
+	}
+
+
+
+	/**
+	 * @param salesApplyCost 
+	 * 获取首付金额（车款*首付比例）
+	 */
+	private String getDpayAm(DscSalesApplyMain salesApplyMain,
+			DscSalesApplyCost salesApplyCost) {
+		
+		String f010 = sysDIcMapped.getDscApplyFinancing("F010",
+				salesApplyMain.getId());
+		BigDecimal fsfbl = salesApplyCost.getFsfbl();
+		
+		return String.valueOf(new BigDecimal(f010)
+				.multiply(fsfbl)
+				.divide(new BigDecimal(100),2,BigDecimal.ROUND_HALF_UP)) ;
+	}
+
+	/**
+	 * 保险融资额 计算
+	 * @param id
+	 * @return
+	 */
+	private String getFbxrze(String id) {
+		
+		BigDecimal result = BigDecimal.ZERO;
+		
+		ArrayList<String> arrayList = new ArrayList<String>(21){{
+			add("F091");add("F092");add("F093");add("F094");add("F095");
+			add("F101");add("F102");add("F103");add("F104");add("F105");
+			add("F111");add("F112");add("F113");add("F114");add("F115");
+			add("F121");add("F122");add("F123");add("F124");add("F125");
+			add("F119");
+		}};
+		
+		for (String code : arrayList) {
+			result = result.add(
+					new BigDecimal(sysDIcMapped.getDscApplyFinancing(code, id)));
+		}
+		return String.valueOf(result);
+	}
+
+}

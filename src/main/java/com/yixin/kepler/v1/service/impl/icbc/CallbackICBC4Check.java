@@ -1,0 +1,174 @@
+package com.yixin.kepler.v1.service.impl.icbc;
+
+import java.util.Date;
+
+import com.yixin.kepler.v1.common.constants.IcbcConstant;
+import com.yixin.kepler.v1.common.enumpackage.BankPhaseEnum;
+import com.yixin.kepler.v1.common.enumpackage.ICBCTrxCodeEnum;
+import com.yixin.kepler.v1.datapackage.dto.icbc.IcbcAckDataDTO;
+import com.yixin.kepler.v1.datapackage.dto.icbc.IcbcApplyDTO;
+import com.yixin.kepler.v1.datapackage.dto.icbc.IcbcBackDataDTO;
+import com.yixin.kepler.v1.datapackage.dto.icbc.IcbcCommonDTO;
+import com.yixin.kepler.v1.utils.JacksonUtils;
+
+import org.apache.commons.lang3.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.yixin.common.exception.BzException;
+import com.yixin.common.utils.DateUitls;
+import com.yixin.kepler.common.enums.AssetStateEnum;
+import com.yixin.kepler.core.constant.CommonConstant;
+import com.yixin.kepler.enity.AssetBankTran;
+import com.yixin.kepler.enity.AssetMainInfo;
+
+/**
+ * 工行-银行侧回调校验类
+ * 
+ * Package : com.yixin.kapler_v1.service.impl.icbc
+ * 
+ * @author YixinCapital -- chen.lin
+ *		   2018年9月13日 下午5:18:57
+ *
+ */
+public class CallbackICBC4Check {
+
+	
+	private static final Logger LOGGER = LoggerFactory.getLogger(CallbackICBC4Check.class);
+
+
+    /**
+     * 校验工行回调消息并入库(k_asset_bank_tran表)
+     * @param feedback
+     * @param icbcJson
+     * @param icbcTrxCodeEnum
+     * @return response
+     */
+	public static IcbcApplyDTO<IcbcAckDataDTO> checkAndSaveMsg(IcbcApplyDTO<IcbcBackDataDTO> feedback, String icbcJson, ICBCTrxCodeEnum icbcTrxCodeEnum){
+		IcbcApplyDTO<IcbcAckDataDTO> response = new IcbcApplyDTO<>();
+        try {
+        	// --------------声明返回结果
+        	IcbcCommonDTO responseCommon = new IcbcCommonDTO();
+        	IcbcAckDataDTO responseData = new IcbcAckDataDTO();
+        	response.setComm(responseCommon);
+        	response.setData(responseData);
+        	
+        	// --------------组装返回公共信息
+        	responseCommon.setSendtime(DateUitls.dateToStr(new Date(), "yyyyMMdd HH:mm:ss"));
+        	responseCommon.setChannel(IcbcConstant.CHANNEL_PC);
+        	responseCommon.setSendcode(IcbcConstant.SENDCODE_YXCD);
+        	responseCommon.setUnitcode(IcbcConstant.UNITCODE);
+        	
+        	final IcbcCommonDTO commDataDTO = feedback.getComm();
+        	if (null == commDataDTO) {
+        		LOGGER.error("工行回调报文异常!公共报文头为空!");
+        		// 返回失败
+        		responseData.setProcflag(IcbcConstant.PROCFLAG_CODE_OTHER_ERROR);
+        		responseData.setErrmsg("公共报文头为空");
+        		return response;
+        	}
+        	responseCommon.setOrderno(commDataDTO.getOrderno());
+        	responseCommon.setTrxcode(commDataDTO.getTrxcode());
+        	responseCommon.setSendserno(commDataDTO.getSendserno());
+        	responseData.setOrderno(commDataDTO.getOrderno());
+        	final IcbcBackDataDTO dataDTO = JacksonUtils.fromJsonToObject(JacksonUtils.fromObjectToJson(feedback.getData()), IcbcBackDataDTO.class);;
+        	if (null == dataDTO) {
+        		LOGGER.error("工行回调报文异常!消息体为空!");
+        		// 返回失败
+        		responseData.setProcflag(IcbcConstant.PROCFLAG_CODE_OTHER_ERROR);
+        		responseData.setErrmsg("消息体为空");
+        		return response;
+        	}
+        	
+        	// --------------基本校验结束，开始入库，入库后进行完整字段校验
+        	LOGGER.info("工行回调入库开始");
+        	AssetMainInfo assetMainInfo = AssetMainInfo.getByVenusApplyNo(dataDTO.getOrderno());
+        	if (assetMainInfo == null) {
+        		LOGGER.error("申请编号错误，资产信息为空，orderno={}", dataDTO.getOrderno());
+        		throw new BzException("申请编号错误，资产信息为空");
+        	}
+        	AssetBankTran callbackTran = new AssetBankTran();
+        	callbackTran.setTranNo(commDataDTO.getSendserno()); //交易流水号
+        	callbackTran.setReqBody(icbcJson);
+        	callbackTran.setApplyNo(assetMainInfo.getApplyNo());
+        	callbackTran.setBankOrderNo(assetMainInfo.getVenusApplyNo());
+        	callbackTran.setSender(CommonConstant.SenderType.BANK);
+        	callbackTran.setApiCode(commDataDTO.getTrxcode()); //接口代码
+        	callbackTran.setApprovalCode(dataDTO.getApprovalcode()); //交易结果码值
+        	callbackTran.setApprovalDesc(dataDTO.getApprovalmsg()); //交易结果描述
+        	callbackTran.setAssetId(assetMainInfo.getFinancialId());
+        	callbackTran.setAssetNo(assetMainInfo.getFinancialCode());
+        	String trxcode = commDataDTO.getTrxcode();
+			String approvalcode = dataDTO.getApprovalcode();
+
+			Integer resultCode = null;
+        	if (trxcode.equals(IcbcConstant.TRXCODE_10201)){//信审回调
+        		callbackTran.setPhase(BankPhaseEnum.LAST_TRIAL.getPhase());
+        		resultCode = assetMainInfo.getLastState();
+        	}else if(trxcode.equals(IcbcConstant.TRXCODE_40201)){//请款回调
+        		callbackTran.setPhase(BankPhaseEnum.PAYMENT.getPhase());
+        		resultCode = assetMainInfo.getPaymentState();
+        	}else if(trxcode.equals(IcbcConstant.TRXCODE_30101)){//面签回调
+        		callbackTran.setPhase(BankPhaseEnum.FACE_SIGN.getPhase());
+        		resultCode = assetMainInfo.getContractSignState();
+        	}
+        	// --------------回调必填数据校验(common.TRXCode、orderNo、approvalCode、approvalMsg)
+        	if (StringUtils.isBlank(commDataDTO.getTrxcode())) {
+        		LOGGER.error("工行回调报文异常:交易码为空!");
+        		// 返回失败
+        		responseData.setProcflag(IcbcConstant.PROCFLAG_CODE_OTHER_ERROR);
+        		responseData.setErrmsg("交易码为空");
+        	} else if (StringUtils.isBlank(dataDTO.getOrderno())) {
+        		LOGGER.error("工行回调报文异常:业务订单号为空!");
+        		// 返回失败
+        		responseData.setProcflag(IcbcConstant.PROCFLAG_CODE_OTHER_ERROR);
+        		responseData.setErrmsg("业务订单号为空");
+        	} else if (StringUtils.isBlank(dataDTO.getApprovalcode())) {
+        		LOGGER.error("工行回调报文异常:处理结果码值为空!");
+        		// 返回失败
+        		responseData.setProcflag(IcbcConstant.PROCFLAG_CODE_OTHER_ERROR);
+        		responseData.setErrmsg("处理结果码值为空");
+        	} else if (StringUtils.isBlank(dataDTO.getApprovalmsg())) {
+        		LOGGER.error("工行回调报文异常:处理结果消息为空!");
+        		// 返回失败
+        		responseData.setProcflag(IcbcConstant.PROCFLAG_CODE_OTHER_ERROR);
+        		responseData.setErrmsg("处理结果消息为空");
+        	} else if (!icbcTrxCodeEnum.getCode().equals(commDataDTO.getTrxcode())){
+        		// 判断交易码是否为接口送入参数，如不是则返回异常
+        		LOGGER.error("工行回调交易码与接口不匹配!{}返回约定交易码:{},实际返回交易码:{}", icbcTrxCodeEnum.getName(), icbcTrxCodeEnum.getCode(), commDataDTO.getTrxcode());
+        		// 返回失败
+        		responseData.setProcflag(IcbcConstant.PROCFLAG_CODE_OTHER_ERROR);
+        		responseData.setErrmsg("交易码与接口不匹配");
+        	} else if (AssetStateEnum.SUCCESS.getState().equals(resultCode)){
+        		LOGGER.error("资产[{}]请求状态为成功，本次交易非法!", dataDTO.getOrderno());
+        		// 返回失败
+        		responseData.setProcflag(IcbcConstant.PROCFLAG_CODE_OTHER_ERROR);
+        		responseData.setErrmsg("请求已经成功，本次交易非法!");
+        	} else if (trxcode.equals(IcbcConstant.TRXCODE_30101) && !AssetStateEnum.SUCCESS.getState().equals(assetMainInfo.getLastState())) {
+        		LOGGER.error("工商银行面签回调非法[{}]，信审还未成功!", dataDTO.getOrderno());
+        		// 返回失败
+        		responseData.setProcflag(IcbcConstant.PROCFLAG_CODE_OTHER_ERROR);
+        		responseData.setErrmsg("面签非法，信审未成功");
+        	} else if (trxcode.equals(IcbcConstant.TRXCODE_40201) && !AssetStateEnum.SUCCESS.getState().equals(assetMainInfo.getContractSignState())) {
+        		LOGGER.error("工商银行请款回调非法[{}]，面签还未成功!", dataDTO.getOrderno());
+        		// 返回失败
+        		responseData.setProcflag(IcbcConstant.PROCFLAG_CODE_OTHER_ERROR);
+        		responseData.setErrmsg("请款非法，面签未成功");
+        	} else if (StringUtils.isBlank(dataDTO.getLendate()) && trxcode.equals(IcbcConstant.TRXCODE_40201) && approvalcode.equals(IcbcConstant.APPROVAL_CODE_SUCCESS)) {
+        		LOGGER.error("工商银行请款反馈结果放款时间为空!", dataDTO.getOrderno());
+        		// 返回失败
+        		responseData.setProcflag(IcbcConstant.PROCFLAG_CODE_OTHER_ERROR);
+        		responseData.setErrmsg("放款时间为空");
+        	} else {
+        		responseData.setProcflag(IcbcConstant.PROCFLAG_CODE_SUCCESS);
+        	}
+        	
+        	callbackTran.setRepBody(JacksonUtils.fromObjectToJson(response));
+        	String id = callbackTran.create();
+        	LOGGER.info("工行回调入库完毕:{}", id);
+		} catch (Exception e) {
+			LOGGER.error("校验工行回调消息并入库(k_asset_bank_tran表)失败，错误={}", e);
+		}
+        return response;
+    }
+}

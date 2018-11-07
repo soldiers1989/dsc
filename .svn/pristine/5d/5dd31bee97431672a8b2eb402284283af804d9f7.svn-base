@@ -1,0 +1,196 @@
+package com.yixin.kepler.v1.service.capital.yillion;
+
+import com.yixin.common.exception.BzException;
+import com.yixin.common.utils.InvokeResult;
+import com.yixin.common.utils.JsonObjectUtils;
+import com.yixin.dsc.entity.order.*;
+import com.yixin.dsc.util.PropertiesManager;
+import com.yixin.kepler.common.UrlConstant;
+import com.yixin.kepler.common.enums.AssetPhaseEnum;
+import com.yixin.kepler.common.enums.AssetStateEnum;
+import com.yixin.kepler.common.enums.BankPhaseEnum;
+import com.yixin.kepler.core.base.AbstractBaseDealDomain;
+import com.yixin.kepler.core.constant.CommonConstant;
+import com.yixin.kepler.core.domain.SysDIcMapped;
+import com.yixin.kepler.dto.BaseMsgDTO;
+import com.yixin.kepler.enity.AssetFinanceInfo;
+import com.yixin.kepler.enity.AssetMainInfo;
+import com.yixin.kepler.v1.common.constants.BankRequestConstant;
+import com.yixin.kepler.v1.common.constants.IcbcConstant;
+import com.yixin.kepler.v1.common.constants.YILLIONConstant;
+import com.yixin.kepler.v1.common.enumpackage.YILLIONUrlEnum;
+import com.yixin.kepler.v1.common.util.SerialNumberUtil;
+import com.yixin.kepler.v1.datapackage.dto.yillion.YILLIONLastTrialDTO;
+import com.yixin.kepler.v1.datapackage.entity.AssetBankRequest;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
+
+import javax.annotation.Resource;
+
+/**
+ * @description:
+ * @date: 2018-11-01 14:52
+ */
+@Service("YILLIONLastTrialRequestStrategy")
+public class LastTrialRequestStrategy extends AbstractBaseDealDomain<Object, BaseMsgDTO> {
+
+    private final Logger logger = LoggerFactory.getLogger(getClass());
+
+    private ThreadLocal<YILLIONLastTrialDTO> lastTrailDataThreadLocal = new ThreadLocal<>();
+
+    private ThreadLocal<AssetMainInfo> mainInfoThreadLocal = new ThreadLocal<>();
+
+    @Resource
+    private SerialNumberUtil serialNumberUtil;
+    @Resource
+    private SysDIcMapped sysDIcMapped;
+    @Resource
+    private PropertiesManager propertiesManager;
+
+    @Override
+    protected void getData() throws BzException {
+
+        String applyNo = (String) inputDto.get();
+
+        logger.info("申请单号为{},开始封装银行请求参数", applyNo);
+        DscSalesApplyMain applyMain = DscSalesApplyMain.getByApplyNo(applyNo);
+        if (applyMain == null) {
+            logger.error("申请单号为{},申请编号错误，申请信息表", applyNo);
+            throw new BzException("申请编号错误，申请信息不存在");
+        }
+        String mainId = applyMain.getId();
+        DscSalesApplyCust customer = DscSalesApplyCust.getOneByMainId(mainId);
+        if (customer == null) {
+            logger.error("申请单号为{},申请编号错误，客户信息不存在", applyNo);
+            throw new BzException("申请编号错误，客户信息不存在");
+        }
+        DscSalesApplyCar car = DscSalesApplyCar.getBymainId(mainId);
+        if (car == null) {
+            logger.error("申请单号为{},申请编号错误，车辆信息不存在", applyNo);
+            throw new BzException("申请编号错误，车辆信息不存在");
+        }
+        DscSalesApplyCost cost = DscSalesApplyCost.getByMainId(mainId);
+        if (cost == null) {
+            logger.error("申请单号为{},申请编号错误，合同申请费用信息表", applyNo);
+            throw new BzException("申请编号错误，合同申请费用信息不存在");
+        }
+        DscSalesApplyPayee payee = DscSalesApplyPayee.getByMainId(mainId);
+        if (payee == null) {
+            logger.error("申请单号为{},申请编号错误，合同申请收款信息表", applyNo);
+            throw new BzException("申请编号错误，合同申请收款信息不存在");
+        }
+
+        AssetMainInfo mainInfo = AssetMainInfo.getByApplyNo(applyNo);
+        if (mainInfo == null) {
+            mainInfo = createMainInfo(applyNo, applyMain);
+        } else {
+            mainInfo.setVenusApplyNo(serialNumberUtil.getTranNo4Idfactory(IcbcConstant.TRAN_BIZCODE, IcbcConstant.TRAN_SYSCODE));
+            mainInfo.update();
+        }
+
+        String venusApplyNo = mainInfo.getVenusApplyNo();
+
+        YILLIONLastTrialDTO lastTrialInfo = new YILLIONLastTrialDTO();
+        lastTrailDataThreadLocal.set(lastTrialInfo);
+
+        //订单编号
+        lastTrialInfo.setOrder_no(YILLIONConstant.ORDER_NO_PREFIX + venusApplyNo);
+        //申请人姓名
+        lastTrialInfo.setName(customer.getAkhxm());
+        //证件类型
+        lastTrialInfo.setId_type(codeConvert("azjlx", customer.getAzjlx()));
+        //证件号码
+        lastTrialInfo.setId_no(customer.getAzjhm());
+        //银行预留手机号
+        lastTrialInfo.setCellphone(applyMain.getAckrsjhm());
+        //住房状况
+        lastTrialInfo.setHouse_condition(codeConvert("ajzzk", customer.getAjzzk()));
+        //居住地省份
+        lastTrialInfo.setAbode_state(customer.getAxjzdsf());
+
+        //todo 剩余字段set
+
+
+    }
+
+
+    private String codeConvert(String code, String value) {
+        return sysDIcMapped.getMappingValue(code, value, CommonConstant.BankName.ICBC_BANK);
+    }
+
+    private AssetMainInfo createMainInfo(String applyNo, DscSalesApplyMain main) {
+        AssetMainInfo mainInfo = new AssetMainInfo();
+        mainInfo.setApplyNo(applyNo);
+        mainInfo.setAssetPhase(AssetPhaseEnum.TRIAL.getPhase());
+        //电子征信默认为成功
+        mainInfo.setCreditSignState(AssetStateEnum.SUCCESS.getState());
+        mainInfo.setContractSignState(AssetStateEnum.INIT.getState());
+        mainInfo.setFirstState(AssetStateEnum.INIT.getState());
+        mainInfo.setLastState(AssetStateEnum.INIT.getState());
+        mainInfo.setPreState(null);
+        mainInfo.setPaymentState(AssetStateEnum.INIT.getState());
+        //渠道编号
+        mainInfo.setChannelCode(main.getDealerChannelCode());
+        // 渠道名称
+        mainInfo.setChannelName(main.getDealerChannelName());
+        //发起融资公司编号
+        mainInfo.setCompanyCode(main.getRentingCompanyCode());
+        mainInfo.setFinancialId(main.getCapitalId());
+        mainInfo.setFinancialCode(AssetFinanceInfo.getById(main.getCapitalId()).getCode());
+        //生成唯一标识
+        mainInfo.setVenusApplyNo(serialNumberUtil.getTranNo4Idfactory(IcbcConstant.TRAN_BIZCODE, IcbcConstant.TRAN_SYSCODE));
+        mainInfo.create();
+        return mainInfo;
+    }
+
+    @Override
+    protected void assembler() throws BzException {
+
+    }
+
+    @Override
+    protected InvokeResult<BaseMsgDTO> message() throws BzException {
+
+        AssetMainInfo mainInfo = mainInfoThreadLocal.get();
+        YILLIONLastTrialDTO lastTrialInfo = lastTrailDataThreadLocal.get();
+
+        inputDto.remove();
+        mainInfoThreadLocal.remove();
+        lastTrailDataThreadLocal.remove();
+
+        //订单编号
+        String applyNo = mainInfo.getApplyNo();
+        String osbUrl = propertiesManager.getOsbEnvironment() + UrlConstant.OsbSystemUrl.yillionInterface + YILLIONUrlEnum.ENTRY_APPLY.getUrl();
+
+        logger.info("亿联(终审)组装报文创建任务记录开始,申请编号:{}", applyNo);
+        AssetBankRequest request = new AssetBankRequest();
+        //申请编号
+        request.setApplyNo(applyNo);
+        //银行申请编号
+        request.setBankOrderNo(lastTrialInfo.getOrder_no());
+        //资方编号
+        request.setAssetNo(mainInfo.getFinancialCode());
+        //资管请求报文
+        request.setAssetReqBody(JsonObjectUtils.objectToJson(lastTrialInfo));
+        //所属阶段-信审
+        request.setPhase(BankPhaseEnum.LAST_TRIAL.getPhase());
+        //请求的url地址
+        request.setReqUrl(osbUrl);
+        //向银行发起请求状态 0-未发起
+        request.setReqState(BankRequestConstant.UN_REQ_BANK);
+        //请求重试标记初始化
+        request.setRetryMark(BankRequestConstant.RETRY_INIT_COUNT);
+        request.setBzId(mainInfo.getId());
+        String taskId = request.create();
+        logger.info("亿联发起信审任务记录结束,申请编号:{},任务表ID:{}", applyNo, taskId);
+        //预审默认初始化
+        mainInfo.setPreState(AssetStateEnum.INIT.getState());
+        //终审进行中
+        mainInfo.setLastState(AssetStateEnum.DOING.getState());
+        mainInfo.setBankOrderNo(lastTrialInfo.getOrder_no());
+        mainInfo.update();
+        logger.info("亿联发起信审创建任务记录成功后更新终审状态为处理中,申请编号:{}", applyNo);
+        return new InvokeResult<>(new BaseMsgDTO(CommonConstant.SUCCESS, "SUCCESS"));
+    }
+}

@@ -1,0 +1,242 @@
+package com.yixin.dsc.api;
+
+import java.util.List;
+import java.util.stream.Collectors;
+
+import org.apache.commons.lang3.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.util.CollectionUtils;
+import org.springframework.validation.BindingResult;
+import org.springframework.validation.ObjectError;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.alibaba.fastjson.JSONObject;
+import com.yixin.common.utils.InvokeResult;
+import com.yixin.common.utils.JsonObjectUtils;
+import com.yixin.dsc.common.exception.BzException;
+import com.yixin.dsc.dto.DscCapitalDto;
+import com.yixin.dsc.dto.DscContractSignFileDTO;
+import com.yixin.dsc.dto.DscRepayScheduleDTO;
+import com.yixin.dsc.dto.order.DscSyncDTO;
+import com.yixin.dsc.service.sync.DscSyncAlixDataService;
+import com.yixin.dsc.service.sync.DscSyncCapitalDataService;
+import com.yixin.kepler.dto.BaseMsgDTO;
+
+/**
+ * 数据同步api
+ * Package : com.yixin.dsc.api
+ * 
+ * @author YixinCapital -- huguoxing
+ *		   2018年6月4日 下午3:12:35
+ *
+ */
+@RestController
+@RequestMapping(path="/api/dscSyncDataApi")
+public class DscSyncDataApi {
+
+	private static final Logger LOGGER = LoggerFactory.getLogger(DscSyncDataApi.class);
+
+	@Autowired
+	private DscSyncAlixDataService syncAlixDataService;
+	
+	@Autowired
+	private DscSyncCapitalDataService dscSyncCapitalDataService;
+
+
+	/**
+	 * 同步订单全量数据
+	 * @param dscSyncDTO
+	 * @return
+	 * @author YixinCapital -- wangwenlong
+	 *	       2018年6月4日 下午8:07:30
+	 */
+	@RequestMapping("/syncOrderAllData")
+	public InvokeResult<Boolean> syncData(@RequestBody DscSyncDTO dscSyncDTO){
+		InvokeResult<Boolean> result = new InvokeResult<>();
+		if(dscSyncDTO==null || StringUtils.isBlank(dscSyncDTO.getApplyNo())) {
+            return result.failure("同步订单全量数据失败，申请编号为空");
+        }
+        try {
+        	result.setData(syncAlixDataService.syncAlixAllData(dscSyncDTO));
+		} catch (BzException e) {
+			LOGGER.error("DscSyncDataApi同步订单全量数据失败,订单编号:{},错误信息:{}",dscSyncDTO.getApplyNo(), e.getMessage());
+			return result.failure(e.getMessage());
+		} catch (Exception e) {
+			LOGGER.error("DscSyncDataApi同步订单全量数据失败,订单编号:{},",dscSyncDTO.getApplyNo(), e);
+			return result.failure("同步订单全量数据失败");
+		}
+		return result;
+	}
+
+
+	/**
+	 * 同步请款附件信息
+	 * @param dscSyncDTO
+	 * @return
+	 * @author YixinCapital -- wangwenlong
+	 *	       2018年6月4日 下午8:07:30
+	 */
+	@RequestMapping("/syncRequestFundsAndAttachmentData")
+	public InvokeResult<Boolean> syncRequestFundsAndAttachmentData(@RequestBody DscSyncDTO dscSyncDTO){
+		InvokeResult<Boolean> result = new InvokeResult<>();
+		if(dscSyncDTO==null || StringUtils.isBlank(dscSyncDTO.getApplyNo())) {
+			return result.failure("同步请款附件信息失败，申请编号为空");
+		}
+		result.setData(syncAlixDataService.syncRequestFundsAndAttachmentData(dscSyncDTO));
+		return result;
+	}
+
+	/**
+	 * 同步贷后资料接口
+	 * @param param 同步信息
+	 * @return
+	 * @author YixinCapital -- wangwenlong
+	 *	       2018年6月4日 下午8:07:30
+	 */
+	@RequestMapping("/syncLloanData")
+	public InvokeResult<Boolean> syncLloanData(@RequestBody DscSyncDTO param){
+		InvokeResult<Boolean> iResult = new InvokeResult<>();
+		LOGGER.info("DscSyncDataApi同步贷后资料接口入参:{}", JSONObject.toJSONString(param));
+		if(param == null){
+			return iResult.failure("参数为空");
+		}
+		String applyNo = param.getApplyNo();
+		if(StringUtils.isBlank(applyNo)){
+			return iResult.failure("订单编号[applyNo]为空");
+		}
+		if(CollectionUtils.isEmpty(param.getFileAttachmentDTOList())){
+			return iResult.failure("贷后资料为空");
+		}
+		try {
+			iResult.setData(this.syncAlixDataService.syncLloanData(param));
+		} catch (BzException e) {
+			LOGGER.error("DscSyncDataApi同步贷后资料接口失败，订单编号:{},错误：{}",applyNo, e.getMessage());
+			return iResult.failure(e.getMessage());
+		} catch (Exception e) {
+			LOGGER.error("DscSyncDataApi同步贷后资料接口异常,订单编号:{},",applyNo, e);
+			return iResult.failure("同步贷后资料接口失败");
+		}
+		LOGGER.info("DscSyncDataApi同步贷后资料接口，订单编号：{},返参:{}", applyNo,JSONObject.toJSONString(iResult));
+		return iResult;
+	}
+
+
+	/**
+	 * 规则同步
+	 * @param capitalDto 入参如果有资管ID 按照指定资管同步，否则同步全量
+	 * @return 
+	 * @author YixinCapital -- wangwenlong
+	 *	       2018年6月13日 下午4:32:35
+	 */
+	@RequestMapping("/syncAccessRules")
+	public InvokeResult<Boolean> syncAccessRules(@RequestBody DscCapitalDto capitalDto){
+		InvokeResult<Boolean> iResult = new InvokeResult<>();
+		LOGGER.info("DscSyncDataApi规则同步入参:{}", JSONObject.toJSONString(capitalDto));
+		try {
+			iResult.setData(this.dscSyncCapitalDataService.syncAccessRules(capitalDto));
+		} catch (BzException e) {
+			LOGGER.error("DscSyncDataApi规则同步失败，错误：{}", e.getMessage());
+			return iResult.failure(e.getMessage());
+		} catch (Exception e) {
+			LOGGER.error("DscSyncDataApi规则同步异常", e);
+			return iResult.failure("规则同步失败");
+		}
+		LOGGER.info("DscSyncDataApi规则同步,返参:{}",JSONObject.toJSONString(iResult));
+		return iResult;
+	}
+
+
+
+	/**
+	 * 同步易鑫放款信息
+	 * @param dscRepayScheduleDTO
+	 * @param bindResult
+	 * @return 
+	 * @author YixinCapital -- wangwenlong
+	 *	       2018年9月26日 下午3:37:20
+	 */
+	@RequestMapping("/syncYXLoanInfo")
+	public InvokeResult<BaseMsgDTO> syncYXLoanInfo(@RequestBody DscRepayScheduleDTO dscRepayScheduleDTO){
+		InvokeResult<BaseMsgDTO> iResult = new InvokeResult<>();
+		if(dscRepayScheduleDTO == null){
+			return iResult.failure("参数为空");
+		}
+		String applyNo = dscRepayScheduleDTO.getApplyNo();
+		if(StringUtils.isBlank(applyNo)){
+			return iResult.failure("订单编号为空");
+		}
+		if(dscRepayScheduleDTO.getLoanTime() == null){
+			return iResult.failure("放款时间为空");
+		}
+		if(dscRepayScheduleDTO.getActualLoanAmount() == null){
+			return iResult.failure("实际放款金额为空");
+		}
+		if(CollectionUtils.isEmpty(dscRepayScheduleDTO.getLoanSerialList())){
+			return iResult.failure("放款流水集合为空");
+		}
+		if(CollectionUtils.isEmpty(dscRepayScheduleDTO.getRepaySchedules())){
+			return iResult.failure("还款计划明细为空");
+		}
+		LOGGER.info("同步易鑫放款信息syncLoanInfo开始,订单编号:{},入参:{}",applyNo,JsonObjectUtils.objectToJson(dscRepayScheduleDTO));
+		try {
+			iResult.setData(syncAlixDataService.syncYXLoanInfo(dscRepayScheduleDTO));
+		} catch (com.yixin.common.exception.BzException e) {
+			LOGGER.error("同步易鑫放款信息syncLoanInfo失败，订单编号:{},错误：{}", applyNo,e.getMessage());
+			iResult.setData(BaseMsgDTO.failureData(e.getMessage()));
+			return iResult;
+		} catch (Exception e) {
+			LOGGER.error("同步易鑫放款信息syncLoanInfo异常，订单编号:{}",applyNo, e);
+			return iResult.failure("同步易鑫放款信息失败");
+		}
+		LOGGER.info("同步易鑫放款信息syncLoanInfo结束,订单编号:{},返参:{}",applyNo,JsonObjectUtils.objectToJson(iResult));
+		return iResult;
+	}
+
+
+	/**
+	 * 合同签署
+	 * @author sukang
+	 * @param dscContractSignFileDTO {@link DscContractSignFileDTO}
+	 * @param bindResult BindingResult {@link BindingResult}
+	 * @return InvokeResult
+	 */
+	@PostMapping("/deal/contract-file")
+	public InvokeResult<Object> dealContractFile(
+			@RequestBody @Validated DscContractSignFileDTO dscContractSignFileDTO
+			, BindingResult bindResult){
+		InvokeResult<Object> invokeResult = new InvokeResult<>();
+
+		LOGGER.info("处理合同文件请求参数为{}",JsonObjectUtils.objectToJson(dscContractSignFileDTO));
+
+		List<String> collect;
+		if ((collect = dealBindingResult(bindResult)) != null){
+			invokeResult.failure("参数异常").setData(collect);
+			return invokeResult;
+		}
+
+		try {
+			return syncAlixDataService.dealContractFile(dscContractSignFileDTO);
+		}catch (Exception e){
+			LOGGER.error("处理合同文件异常,异常信息为",e);
+			invokeResult.failure("处理合同文件异常");
+		}
+		return invokeResult;
+	}
+
+
+	private List<String> dealBindingResult(BindingResult bindingResult){
+		if (bindingResult.getErrorCount() != 0){
+			return bindingResult.getAllErrors()
+					.stream()
+					.map(ObjectError::getDefaultMessage)
+					.collect(Collectors.toList());
+		}
+		return null;
+	}
+}

@@ -1,0 +1,755 @@
+package com.yixin.kepler.enity;/**
+ * Created by liushuai2 on 2017/8/8.
+ */
+
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+import java.util.Map;
+
+import javax.persistence.Basic;
+import javax.persistence.Column;
+import javax.persistence.Entity;
+import javax.persistence.FetchType;
+import javax.persistence.Table;
+
+import org.springframework.util.Assert;
+
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
+import com.yixin.common.exception.BzException;
+import com.yixin.common.system.domain.BZBaseEntiy;
+import com.yixin.common.system.util.Label;
+import com.yixin.common.utils.JsonObjectUtils;
+import com.yixin.kepler.common.SerialNumberUtil;
+import com.yixin.kepler.core.constant.CommonConstant;
+
+import net.sf.json.JSONArray;
+import net.sf.json.JSONObject;
+
+/**
+ * Package : com.yixin.creditfront.core.file
+ *
+ * @author YixinCapital -- liushuai2
+ *         2017年08月08日 13:37
+ */
+@Entity
+@Table(name = "k_osb_file_log")
+public class OsbFileLog extends BZBaseEntiy{
+    /**
+     MQ_ID	RabbitMQ唯一标识	varchar(16)
+     TRAN_NO	交易流水	varchar(128)
+     TYPE	上传还是下载，0：上传，1：下载	BIT(1)
+     COMPRESS	是否需要解压缩，0：不需要，1：需要压缩，2：需要解压	tinyint(4)
+     COMPRESS_PWD	压缩解压密码	varchar2(32)
+     COMPRESS_FORMATE	压缩文件类型，0：zip，:1：tar，2：tar.gz，下载时不需要该类型	tinyint(4)
+     COMPRESS_NAME	压缩后的文件名称	varchar(32)
+     ARCHIVES	是否需要存档，0：不需要，1：需要，默认0	BIT(1)
+     FILE_JSON	文档列表json数据	varchar(1024)
+     SERVER_TYPE	文件服务器类型，0：SFTP, 1：FTP，默认0	BIT(1)
+     SERVER_IP	文件服务器IP	varchar2(15)
+     SERVER_PORT	文件服务器端口	INT(8)
+     SERVER_UNAME	文件服务器用户名	varchar(16)
+     SERVER_PWD	文件服务器用户密码	varchar(16)
+     SERVER_FILE_PATH	上传、下载的文件服务器的目录	varchar(64)
+     DEAL_STATUS	"处理的状态，0：待处理，1：esb受理成功，2：上传、下载成功
+     当esb返回上传受理成功后更新状态为1
+     当esb通知业务系统上传、下载成功后（MQ消息），业务系统取得mq内容后更新改状态为上传成功（）"	tinyint(4)
+
+     */
+    /**
+     * RabbitMq的系统标志
+     */
+    @Label(name = "rabbitmq的routing key")
+    @Column(name = "routing_key", length = 128, nullable =  false)
+    private String routingKey;
+
+    @Label(name = "业务类型的标志，跟bzId配合使用")
+    @Column(name = "bz_type", length = 32, nullable =  false)
+    private String bzType;
+
+
+    @Label(name = "交易流水")
+    @Column(name = "tran_no", length = 32, nullable =  false)
+    private String tranNo;
+
+    @Label(name = "操作类型 0：上传，1：下载")
+    @Column(name = "type", length = 1, nullable =  false)
+    private int type;
+
+
+    @Label(name = "是否需要压缩")
+    @Column(name = "compress")
+    private Boolean compress = Boolean.valueOf(false);
+
+    @Label(name = "压缩密码")
+    @Column(name = "compress_pwd", length = 64)
+    private String compressPwd;
+
+    @Label(name = "秘钥")
+    @Column(name = "encrypt_key", length = 128)
+    private String encryptKey;
+
+    @Label(name = "加密方式")
+    @Column(name = "encrypt_type", length = 32)
+    private String encryptType;
+
+
+
+    @Label(name = "压缩文件类型")
+    @Column(name = "compress_format", length = 16)
+    private String compressFormat;
+
+    @Label(name = "压缩后的文件名称")
+    @Column(name = "compress_name", length = 128)
+    private String compressName;
+
+
+    @Label(name = "压缩服务的压缩流水号")
+    @Column(name = "compress_tran_no", length = 128)
+    private String compressTranNo;
+
+    @Label(name = "调用压缩服务返回的文件json")
+    @Basic(fetch = FetchType.EAGER)
+    @Column(name = "compress_file_json", columnDefinition ="LONGTEXT", nullable =  true)
+    private String compressFileJson;
+
+    @Label(name = "是否需要归档")
+    @Column(name = "archives")
+    private Boolean archives = Boolean.valueOf(false);
+
+    @Label(name = "文件内容")
+    @Basic(fetch = FetchType.EAGER)
+    @Column(name = "file_json", columnDefinition ="LONGTEXT", nullable =  false)
+    private String fileJson;
+
+    @Label(name = "服务器类型 sftp和ftp ")
+    @Column(name = "server_type", length = 8, nullable =  false)
+    private String serverType;
+
+    @Label(name = "服务器端口号")
+    @Column(name = "server_port", length = 8, nullable =  false)
+    private int serverPort;
+
+    @Label(name = "服务器ip")
+    @Column(name = "server_ip", length = 15, nullable =  false)
+    private String serverIp;
+
+    @Label(name = "登录目标服务器的用户名称")
+    @Column(name = "server_uname", length = 16, nullable =  false)
+    private String serverUname;
+
+    @Label(name = "登录目标服务器的用户密码")
+    @Column(name = "server_pwd", length = 16, nullable =  false)
+    private String serverPwd;
+
+    @Label(name = "目标服务器的目录")
+    @Column(name = "server_file_path", length = 64, nullable =  false)
+    private String serverFilePath;
+
+    @Label(name = "处理状态0：等待处理，1：esb受理成功，2：上传下载成功")
+    @Column(name = "deal_status", length = 4, nullable =  false)
+    private int dealStatus;
+
+
+    @Label(name = "源文件json")
+    @Column(name = "source_file_json", length = 512, nullable =  false)
+    private String sourceFileJson;
+
+    public OsbFileLog(){
+
+    }
+
+    public OsbFileLog(String routingKey, String tranNo, int type, boolean compress, String compressFormat, String compressPwd, String compressName, boolean archives, String fileJson,
+                      String serverType, String serverIp, int serverPort, String serverUname, String serverPwd, String serverFilePath, String bzType, String encryptKey, String encryptType){
+        this.dealStatus = CommonConstant.DEAL_STATUS_UNDEAL;
+
+        this.routingKey = routingKey;
+        this.tranNo = tranNo;
+        this.compress = compress;
+        this.compressFormat = compressFormat;
+        this.compressPwd = compressPwd;
+        this.compressName = compressName;
+        this.archives = archives;
+        this.fileJson = fileJson;
+        this.serverType = serverType;
+        this.serverIp = serverIp;
+        this.serverPort = serverPort;
+        this.serverUname = serverUname;
+        this.serverPwd = serverPwd;
+        this.serverFilePath = serverFilePath;
+        this.type = type;
+        this.bzType = bzType;
+        this.encryptKey = encryptKey;
+        this.encryptType = encryptType;
+    }
+
+
+    public OsbFileLog clone(){
+        OsbFileLog log = new OsbFileLog();
+        log.dealStatus = CommonConstant.DEAL_STATUS_UNDEAL;
+        log.routingKey = routingKey;
+        // 需要重新更新序列号
+//       log.tranNo = tranNo;
+        log.compress = compress;
+        log.compressFormat = compressFormat;
+        log.compressPwd = compressPwd;
+        log.compressName = compressName;
+        log.archives = archives;
+        log.fileJson = fileJson;
+        log.serverType = serverType;
+        log.serverIp = serverIp;
+        log.serverPort = serverPort;
+        log.serverUname = serverUname;
+        log.serverPwd = serverPwd;
+        log.serverFilePath = serverFilePath;
+        log.type = type;
+        log.bzType = bzType;
+        log.setBzId(this.getBzId());
+        log.setEncryptKey(this.encryptKey);
+        log.setEncryptType(encryptType);
+        return log;
+    }
+
+    public String getEncryptKey() {
+        return encryptKey;
+    }
+
+    public void setEncryptKey(String encryptKey) {
+        this.encryptKey = encryptKey;
+    }
+
+    public String getEncryptType() {
+        return encryptType;
+    }
+
+    public void setEncryptType(String encryptType) {
+        this.encryptType = encryptType;
+    }
+
+    public String getRoutingKey() {
+        return routingKey;
+    }
+
+    public void setRoutingKey(String routingKey) {
+        this.routingKey = routingKey;
+    }
+
+    public String getTranNo() {
+        return tranNo;
+    }
+
+    public void setTranNo(String tranNo) {
+        this.tranNo = tranNo;
+    }
+
+    public int getType() {
+        return type;
+    }
+
+    public void setType(int type) {
+        this.type = type;
+    }
+
+    public Boolean isCompress() {
+        return this.compress;
+    }
+
+    public void setCompress(Boolean isCompress) {
+        this.compress = isCompress;
+    }
+
+    public String getCompressPwd() {
+        return compressPwd;
+    }
+
+    public void setCompressPwd(String compressPwd) {
+        this.compressPwd = compressPwd;
+    }
+
+    public String getCompressFormat() {
+        return compressFormat;
+    }
+
+    public void setCompressFormat(String compressFormat) {
+        this.compressFormat = compressFormat;
+    }
+
+    public String getCompressName() {
+        return compressName;
+    }
+
+    public void setCompressName(String compressName) {
+        this.compressName = compressName;
+    }
+
+    public String getCompressTranNo() {
+        return compressTranNo;
+    }
+
+    public void setCompressTranNo(String compressTranNo) {
+        this.compressTranNo = compressTranNo;
+    }
+
+    public String getCompressFileJson() {
+        return compressFileJson;
+    }
+
+    public void setCompressFileJson(String compressFileJson) {
+        this.compressFileJson = compressFileJson;
+    }
+
+    public Boolean isArchives() {
+        return this.archives;
+    }
+
+    public void setArchives(Boolean isArchives) {
+        this.archives = isArchives;
+    }
+
+    public String getFileJson() {
+        return fileJson;
+    }
+
+    public void setFileJson(String fileJson) {
+        this.fileJson = fileJson;
+    }
+
+    public String getServerType() {
+        return serverType;
+    }
+
+    public void setServerType(String serverType) {
+        this.serverType = serverType;
+    }
+
+    public int getServerPort() {
+        return serverPort;
+    }
+
+    public void setServerPort(int serverPort) {
+        this.serverPort = serverPort;
+    }
+
+    public String getServerIp() {
+        return serverIp;
+    }
+
+    public void setServerIp(String serverIp) {
+        this.serverIp = serverIp;
+    }
+
+    public String getServerUname() {
+        return serverUname;
+    }
+
+    public void setServerUname(String serverUname) {
+        this.serverUname = serverUname;
+    }
+
+    public String getServerPwd() {
+        return serverPwd;
+    }
+
+    public void setServerPwd(String serverPwd) {
+        this.serverPwd = serverPwd;
+    }
+
+    public String getServerFilePath() {
+        return serverFilePath;
+    }
+
+    public void setServerFilePath(String serverFilePath) {
+        this.serverFilePath = serverFilePath;
+    }
+
+    public int getDealStatus() {
+        return dealStatus;
+    }
+
+    public void setDealStatus(int dealStatus) {
+        this.dealStatus = dealStatus;
+    }
+
+    public String getBzType() {
+        return bzType;
+    }
+
+    public void setBzType(String bzType) {
+        this.bzType = bzType;
+    }
+
+    /**
+     * 获取指定时间状态没有修改的信息
+     * @param beforeMinute
+     * @return
+     */
+    public static List<OsbFileLog> unDone(int beforeMinute){
+        return get(CommonConstant.DEAL_STATUS_UNDEAL, beforeMinute);
+    }
+    public static OsbFileLog getByTranNo(String tranNo){
+        StringBuilder sql = new StringBuilder("select k from OsbFileLog k where k.tranNo = ?1 and k.deleted is false");
+        List<Object> params = Lists.newArrayList();
+        params.add(tranNo);
+        List<OsbFileLog> logs = getRepository().createJpqlQuery(sql.toString()).setParameters(params).list();
+        if(null != logs && !logs.isEmpty()) return logs.get(0);
+        return null;
+    }
+
+
+    public static long beDeletedCount(String bzId, String bzType, int type){
+        StringBuilder sql = new StringBuilder("select count(*) from OsbFileLog k where k.bzId = ?1 and k.bzType = ?2 and k.type = ?3 and k.deleted is true");
+        List<Object> params = Lists.newArrayList();
+        params.add(bzId);
+        params.add(bzType);
+        params.add(type);
+        Long num = getRepository().createJpqlQuery(sql.toString()).setParameters(params).singleResult();
+
+        return num == null ? 0 : num.longValue();
+    }
+
+
+    public static OsbFileLog getByApplyNo(String applyNo){
+        StringBuilder sql = new StringBuilder("select k from OsbFileLog k where"
+        		+ " k.bzId = ?1 and k.dealStatus = ?2 and k.deleted is false");
+        List<Object> params = new ArrayList<Object>(2){{
+        	add(applyNo);
+        	add(CommonConstant.DEAL_STATUS_UNDEAL);
+        }};
+        List<OsbFileLog> logs = getRepository()
+        		.createJpqlQuery(sql.toString()).setParameters(params).list();
+        
+        Assert.isTrue(!logs.isEmpty(), "未找到申请号为"+applyNo+"的文件");
+        return logs.get(0);
+    }
+    public static OsbFileLog getUnDealByTranNo(String tranNo){
+        Map<String, Object> params = Maps.newHashMap();
+        params.put("tranNo", tranNo);
+        params.put("dealStatus", CommonConstant.DEAL_STATUS_UNDEAL);
+        List<OsbFileLog> logs = findByProperties(OsbFileLog.class, params);
+        if(null != logs && !logs.isEmpty()) return logs.get(0);
+        return null;
+    }
+
+    public static List<OsbFileLog> get(Integer dealStatus, int beforeMinutes){
+        StringBuilder jpql = new StringBuilder("select k from OsbFileLog as k where k.deleted is false ");
+        List<Object> parameters = new ArrayList<Object>();
+
+        if(dealStatus != null){
+            jpql.append(" and k.dealStatus = ? ");
+            parameters.add(dealStatus.intValue());
+        }
+
+        if(beforeMinutes > 0){
+            jpql.append(" and k.createTime < ? ");
+            parameters.add(new Date(System.currentTimeMillis() - beforeMinutes * 60 * 1000));
+        }
+
+        return getQueryChannel().list(getQueryChannel().createJpqlQuery(jpql.toString()).setParameters(parameters));
+    }
+
+
+    /**
+     * 获取osb处理失败的任务
+     *
+     *
+     * @param beforeMinutes         获取多少分钟以前的osb处理失败的消息
+     * @return
+     */
+    public static List<OsbFileLog> getOsbFailure(int beforeMinutes){
+        return get(CommonConstant.DEAL_STATUS_OSB_FAILURE, beforeMinutes);
+    }
+
+    public void acknowledge(){
+        this.setDealStatus(CommonConstant.DEAL_STATUS_DEALING);
+        this.update();
+    }
+
+
+    public static void acknowledge(String tranNo){
+        updateDealStatus(tranNo, CommonConstant.DEAL_STATUS_DEALING);
+    }
+
+    public static void updateDealStatus(String tranNo, int dealStatus){
+        Assert.notNull(tranNo, "tranNo cannot be NULL");
+        Assert.isTrue( dealStatus > 0, " dealStatus is minus");
+        OsbFileLog log = getByTranNo(tranNo);
+        //收妥通知
+        log.setDealStatus(dealStatus);
+        log.update();
+    }
+    /**
+     * 批量更新状态为已处理
+     * 已处理 = 2
+     * @param logs
+     */
+    public static void dealed(List<OsbFileLog> logs){
+        for(OsbFileLog log : logs){
+            log.dealed();
+        }
+    }
+
+    /**
+     * 更新为已处理
+     */
+    public void dealed(){
+        this.dealStatus = CommonConstant.DEAL_STATUS_DEALED;
+        this.update();
+    }
+
+    public OsbFileLog faile(){
+        this.dealStatus = CommonConstant.DEAL_STATUS_OSB_FAILURE;
+        this.update();
+        return this;
+    }
+
+    /**
+     * 删除
+     */
+    public void delete(){
+        this.setDeleted( true );
+        this.update();
+    }
+
+    /**
+     * 批量更新状态为无效的数据
+     * 无效的数据(流程状态不对) = 3
+     * @param logs
+     */
+    public static void dealInvalid(List<OsbFileLog> logs){
+        for(OsbFileLog log : logs){
+            log.dealInvalid();
+        }
+    }
+
+    private void dealInvalid(){
+        this.dealStatus = CommonConstant.DEAL_STATUS_INVALID;
+        this.update();
+    }
+
+    /**
+     * 批量更新状态为未处理
+     * 未处理 = 0
+     * @param logs
+     */
+    public static void untreated(List<OsbFileLog> logs){
+        for(OsbFileLog log : logs){
+            log.untreated();
+        }
+    }
+
+    public void untreated(){
+        this.dealStatus = CommonConstant.DEAL_STATUS_UNDEAL;
+        this.update();
+    }
+
+    /**
+     * 更新状态为正在处理
+     * 处理中 = 1
+     */
+
+    public void dealing(){
+        this.dealStatus = CommonConstant.DEAL_STATUS_DEALING;
+        this.update();
+    }
+
+
+    /**
+     * 更新为Osb
+     * @param id
+     */
+    public static void osbFailure(String id){
+        OsbFileLog log = get(OsbFileLog.class, id);
+        if(log != null){
+            log.dealStatus = CommonConstant.DEAL_STATUS_OSB_FAILURE;
+            log.update();
+        }
+    }
+
+
+    /**
+     * 创建压缩的用的osbfileLog
+     * @param bzId 订单号
+     * @param bzType 类型
+     * @param json 源文件json
+     * @return OsbFileLog
+     */
+    public static OsbFileLog createOsbFileLog(String bzId,
+                                        String bzType, String json) {
+
+        OsbFileLog osbFileLog = new OsbFileLog();
+        osbFileLog.setBzId(bzId);
+        osbFileLog.setBzType(bzType);
+        osbFileLog.setRoutingKey("");
+        osbFileLog.setFileJson(json);
+        osbFileLog.setServerFilePath("");
+        osbFileLog.setServerIp("");
+        osbFileLog.setServerUname("");
+        osbFileLog.setServerType("");
+        osbFileLog.setServerPort(11);
+        osbFileLog.setServerPwd("");
+        osbFileLog.setSourceFileJson("");
+        osbFileLog.setTranNo(SerialNumberUtil.generate());
+        osbFileLog.create();
+        return osbFileLog;
+    }
+
+
+
+    /**
+     * 更新为osb失败，按照tranNo
+     * @param tranNo
+     */
+    public static void osbFailureByTranNo(String tranNo){
+        StringBuilder sql = new StringBuilder("select a from OsbFileLog as a where a.deleted is false ");
+        sql.append(" and a.tranNo = ?1");
+        List<Object> params = Lists.newArrayList();
+        params.add(tranNo);
+        List<OsbFileLog> logs = getRepository().createJpqlQuery( sql.toString()).setParameters(params).list();
+        if(logs != null && logs.size() > 0){
+            //注意这里只更新第一条，保证每个tranNo对应一条数据
+            OsbFileLog log = logs.get(0);
+            log.dealStatus = CommonConstant.DEAL_STATUS_OSB_FAILURE;
+            log.update();
+        }
+
+    }
+
+    
+    /**
+     * 通过申请编号和请求类型获取最新的OsbFileLog
+     * @param applyNo requestType
+     * @return
+     * @throws BzException
+     */
+    public static OsbFileLog getOsbFilesByApplyNoAndRequestType(String applyNo,String requestType) throws BzException {
+    	List<OsbFileLog> list=null;
+        List<Object> conditions = Lists.newArrayList();
+
+        try {
+            StringBuilder jpql =new StringBuilder(
+                    "select file from OsbFileLog file where file.bzId= ?1 and file.bzType= ?2 order by UPDATE_TIME DESC");
+            conditions.add(applyNo);
+            conditions.add(requestType);
+            list =getRepository().createJpqlQuery(jpql.toString()).setParameters(conditions).list();
+        } catch (Exception e) {
+            logger.error("通过申请编号和请求类型获取最新的文件信息表出错！", e);
+            throw new BzException("");
+        }
+        if(null!=list && list.size()>0){
+            return list.get(0);
+        }else{
+            return null;
+        }
+    }
+
+    /**
+     * 根据状态获取信息
+     * @param bzId
+     * @param bzType
+     * @return
+     */
+    public static OsbFileLog getOk(String bzId, String bzType){
+        StringBuilder sql = new StringBuilder("select k from OsbFileLog k where k.bzId = ?1 and k.bzType = ?2 and k.dealStatus = ?3 and k.deleted is false order by k.createTime desc");
+        List<Object> params = Lists.newArrayList();
+        params.add(bzId);
+        params.add(bzType);
+        params.add(CommonConstant.DEAL_STATUS_DEALED);
+        OsbFileLog log = getRepository().createJpqlQuery(sql.toString()).setParameters(params).singleResult();
+        return log;
+    }
+
+    /**
+     * 是否成功了
+     * @param bzId
+     * @param bzType
+     * @return
+     */
+    public static boolean isOk(String bzId, String bzType){
+        StringBuilder sql = new StringBuilder("select k from OsbFileLog k where k.bzId = ?1 and k.bzType = ?2 and k.dealStatus = ?3 and k.deleted is false");
+        List<Object> params = Lists.newArrayList();
+        params.add(bzId);
+        params.add(bzType);
+        params.add(CommonConstant.DEAL_STATUS_DEALED);
+        List<OsbFileLog> logs = getRepository().createJpqlQuery(sql.toString()).setParameters(params).list();
+        return null != logs && !logs.isEmpty();
+
+    }
+
+
+    public static Map<String, List<String[]>> getBsbshvFiles(String bzId, String bzType) {
+        OsbFileLog osbFileLog = getOk(bzId, bzType);
+        List<String[]> list = Lists.newArrayList();
+        Map<String, List<String[]>> map = Maps.newHashMap();
+        if (osbFileLog != null) {
+            String fileJson = osbFileLog.getFileJson();
+            JSONArray jsonArray = JSONArray.fromObject(fileJson);
+            for (int i = 0; i < jsonArray.size(); i++) {
+                JSONObject obj = jsonArray.getJSONObject(i);
+                list.add(new String[]{obj.getString("fileId"), obj.getString("fileName")});
+            }
+            String bsbshvTranNo = osbFileLog.getCompressName();
+            bsbshvTranNo = bsbshvTranNo.substring(bsbshvTranNo.lastIndexOf("_") + 1);
+            map.put(bsbshvTranNo, list);
+        }
+        return map;
+    }
+
+
+    public String getSourceFileJson() {
+        return sourceFileJson;
+    }
+
+    public void setSourceFileJson(String sourceFileJson) {
+        this.sourceFileJson = sourceFileJson;
+    }
+
+    /**
+     * 通过compressTranNo查询对象
+     * @param compressTranNo 压缩流水号
+     * @return OsbFileLog
+     */
+    public static OsbFileLog getByCompressTranNo(String compressTranNo){
+        StringBuilder sql = new StringBuilder("select k from OsbFileLog k where k.compressTranNo = ?1 and k.deleted is false");
+        List<Object> params = Lists.newArrayList();
+        params.add(compressTranNo);
+        List<OsbFileLog> logs = getRepository().createJpqlQuery(sql.toString()).setParameters(params).list();
+        if(null != logs && !logs.isEmpty()) {
+            return logs.get(0);
+        }
+        return null;
+    }
+
+
+    /**
+     * 通过fileLogId获取log信息
+     * @param osbFileLogId
+     * @return log
+     * @author YixinCapital -- chen.lin
+     *	       2018年9月29日 上午11:59:08
+     */
+    public static OsbFileLog getByFileLogId(String osbFileLogId){
+        StringBuilder jpql = new StringBuilder("select k from OsbFileLog k where 1=1 and k.id = ?1 ");
+        List<Object> params = Lists.newArrayList();
+        params.add(osbFileLogId);
+        OsbFileLog log = getRepository().createJpqlQuery(jpql.toString()).setParameters(params).singleResult();
+        logger.info("通过fileLogId获取log信息，log={}，jpql={}", JsonObjectUtils.objectToJson(log), jpql.toString());
+        return log;
+    }
+    
+    
+    /**
+     * 判断是否需要压缩的文件
+     * @param applyNo 申请编号
+     */
+    public static boolean isImageCompress(String applyNo) {
+        return false;
+    }
+
+	public static Integer getCurrentDayNum() {
+		
+		String hql = "SELECT ofl FROM OsbFileLog ofl WHERE TO_DAYS(ofl.createTime) = TO_DAYS(NOW())";
+		
+		return getRepository().createJpqlQuery(hql).list().size();
+	}
+}

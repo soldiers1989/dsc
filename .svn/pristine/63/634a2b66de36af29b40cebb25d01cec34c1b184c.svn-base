@@ -1,0 +1,321 @@
+package com.yixin.web.service.impl;
+
+import com.yixin.common.system.domain.BaseEntity;
+import com.yixin.common.system.ioc.SpringContextUtil;
+import com.yixin.common.utils.InvokeResult;
+import com.yixin.common.utils.Page;
+import com.yixin.dsc.dto.order.DscSyncDTO;
+import com.yixin.dsc.dto.rule.DscMatchResultDto;
+import com.yixin.dsc.entity.order.DscSalesApplyMain;
+import com.yixin.kepler.common.enums.BankPhaseEnum;
+import com.yixin.kepler.core.domain.AsyncTask;
+import com.yixin.kepler.core.domain.cmbc.AttachmentSupplyStrategy;
+import com.yixin.kepler.dto.BaseMsgDTO;
+import com.yixin.kepler.dto.OsbAttachmentDTO;
+import com.yixin.kepler.enity.AssetBankTran;
+import com.yixin.kepler.enity.OsbFileLog;
+import com.yixin.web.common.AssetStatusType;
+import com.yixin.web.common.MogoTemplateUtil;
+import com.yixin.web.dto.AssetMainInfoDto;
+import com.yixin.web.dto.ConditionBaseDto;
+import com.yixin.web.service.AssetMainInfoService;
+import com.yixin.web.service.base.BaseService;
+import com.yixin.web.service.dao.EntityCommonDao;
+import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
+
+import javax.annotation.Resource;
+
+import java.util.*;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
+
+/**
+ * @author sukang
+ */
+@Service
+public class AssetMainInfoServiceImpl extends BaseService implements AssetMainInfoService{
+
+
+    private final Logger logger = LoggerFactory.getLogger(getClass());
+
+
+    @Resource
+    private EntityCommonDao entityCommonDao;
+
+    @Resource
+    private AttachmentComponent attachmentComponent;
+
+
+    @Override
+    public Page<Map<String, Object>> getAssetMainList(AssetMainInfoDto assetMainInfoDto) {
+
+        //优先以订单号查询
+        String applyNo = entityCommonDao.getApplyNoFromCust(assetMainInfoDto);
+
+        ArrayList<Object> parameters = new ArrayList<>(6);
+
+        StringBuilder hql = getSql();
+        hql.append(" WHERE 1=1 ");
+
+        int index = 0;
+        if (StringUtils.isNotBlank(applyNo)){
+            hql.append(" AND ami.applyNo = ?".concat(String.valueOf(++index)));
+            parameters.add(applyNo);
+        }
+        if (assetMainInfoDto.getStartDate() != null) {
+            hql.append(" AND ami.createTime >= ?".concat(String.valueOf(++index)));
+            parameters.add(assetMainInfoDto.getStartDate());
+        }
+        if (assetMainInfoDto.getEndDate() != null) {
+            hql.append(" AND ami.createTime <= ?".concat(String.valueOf(++index)));
+            parameters.add(assetMainInfoDto.getEndDate());
+        }
+
+        if (StringUtils.isNotBlank(assetMainInfoDto.getFinancialCode())){
+            hql.append(" AND ami.financialCode = ?".concat(String.valueOf(++index)));
+            parameters.add(assetMainInfoDto.getFinancialCode());
+        }
+
+        if (StringUtils.isNotBlank(assetMainInfoDto.getLastTrialStatus())){
+            hql.append(" AND ami.lastState = ?".concat(String.valueOf(++index)));
+            parameters.add(Integer.parseInt(assetMainInfoDto.getLastTrialStatus()));
+        }
+
+        if (StringUtils.isNotBlank(assetMainInfoDto.getPaymentStatus())){
+            hql.append(" AND ami.paymentState = ?".concat(String.valueOf(++index)));
+            parameters.add(Integer.parseInt(assetMainInfoDto.getPaymentStatus()));
+        }
+        hql.append(" ORDER BY ami.createTime DESC ");
+        String sql = hql.toString();
+        logger.debug("查询文件上传的结果sql为{}",sql);
+        @SuppressWarnings("unchecked")
+        Page<Map<String,Object>> pagedList = queryChannel.createJpqlQuery(sql)
+                .setParameters(parameters)
+                .setPage(assetMainInfoDto.getCurrentPage(),10)
+                .pagedList();
+
+        //添加结果的状态描述
+        List<Map<String, Object>> maps = pagedList.getData();
+
+        dealStatus(maps);
+        pagedList.setData(maps);
+        return pagedList;
+    }
+
+
+    @Override
+    public List<Map<String, Object>> getAssetMainDetail(String applyNo) {
+
+        StringBuilder hql = getSql();
+        hql.append( "WHERE ami.applyNo = ?1");
+
+        List<String> params = Collections.singletonList(applyNo);
+
+        String sql = hql.toString();
+        logger.debug("订单{},查询sql为{}",applyNo,sql);
+        @SuppressWarnings("unchecked")
+        List<Map<String,Object>> result = queryChannel.createJpqlQuery(sql)
+                .setParameters(params).list();
+        dealStatus(result);
+
+        getSettleOsbInfo(result);
+
+        return result;
+    }
+
+    @Override
+    public Page<Map<String, Object>> getAttachmentInfo(ConditionBaseDto conditionBaseDto) {
+
+        String sql= " SELECT new map( dsam.applyNo as applyNo, " +
+                            " DATE_FORMAT(dfa.createTime,'%Y-%m-%d %H:%i:%s') AS createTime, " +
+                            " dfa.fileId AS fileId, dfa.fileUrl AS fileUrl, dfa.attachSubClass AS attachSubClass, " +
+                            " dfa.fileName AS fileName ) " +
+                            " FROM DscFileAttachment dfa" +
+                            " LEFT JOIN DscSalesApplyMain dsam ON dsam.id = dfa.mainId " +
+                            " WHERE dsam.applyNo = ?1 ";
+        List<String> params = Collections.singletonList(conditionBaseDto.getApplyNo());
+
+        logger.debug("查询附件订单{}列表的sql为{}",conditionBaseDto.getApplyNo(),sql);
+        @SuppressWarnings("unchecked")
+        Page<Map<String,Object>> pagedList = queryChannel.createJpqlQuery(sql)
+                .setParameters(params)
+                .setPage(conditionBaseDto.getCurrentPage(),10)
+                .pagedList();
+        return pagedList;
+    }
+
+
+    @Override
+    public List<Map<String,Object>> getSynLogInfo(ConditionBaseDto conditionBaseDto) {
+
+        List<DscSyncDTO> info = MogoTemplateUtil.getInfo(conditionBaseDto);
+
+        List<Map<String,Object>> result = new ArrayList<>();
+        if (!CollectionUtils.isEmpty(info)) {
+            info.forEach(t -> {
+                Map<String, Object> hashMap = new HashMap<>(2);
+                hashMap.put("applyNo", t.getApplyNo());
+                hashMap.put("data", t);
+                hashMap.put("createTime", t.getSign());
+                result.add(hashMap);
+            });
+        }
+        return result;
+    }
+
+    @Override
+    public List<DscMatchResultDto> getMatchResults(ConditionBaseDto conditionBaseDto) {
+        return MogoTemplateUtil.getMatchResults(conditionBaseDto);
+    }
+
+    private void getSettleOsbInfo(List<Map<String,Object>> result){
+        result.forEach(t -> {
+            String applyNo = String.valueOf(t.get("applyNo"));
+            t.put("lastTrialOsbStatus",OsbFileLog.isOk(applyNo, BankPhaseEnum.LAST_TRIAL.getPhase()));
+            t.put("paymentOsbStatus",OsbFileLog.isOk(applyNo, BankPhaseEnum.PAYMENT.getPhase()));
+            t.put("afterLoanOsbStatus",OsbFileLog.isOk(applyNo, BankPhaseEnum.AFTER_LOAN.getPhase()));
+
+            List<AssetBankTran> assetBankTrans = AssetBankTran.getByApplyNo(applyNo, BankPhaseEnum.PUSHFILE.getPhase());
+
+            List<AssetBankTran> success = assetBankTrans
+                    .stream()
+                    .filter(v -> "true".equals(v.getApprovalCode()))
+                    .collect(Collectors.toList());
+            t.put("pushFileStatus",CollectionUtils.isNotEmpty(success));
+        });
+    }
+
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public List<Object> getInfoByTable(String applyNo, String tableInfo) {
+
+        if (DscSalesApplyMain.class.getSimpleName().equals(tableInfo)){
+            return Collections.singletonList(DscSalesApplyMain.getByApplyNo(applyNo));
+        }
+
+
+        String hql = " select t from ".concat(tableInfo)
+                .concat(" AS t LEFT JOIN DscSalesApplyMain AS dsam ON t.mainId = dsam.id " +
+                        " WHERE dsam.applyNo = ?1 ");
+        return queryChannel.createJpqlQuery(hql).setParameters(
+                Collections.singletonList(applyNo)).list();
+    }
+
+    private void dealStatus(List<Map<String, Object>> maps){
+        maps.forEach(t -> {
+            t.put("creditSignStateInfo",
+                    getStatusMsg(t.get("creditSignState"), AssetStatusType.creditSignStateInfo));
+            t.put("contractSignStateInfo",
+                    getStatusMsg(t.get("contractSignState"),AssetStatusType.contractSignStateInfo));
+            t.put("preStateInfo",
+                    getStatusMsg(t.get("preState"),AssetStatusType.bankStatusInfo));
+            t.put("firstStateInfo",
+                    getStatusMsg(t.get("firstState"),AssetStatusType.bankStatusInfo));
+            t.put("lastStateInfo",
+                    getStatusMsg(t.get("lastState"),AssetStatusType.bankStatusInfo));
+            t.put("paymentStateInfo",
+                    getStatusMsg(t.get("paymentState"),AssetStatusType.bankStatusInfo));
+        });
+    }
+    
+    
+    
+    private StringBuilder getSql(){
+        return  new StringBuilder(
+                " SELECT new map(ami.applyNo as applyNo, " +
+                        " DATE_FORMAT(ami.createTime,'%Y-%m-%d %H:%i:%s') as createTime, " +
+                        " ami.financialCode as financialCode, ami.deleted as deleted, " +
+                        " dsac.asjhm as phoneNo, dsac.azjhm as idNo, dsac.akhxm as name, " +
+                        " ami.creditSignState as creditSignState, ami.contractSignState as contractSignState, " +
+                        " ami.preState as preState, ami.firstState as firstState,ami.lastState as lastState, " +
+                        " ami.paymentState as paymentState) " +
+                        " FROM AssetMainInfo ami " +
+                        " LEFT JOIN DscSalesApplyMain dsam ON ami.applyNo = dsam.applyNo " +
+                        " LEFT JOIN DscSalesApplyCust dsac ON dsam.id = dsac.mainId ");
+    }
+
+
+    @Override
+    public BaseMsgDTO supplyAttachment(ConditionBaseDto conditionBaseDto){
+
+        List<String> attachmentList = getAttachmentList(conditionBaseDto);
+
+        attachmentComponent.dealAsyncTask(attachmentList);
+        return BaseMsgDTO.successData(attachmentList.toString());
+    }
+
+
+    @Override
+    public List<BaseMsgDTO> supplyAttachmentBank(ConditionBaseDto conditionBaseDto) {
+
+        AttachmentSupplyStrategy supplyStrategy = SpringContextUtil.getBean(
+                "CMBCAttachmentSupplyStrategy",AttachmentSupplyStrategy.class);
+
+        List<BaseMsgDTO> result = new ArrayList<>();
+        if (StringUtils.isNotBlank(conditionBaseDto.getApplyNo())){
+            InvokeResult<BaseMsgDTO> sendResult = supplyStrategy.sendResult(
+                    conditionBaseDto.getApplyNo(),BankPhaseEnum.PAYMENT);
+            result.add((BaseMsgDTO) sendResult.getData());
+        }else {
+            List<String> attachmentList = getAttachmentList(conditionBaseDto);
+            for (String applyNo:attachmentList){
+
+                //查询最近一次的osb_file_log
+                OsbFileLog osbFileLog = getOsbFileLogCurrent(applyNo);
+
+                if (osbFileLog == null || osbFileLog.getDealStatus() != 2){
+                    result.add(BaseMsgDTO.failureData(applyNo+"未找到文件"));
+                    continue;
+                }
+                InvokeResult<BaseMsgDTO> sendResult = supplyStrategy.sendResult(applyNo, BankPhaseEnum.PAYMENT);
+                BaseMsgDTO baseMsgDTO = (BaseMsgDTO) sendResult.getData();
+                baseMsgDTO.setMessage("订单号"+applyNo+baseMsgDTO.getMessage());
+                result.add(baseMsgDTO);
+            }
+        }
+
+        return result;
+    }
+
+
+
+    private OsbFileLog getOsbFileLogCurrent(String applyNo){
+        return OsbFileLog.getOsbFilesByApplyNoAndRequestType(applyNo,BankPhaseEnum.PAYMENT.getPhase());
+    }
+
+
+
+
+    private List<String> getAttachmentList(ConditionBaseDto conditionBaseDto) {
+
+        StringBuilder hql = new StringBuilder(
+                "SELECT DISTINCT ami.applyNo FROM AssetMainInfo ami WHERE ami.deleted = 0 "
+                        + " AND ami.paymentState = 1 AND financialCode = 'CMBC' ");
+        ArrayList<Object> parameters = new ArrayList<>(6);
+
+        int index = 0;
+        if (conditionBaseDto.getStartDate() != null) {
+            hql.append(" AND ami.createTime >= ?".concat(String.valueOf(++index)));
+            parameters.add(conditionBaseDto.getStartDate());
+        }
+
+        if (conditionBaseDto.getEndDate() != null) {
+            hql.append(" AND ami.createTime <= ?".concat(String.valueOf(++index)));
+            parameters.add(conditionBaseDto.getEndDate());
+        }
+        hql.append(" ORDER BY ami.createTime ASC ");
+        String sql = hql.toString();
+        logger.info("资料补传获取历史订单的sql为{}",sql);
+        List<String> list = queryChannel.createJpqlQuery(sql)
+                .setParameters(parameters).list();
+        logger.info("获取到订单的记录为{}",list);
+        return  list;
+    }
+
+
+}

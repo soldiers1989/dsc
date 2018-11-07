@@ -1,0 +1,119 @@
+package com.yixin.kepler.core.domain.cmbc;
+
+import com.yixin.common.exception.BzException;
+import com.yixin.common.utils.DateUitls;
+import com.yixin.common.utils.InvokeResult;
+import com.yixin.kepler.common.RestTemplateUtil;
+import com.yixin.kepler.common.enums.BankPhaseEnum;
+import com.yixin.kepler.common.enums.CMBCTransCodeEnum;
+import com.yixin.kepler.core.config.CMBCConfig;
+import com.yixin.kepler.core.constant.CommonConstant;
+import com.yixin.kepler.core.domain.cmbc.util.CMBCUtil;
+import com.yixin.kepler.dto.BaseMsgDTO;
+import com.yixin.kepler.dto.PretrialDTO;
+import com.yixin.kepler.dto.cmbc.CMBCPreTrialBodyDTO;
+import com.yixin.kepler.dto.cmbc.CMBCReceiveMsgDTO;
+import com.yixin.kepler.dto.cmbc.CMBCRequestDTO;
+import com.yixin.kepler.enity.AssetBankTran;
+import com.yixin.kepler.enity.AssetMainInfo;
+import net.sf.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import java.util.Date;
+
+import static com.yixin.kepler.core.constant.CommonConstant.FAILURE;
+import static com.yixin.kepler.core.constant.CommonConstant.SUCCESS;
+
+/**
+ * Package : com.yixin.kepler.core.domain.cmbc
+ *
+ * @author YixinCapital -- wanghonglin
+ * 2018/6/21 11:56
+ */
+@Service
+public class StateChangeRequest {
+    private static final Logger logger = LoggerFactory.getLogger(StateChangeRequest.class);
+    @Autowired
+    private CMBCConfig cmbcConfig;
+    /**
+     * 组装银行数据
+     * @param mainInfo
+     * @return
+     * @throws BzException
+     */
+    public BaseMsgDTO sendResult(AssetMainInfo assetMainInfo,String notifyType) throws BzException {
+
+        CMBCRequestDTO cmbcRequestDTO = CMBCRequestDTO.getCMBCInstance(
+                CMBCTransCodeEnum.STATE_CHANGE_RESULT);
+        // 1.设置请求头数据基
+        cmbcRequestDTO.setReqSeq(CMBCUtil.createReqSeq()); // 请求方流水号，对应资产编号
+        cmbcRequestDTO.setTransType("000010");
+        cmbcRequestDTO.setMerchantNum(cmbcConfig.getMerchantNum());
+        cmbcRequestDTO.setSystemCode(cmbcConfig.getSystemCode());
+
+        //receiveMsg
+        CMBCReceiveMsgDTO cmbcReceiveMsgDTO = new CMBCReceiveMsgDTO();
+        String chnlTxNo = CMBCUtil.getTradeNo();// 渠道流水号
+        cmbcReceiveMsgDTO.setChnlTxNo(chnlTxNo);
+        cmbcReceiveMsgDTO.setTxDt(DateUitls.dateToStr(new Date(), "yyyyMMdd")); // 交易日期
+        cmbcReceiveMsgDTO.setTxTm(DateUitls.dateToStr(new Date(), "HHmmss")); // 交易时间
+
+
+        CMBCPreTrialBodyDTO cmbcPreTrialDTO = new CMBCPreTrialBodyDTO();
+        cmbcPreTrialDTO.setReceiveMg(cmbcReceiveMsgDTO);
+        cmbcPreTrialDTO.setNotifyType(notifyType);
+        cmbcPreTrialDTO.setSerialNo(assetMainInfo.getAssetNo());
+        cmbcRequestDTO.setBody(cmbcPreTrialDTO);
+        
+        
+        //存储银行交易信息
+        AssetBankTran assetBankTran = new AssetBankTran();
+        assetBankTran.setAssetId(assetMainInfo.getId());
+        assetBankTran.setReqBody(JSONObject.fromObject(cmbcRequestDTO).toString());
+        assetBankTran.setAssetNo(chnlTxNo);
+        assetBankTran.setPhase(BankPhaseEnum.PRE_TRIAL.getPhase());
+        assetBankTran.setReqUrl(cmbcConfig.getOsbReqUrl());
+        assetBankTran.setTranNo(CMBCTransCodeEnum.LAST_TRIAL.getTransCode());
+        assetBankTran.setSender(1);
+        assetBankTran.create();
+
+        logger.info("\n状态变更接口请求报文为{}", assetBankTran.getReqBody());
+        String jsonResult = RestTemplateUtil.sendRequestV2(cmbcConfig.getOsbReqUrl(),
+        		cmbcRequestDTO);
+        logger.info("\n状态变更接口返回报文为:{}",JSONObject.fromObject(jsonResult)
+                .toString());
+        assetBankTran.setRepBody(jsonResult);
+        JSONObject bankResult = JSONObject.fromObject(jsonResult);
+        
+        if (bankResult != null && bankResult.containsKey("body")) {
+        	JSONObject body = JSONObject.fromObject(bankResult.getString("body"));
+            JSONObject returnMsg = body.containsKey("returnMg")
+                    ? body.getJSONObject("returnMg") : null;
+        	if(returnMsg == null){
+                assetBankTran.setApprovalCode(body.getString("rtnSts"));
+                assetBankTran.setApprovalDesc(body.getString("rtnMsg"));
+                assetBankTran.update();
+                return new BaseMsgDTO(CommonConstant.FAILURE,
+                        assetBankTran.getApprovalDesc());
+            }else if("E".equals(returnMsg.getString("rtnSts"))){
+                assetBankTran.setApprovalCode(returnMsg.getString("rtnSts"));
+                assetBankTran.setApprovalDesc(returnMsg.getString("rtnMsg"));
+                assetBankTran.update();
+                return new BaseMsgDTO(CommonConstant.FAILURE,
+                        assetBankTran.getApprovalDesc());
+            }else if("S".equals(returnMsg.getString("rtnSts"))
+                    && "000000".equals(returnMsg.getString("rtnCode"))){
+                assetBankTran.setApprovalCode(returnMsg.getString("rtnSts"));
+                assetBankTran.setApprovalDesc(returnMsg.getString("rtnCode"));
+                assetBankTran.update();
+                return new BaseMsgDTO(CommonConstant.SUCCESS, "success");
+            }
+        }
+		return new BaseMsgDTO(CommonConstant.FAILURE, "failure");
+        
+    }
+        	
+}

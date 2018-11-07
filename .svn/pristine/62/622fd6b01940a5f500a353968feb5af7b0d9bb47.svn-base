@@ -1,0 +1,60 @@
+package com.yixin.kepler.v1.datapackage.dto.yntrust;
+
+/**
+ * @author sukang
+ */
+public class YTConTractFileDTO extends YTCommonRequestDTO{
+
+    /**
+     * 贷款唯一标示
+     */
+    private String UniqueId;
+
+    /**
+     * 获取文件类型
+     * 1、如果项目有多个文件类型需要做电子签章，此字段必填；
+       2、如只有贷款合同需电子签章，此字段选填，默认拉取贷款合同文件；
+     */
+    private String Type;
+
+    /**
+     * 是否获取合同文件内容	填写数字0代表不获取合同内容只是查看文件签章状态
+     */
+
+    private String IsGetFileContent;
+
+
+    public String getUniqueId() {
+        return UniqueId;
+    }
+
+    public void setUniqueId(String uniqueId) {
+        UniqueId = uniqueId;
+    }
+
+    public String getType() {
+        return Type;
+    }
+
+    public void setType(String type) {
+        Type = type;
+    }
+
+    public String getIsGetFileContent() {
+        return IsGetFileContent;
+    }
+
+    public void setIsGetFileContent(String isGetFileContent) {
+        IsGetFileContent = isGetFileContent;
+    }
+
+    @Override
+    public String toString() {
+        final StringBuilder sb = new StringBuilder("YtConTractFileDTO{");
+        sb.append("UniqueId='").append(UniqueId).append('\'');
+        sb.append(", Type='").append(Type).append('\'');
+        sb.append(", IsGetFileContent='").append(IsGetFileContent).append('\'');
+        sb.append('}');
+        return sb.toString();
+    }
+}

@@ -1,0 +1,183 @@
+package com.yixin.kepler.enity;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import javax.persistence.Column;
+import javax.persistence.Entity;
+import javax.persistence.Table;
+
+import org.apache.commons.collections.CollectionUtils;
+
+import com.yixin.common.system.domain.BZBaseEntiy;
+
+
+@Entity
+@Table(name = "sys_dict")
+public class SysDict extends BZBaseEntiy{
+	
+	
+	@Column(name = "alix_field_name", length = 10)
+	private String filedName;
+	
+	
+	@Column(name = "alix_field_code", length = 10)
+	private String filedCode;
+	
+	
+	@Column(name = "alix_dict_code", length = 10)
+	private String dicCode;
+	
+	
+	@Column(name = "alix_dict_name", length = 10)
+	private String dicName;
+	
+	
+	@Column(name = "bank_dict_code", length = 10)
+	private String bankCode;
+	
+	
+	@Column(name = "bank_dict_name", length = 10)
+	private String bankName;
+	
+	/**
+	 * 资方码值， CMBC ,WeBank
+	 */
+	@Column(name = "financial_code", length = 10)
+	private String financialCode;
+
+	public String getFiledName() {
+		return filedName;
+	}
+
+	public void setFiledName(String filedName) {
+		this.filedName = filedName;
+	}
+
+	public String getFiledCode() {
+		return filedCode;
+	}
+
+	public void setFiledCode(String filedCode) {
+		this.filedCode = filedCode;
+	}
+
+	public String getDicCode() {
+		return dicCode;
+	}
+
+	public void setDicCode(String dicCode) {
+		this.dicCode = dicCode;
+	}
+
+	public String getDicName() {
+		return dicName;
+	}
+
+	public void setDicName(String dicName) {
+		this.dicName = dicName;
+	}
+
+	public String getBankCode() {
+		return bankCode;
+	}
+
+	public void setBankCode(String bankCode) {
+		this.bankCode = bankCode;
+	}
+
+	public String getBankName() {
+		return bankName;
+	}
+
+	public void setBankName(String bankName) {
+		this.bankName = bankName;
+	}
+	
+	public String getFinancialCode() {
+		return financialCode;
+	}
+
+	public void setFinancialCode(String financialCode) {
+		this.financialCode = financialCode;
+	}
+	
+	public static List<String> getAllDictBankCode(){
+		String hql = " SELECT DISTINCT(sd.financialCode) FROM SysDict sd WHERE sd.deleted = false";
+     	return getRepository().createJpqlQuery(hql).list();
+	}
+
+	public static List<SysDict> getSysDicByBank(String bankCode){
+		
+		
+		String hql = " SELECT sd FROM SysDict sd WHERE sd.deleted = false and "
+				+ " sd.financialCode = ?1";
+		
+		ArrayList<Object> params = new ArrayList<Object>(1){{
+    		add(bankCode);
+    	}};
+    	
+    	return getRepository().createJpqlQuery(hql).setParameters(params).list();
+	}
+	
+	public static SysDict getFinancialSysDic(String code,String value,String financialCode){
+		String hql = " SELECT sd FROM SysDict sd WHERE sd.filedCode = ?1 and "
+				+ " sd.dicCode = ?2 and sd.financialCode = ?3";
+		
+		ArrayList<Object> params = new ArrayList<Object>(3){{
+    		add(code);
+    		add(value);
+    		add(financialCode);
+    	}};
+    	
+    	return getRepository().createJpqlQuery(hql).setParameters(params).singleResult();
+	}
+
+	public static String getCityPro(String code,String type){
+		
+		String sql = " SELECT alix_name FROM sys_city WHERE alix_code = ?1 AND type = ?2";
+		
+		ArrayList<Object> params = new ArrayList<Object>(2){{
+    		add(code);
+    		add(type);
+    	}};
+    	List<String> resultList = getRepository().createSqlQuery(sql).setParameters(params).list();
+    	if(CollectionUtils.isEmpty(resultList)){
+    		return null;
+    	} else {
+    		return resultList.get(0);
+    	}
+	}
+
+	/**
+	 * 获取alix与银行的融资项码值对应关系
+	 * @param financialCode 资方code
+	 * @param type 类型，如查的是融资项
+	 * @return 对应关系列表
+	 * @author YixinCapital -- chenjiacheng
+	 *             2018/7/18 14:38
+	 */
+	public static List<SysDict> getFinanceCode(String financialCode, String type) {
+		String hql = "select dict from SysDict dict where dict.filedCode=?1 and dict.financialCode=?2";
+		List<Object> conditions = new ArrayList<Object>(2){{
+			add(type);
+			add(financialCode);
+		}};
+		return getRepository().createJpqlQuery(hql).setParameters(conditions).list();
+	}
+
+	public static String getStandardCode(String code,String type) {
+		String sql = " SELECT standard_code FROM sys_city WHERE alix_code = ?1 AND type = ?2 ";
+		
+		ArrayList<Object> params = new ArrayList<Object>(2);
+    	params.add(code);
+    	params.add(type);
+    	
+    	List<String> resultList = getRepository().createSqlQuery(sql).setParameters(params).list();
+    	if(CollectionUtils.isEmpty(resultList)){
+    		return null;
+    	} else {
+    		return resultList.get(0);
+    	}
+	}
+}

@@ -1,0 +1,151 @@
+package com.yixin.web.service.impl;
+
+import com.yixin.common.utils.InvokeResult;
+import com.yixin.common.utils.Page;
+import com.yixin.kepler.common.enums.BankPhaseEnum;
+import com.yixin.kepler.core.listener.SettleOrderEvent;
+import com.yixin.kepler.enity.AssetBankTran;
+import com.yixin.web.common.ConditionConstant;
+import com.yixin.web.dto.AttachmentConditionDto;
+import com.yixin.web.dto.ConditionBaseDto;
+import com.yixin.web.service.BankTransLogService;
+import com.yixin.web.service.base.BaseService;
+import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationContext;
+import org.springframework.stereotype.Service;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+/**
+ * @author sukang
+ */
+
+@Service
+public class BankTransLogServiceImpl extends BaseService implements BankTransLogService{
+
+    private final Logger logger = LoggerFactory.getLogger(getClass());
+
+
+
+
+    private ApplicationContext ioc;
+
+    @Autowired
+    public BankTransLogServiceImpl(ApplicationContext applicationContext) {
+        this.ioc = applicationContext;
+    }
+
+    @Override
+    public Page<Map<String, Object>> getBankTransList(AttachmentConditionDto aConditionDto) {
+
+
+        ArrayList<Object> parameters = new ArrayList<>(4);
+
+        StringBuilder hql = new StringBuilder(
+                " SELECT new map(abt.applyNo as applyNo,"
+                        + " DATE_FORMAT(abt.createTime,'%Y-%m-%d %H:%i:%s') as createTime, "
+                        + " abt.phase AS phase, "
+                        + " abt.approvalCode as approvalCode,abt.approvalDesc as approvalDesc,"
+                        + " abt.reqBody as reqBody,abt.repBody as repBody)"
+                        + " FROM AssetBankTran as abt WHERE 1=1");
+        int index = 0;
+        if (StringUtils.isNotBlank(aConditionDto.getApplyNo())) {
+            hql.append(" and abt.applyNo = ?".concat(String.valueOf(++index)));
+            parameters.add(aConditionDto.getApplyNo());
+        }
+        if (StringUtils.isNotBlank(aConditionDto.getPhase())) {
+            hql.append(" and abt.phase = ?".concat(String.valueOf(++index)));
+            parameters.add(aConditionDto.getPhase());
+        }
+        hql.append(" ORDER BY abt.createTime DESC");
+        String sql = hql.toString();
+        logger.debug("查询银行交易记录sql为{}",sql);
+
+        @SuppressWarnings({ "unchecked" })
+        Page<Map<String, Object>> pagedList = queryChannel.createJpqlQuery(sql)
+                .setParameters(parameters)
+                .setPage(aConditionDto.getCurrentPage(),10)
+                .pagedList();
+        return pagedList;
+    }
+
+    @Override
+    public Page<Map<String, Object>> getSettleFailure(ConditionBaseDto conditionBaseDto) {
+        ArrayList<Object> parameters = new ArrayList<>(4);
+        StringBuilder hql = new StringBuilder(
+                " SELECT new map(abt.applyNo as applyNo,"
+                        + " DATE_FORMAT(abt.createTime,'%Y-%m-%d %H:%i:%s') as createTime,"
+                        + " CASE WHEN abt.approvalCode = 'true' THEN 'success' ELSE 'failure' END as status,"
+                        + " abt.approvalDesc as msgInfo)"
+                        + " FROM AssetBankTran AS abt WHERE abt.deleted = false "
+                        + " AND abt.phase = 'push_file' ");
+
+        int index = 0;
+        if (StringUtils.isNotEmpty(conditionBaseDto.getApplyNo())) {
+            hql.append(" AND abt.applyNo = ?".concat(String.valueOf(++index)));
+            parameters.add(conditionBaseDto.getApplyNo());
+        }
+        //状态1成功 2 失败
+        if (StringUtils.isNotEmpty(conditionBaseDto.getStatus())) {
+            if (ConditionConstant.SETTLE_PUSH_STATUS_SUCCESS.equals(conditionBaseDto.getStatus())) {
+                hql.append(" AND abt.approvalCode = 'true' ");
+            }else if (ConditionConstant.SETTLE_PUSH_STATUS_FAILURE.equals(conditionBaseDto.getStatus())) {
+                hql.append(" AND abt.approvalCode IS NULL OR abt.approvalCode = 'false' ");
+            }
+        }
+
+        if (conditionBaseDto.getStartDate() != null) {
+            hql.append(" AND abt.createTime >= ?".concat(String.valueOf(++index)));
+            parameters.add(conditionBaseDto.getStartDate());
+        }
+        if (conditionBaseDto.getEndDate() != null) {
+            hql.append(" AND abt.createTime <= ?".concat(String.valueOf(++index)));
+            parameters.add(conditionBaseDto.getEndDate());
+        }
+
+        hql.append(" ORDER BY abt.createTime DESC");
+        String sql = hql.toString();
+        logger.debug("获取结算推送记录的sql为{}",sql);
+
+        @SuppressWarnings("unchecked")
+        Page<Map<String,Object>> pagedList = queryChannel.createJpqlQuery(sql)
+                .setParameters(parameters)
+                .setPage(conditionBaseDto.getCurrentPage(),10)
+                .pagedList();
+        return pagedList;
+    }
+
+    @Override
+    public InvokeResult<Boolean> pushSettle(String applyNo) {
+        InvokeResult<Boolean> result = new InvokeResult<>();
+
+        List<AssetBankTran> assetBankTrans = AssetBankTran.getByApplyNo(applyNo,
+                BankPhaseEnum.PAYMENT.getPhase());
+
+        if (CollectionUtils.isEmpty(assetBankTrans)) {
+            return result.failure("订单还未请款");
+        }
+        List<AssetBankTran> pushFiles = AssetBankTran.getByApplyNo(applyNo,
+                BankPhaseEnum.PUSHFILE.getPhase());
+
+        if (CollectionUtils.isNotEmpty(pushFiles)) {
+            List<AssetBankTran> collect = pushFiles
+                    .stream()
+                    .filter(t -> "true".equals(t.getApprovalCode()))
+                    .collect(Collectors.toList());
+            if (CollectionUtils.isNotEmpty(collect)) {
+                return result.failure("该订单已推送成功");
+            }
+        }
+        //调用监听推送数据
+        ioc.publishEvent(new SettleOrderEvent(applyNo));
+        return result.success();
+    }
+}

@@ -1,0 +1,360 @@
+package com.yixin.kepler.core.constant;
+
+/**
+ * 存放定义的常量
+ *
+ * @author YixinCapital -- chenjiacheng
+ * 2018年05月04日 13:50
+ **/
+public interface CommonConstant {
+
+    /**
+     * 固定json类型
+     */
+    String APPLICATION_CONTENTTYPE = "application/json";
+
+    /**
+     * 压缩请求处理结果
+     */
+    interface DealStatus {
+        /**
+         * 未处理
+         */
+        Integer UNTREATED = 0;
+
+        Integer TREATING = 1;
+
+        /**
+         * 已处理
+         */
+        Integer TREATED = 2;
+
+        /**
+         * 处理失败
+         */
+        Integer FAILURE = 3;
+    }
+
+    /**
+     * 银行名称
+     */
+    interface BankName{
+    	String YX = "YX";
+    	/** 民生  */
+        String CMBC = "CMBC";
+        /** 微众 */
+        String WB_BANK = "WeBank";
+        /** 工行  */
+		String ICBC_BANK = "ICBC";
+		/** 云南信托  */
+		String YNTRUST_BANK = "YNTRUST";
+    }
+
+    /**
+     * 操作成功的标识（通用）
+     */
+    String TRUE = "true";
+
+    /**
+     * 操作失败的标识（通用）
+     */
+    String FALSE = "false";
+
+    /**
+     * 默认压缩比例
+     */
+    double scale = 0.8;
+
+    /**
+     * 默认的最大压缩值
+     */
+    long maxSize = 1024;
+
+    /**
+     * 压缩文件所属文件夹
+     */
+    String IMAGE_COMPRESS = "imageCompress";
+
+    /**
+     * 未处理
+     */
+    int DEAL_STATUS_UNDEAL = 0;
+
+    /**
+     * 处理中
+     */
+    int DEAL_STATUS_DEALING = 1;
+
+    /**
+     * 已处理
+     */
+    int DEAL_STATUS_DEALED = 2;
+
+    /**
+     * 无效的数据(流程状态不对)
+     */
+    int DEAL_STATUS_INVALID = 3;
+
+    /**
+     * osb文件处理失败，需要重新上传
+     */
+    int DEAL_STATUS_OSB_FAILURE = 4;
+
+
+    /**
+     * 易鑫的code编码
+     */
+    String YIXIN_CODE = "yx";
+
+    int UPLOAD_TYPE = 0;
+
+    int DOWNLOAD_TYPE = 1;
+
+    /**
+     * osb返回的成功码值
+     */
+    String OSB_SUCCESS = "0000";
+
+    String ZIP_COMPRESS_FORMAT = "zip";
+    String TAR_COMPRESS_FORMAT = "tar";
+    String TARGZ_COMPRESS_FORMAT = "tar.gz";
+
+    //成功
+    String SUCCESS = "100000";
+    //失败
+    String FAILURE = "100001";
+    
+    //字段项驳回
+    String REJECT_DATA = "100005";
+    
+    //附件驳回
+    String REJECT_FILE = "100006";
+    //进行中
+    String PROCESSING = "100002";
+    //未处理
+    String UNTREATED = "100004";
+    
+    
+    String NO_THROUGH = "100003";//不通过
+
+
+    interface PreposeResultCode {
+    	
+        String NORMAL = "200000"; //正常流转
+        
+        String SKIP = "200001"; //跳转
+        
+    }
+
+
+    String RCSC542 = "RCSC542";//民生四要素不通过
+
+    public static final String TC001 = "TC001";//微众银行撤销订单
+    public static final String TC001_DSC = "订单撤销";
+    /**
+     * 附件下载状态
+     */
+    int ATTACH_DOWNLOAD_STATE = 0;
+
+	interface DiscountType {
+
+		/**
+		 * 贴息
+		 */
+		String DISCOUNT_YES = "1";
+
+		/**
+		 * 不贴息
+		 */
+		String DISCOUNT_NO = "0";
+
+	}
+
+	/**
+	 * 微众接口请求，成功响应状态码
+	 */
+	String WB_RESP_CODE = "0000";
+
+	/**
+	 * 发送方（1 易鑫 2银行）
+	 */
+	interface SenderType {
+		/** 易鑫 */
+		Integer YIXIN = 1;
+
+		/** 银行 */
+		Integer BANK = 2;
+	}
+
+	/**
+	 * 将bigDecimal转换成小数模式(4位)
+	 */
+	String TO_POIOT_FOUR = "to_point_4";
+	/**
+	 * 将bigDecimal转换成小数模式（2位） 0.12
+	 */
+	String TO_POIOT_TWO = "to_point_2";
+
+	/**
+	 * alix与微众融资项映射
+	 */
+	String FINANCE_CODE = "finance";
+
+	/**
+	 * alix的融资项映射
+	 */
+	interface FinanceType {
+		/**
+		 * 车款
+		 */
+		String F010 = "F010";
+
+		/**
+		 * gps
+		 */
+		String F060 = "F060";
+
+		/**
+		 * 购置税
+		 */
+		String F050 = "F050";
+
+		/**
+		 * 交强险
+		 */
+		String F091 = "F091";
+
+		/**
+		 * 商业险
+		 */
+		String F101 = "F101";
+
+		/**
+		 * 车船税
+		 */
+		String F121 = "F121";
+
+		/**
+		 * 担保费
+		 */
+		String F117 = "F117";
+
+		/**
+		 * 银行需要的融资项  其值为alix的保险总值  即=交强险+商业险+车船税
+		 */
+		String INS = "INS";
+
+		/**
+		 * 账户管理费/平台管理费
+		 */
+		String F011 = "F011";
+
+		/**
+		 * 无忧盗抢险第一年
+		 */
+		String F111 = "F111";
+		/**
+		 * 加装费
+		 */
+		String F012 = "F012";
+		/**
+		 * 延保
+		 */
+		String F030 = "F030";
+		/**
+		 * 易鑫服务费融资额
+		 */
+		String F013 = "F013";
+		/**
+		 * 责信保正常类型
+		 */
+		String F014 = "F014";
+		/**
+		 * //责信保二档类型
+		 */
+		String F015 = "F015";
+		/**
+		 * 责信保一档类型
+		 */
+		String F016 = "F016";
+		/**
+		 * 责信保三档类型
+		 */
+		String F017 = "F017";
+	}
+
+	/**
+	 * 微众错误码
+	 */
+	interface WeBankErrorCode {
+		/** VIN码格式错误 */
+		String VIN = "1034";
+		
+		/**开户拒绝-负债收入比不准入  */
+		String MONEY = "1036";
+		
+		/** 表示 ticket 不存在或已失效，需重新获取 ticket凭据 */
+		String TICKET_NONE = "1017";
+		
+		/** 表示参与签名的 ticket 不正确 */
+		String TICKET_INCORRECT = "1018";
+
+		/** 表示请款返回交易超时 */
+		String TRADE_TIMEOUT = "0003";
+	}
+	
+	/**
+	 * 云南信托错误码
+	 */
+	interface YNTrustErrorCode {
+		/** 成功  */
+		String SUCCESS = "0000";
+		
+		/** 成功上传 */
+		String SYNC_SUCCESS = "60200039";
+		
+	}
+	
+	String ZERO = "0";
+	
+	String ONE = "1";
+	
+	String TWO = "2";
+
+	interface Message {
+		String CANCEL_FAILD_CREDITFRONT = "取消订单失败,该订单正在信审中";
+		
+		String CANCEL_FAILD_REQUEST_ING = "取消订单失败,该订单正在请款中";
+		
+		String CANCEL_FAILD_REQUEST_END = "取消订单失败,该订单已请款完成";
+	}
+	
+	/**
+	 *	结算标识
+	 */
+	interface SettleVariable {
+		
+		String VALET = "VALET";
+	}
+
+	/**
+	 * 云信银行用的网关
+	 */
+	interface YTChannelCode {
+		/**
+		 * 中金
+		 */
+		int ZHONGJIN = 1;
+
+		/**
+		 * 通联
+		 */
+		int TONGLIAN = 2;
+
+		/**
+		 * 广银联
+		 */
+		int GUANGYINLIAN = 3;
+
+	}
+}

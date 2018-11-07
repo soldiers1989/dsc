@@ -1,0 +1,151 @@
+package com.yixin.web.service.monitor.impl;
+
+import com.alibaba.fastjson.JSON;
+import com.google.common.collect.Maps;
+import com.yixin.dsc.dto.DscFlowResultForAlixDto;
+import com.yixin.dsc.enumpackage.DscAlixLinkEnum;
+import com.yixin.dsc.util.DateUtil;
+import com.yixin.web.common.enums.OrderOperate;
+import com.yixin.web.dto.monitor.OrderStepDurationDto;
+import com.yixin.web.entity.MOrderFlow;
+import com.yixin.web.entity.MOrderInfo;
+import com.yixin.web.service.monitor.OrderOperateService;
+import org.apache.commons.lang3.StringUtils;
+import org.assertj.core.util.Lists;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
+
+import java.util.Comparator;
+import java.util.Date;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * @description:
+ * @date: 2018-10-11 10:51
+ */
+@Service
+public class OrderOperateServiceImpl implements OrderOperateService {
+
+    private final Logger logger = LoggerFactory.getLogger(getClass());
+
+
+    @Override
+    public void recordOrderOperate(String applyNo, OrderOperate operate, String remark) {
+
+        logger.info("record order operate start, applyNo:{}, operate:{}, remark:{}", applyNo, operate, remark);
+        if (StringUtils.isEmpty(applyNo) || operate == null) {
+            return;
+        }
+
+        try {
+            //更新申请单数据主表状态
+            MOrderInfo orderInfo = MOrderInfo.findFirstByProperty(MOrderInfo.class, "applyNo", applyNo);
+            int status = operate.getValue();
+
+            if (orderInfo == null) {
+                orderInfo = new MOrderInfo();
+                orderInfo.setApplyNo(applyNo);
+                orderInfo.setStatus(status);
+                orderInfo.create();
+            } else {
+                orderInfo.setStatus(status);
+                orderInfo.update();
+            }
+
+            MOrderFlow orderFlow = new MOrderFlow();
+
+            Map<String, Object> params = Maps.newConcurrentMap();
+            params.put("applyNo", applyNo);
+            params.put("latest", 0);
+            MOrderFlow latestOrderFlow = MOrderFlow.findFirstByProperties(MOrderFlow.class, params);
+
+            if (latestOrderFlow != null) {
+                latestOrderFlow.setLatest(1);
+                latestOrderFlow.update();
+
+                orderFlow.setPreviousId(latestOrderFlow.getId());
+            }
+
+
+            //添加申请单流程记录
+            orderFlow.setApplyNo(applyNo);
+            orderFlow.setStatus(status);
+            orderFlow.setRemark(remark);
+            orderFlow.setLatest(0);
+            orderFlow.create();
+
+            logger.info("record order operate end, applyNo:{}, operate:{}, remark:{}", applyNo, operate, remark);
+
+        } catch (Exception e) {
+            logger.error("record order operate error, applyNo:{}, operate:{}, remark:{}", applyNo, operate, remark);
+        }
+    }
+
+    @Override
+    public void recordOrderOperate(DscFlowResultForAlixDto resultForAlix) {
+        if (resultForAlix == null) {
+            return;
+        }
+
+        try {
+            String applyNo = resultForAlix.getApplyNo();
+            String link = resultForAlix.getLink();
+            String message = resultForAlix.getMessage();
+
+            if (DscAlixLinkEnum.CREDITFRONT.getCode().equals(link)) {
+                recordOrderOperate(applyNo, OrderOperate.PUSH_ALIX_AUDIT_RESULT, message);
+            }
+
+        } catch (Exception e) {
+            logger.error("record order operate error");
+
+        }
+
+    }
+
+    @Override
+    public OrderStepDurationDto queryOrderStepDurationInfo(Integer statsBefore, Integer statusAfter, Date queryDate) {
+
+        List<Map<String, Date>> operateTimeBetweenStatus = MOrderFlow.queryOperateTimeBetweenStatus(statsBefore, statusAfter, DateUtil.getStartOfDay(queryDate), DateUtil.getEndOfDay(queryDate));
+
+        if (operateTimeBetweenStatus == null || operateTimeBetweenStatus.size() <= 0) {
+            return null;
+        }
+
+        OrderStepDurationDto result = new OrderStepDurationDto();
+
+        List<Long> durations = Lists.newArrayList();
+
+        long totalDuration = 0;
+
+        for (Map<String, Date> operateDurationItem : operateTimeBetweenStatus) {
+
+            Date dateBefore = operateDurationItem.get("dateBefore");
+            Date dateAfter = operateDurationItem.get("dateAfter");
+
+            if (dateAfter == null || dateBefore == null) {
+                continue;
+            }
+
+            long durationHours = DateUtil.getMinutesBetweentDates(dateBefore, dateAfter);
+            totalDuration = totalDuration + durationHours;
+
+            durations.add(durationHours);
+        }
+
+        durations.sort(Comparator.naturalOrder());
+
+        int durationCount = durations.size();
+
+        result.setMin(durations.get(0));
+        result.setMax(durations.get(durationCount - 1));
+        result.setMid(durations.get(durationCount / 2));
+        result.setAverage(totalDuration / durationCount);
+
+        logger.info(JSON.toJSONString(result));
+
+        return result;
+    }
+}

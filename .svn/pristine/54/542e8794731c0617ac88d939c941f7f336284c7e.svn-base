@@ -1,0 +1,61 @@
+package com.yixin.web.runnable;
+
+import com.yixin.common.system.ioc.SpringContextUtil;
+import com.yixin.web.dto.message.MessageInfoDTO;
+import com.yixin.web.service.message.EmailSendService;
+import com.yixin.web.service.monitor.NoticeRuleService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * 业务异常通知 task
+ *
+ * @description:
+ * @date: 2018-10-08 16:50
+ */
+public class BzErrorNoticeRunnable implements Runnable {
+    private Logger logger = LoggerFactory.getLogger(getClass());
+
+
+    private EmailSendService emailSendService;
+
+    private MessageInfoDTO messageInfo;
+
+    private NoticeRuleService noticeRuleService;
+
+    /**
+     * 用于标识
+     */
+    private String noticeId;
+
+
+    public BzErrorNoticeRunnable(MessageInfoDTO messageInfo, String noticeId) {
+        this.messageInfo = messageInfo;
+        this.noticeId = noticeId;
+    }
+
+    @Override
+    public void run() {
+
+        //初始化
+        init();
+
+        //判断是否需要再发
+        Boolean needNotice = noticeRuleService.judgeNeedNotice(noticeId + "_bz_error");
+        logger.info("bz error notice,judge need notice, notice id:{}, result:{}", noticeId, needNotice);
+        if (needNotice != null && !needNotice) {
+            logger.warn("bz error notice, need not notice, notice id :{}", noticeId);
+            return;
+        }
+
+        //发送邮件
+        emailSendService.sendEmail(messageInfo);
+    }
+
+    private void init() {
+        emailSendService = SpringContextUtil.getBean(EmailSendService.class);
+        noticeRuleService = SpringContextUtil.getBean(NoticeRuleService.class);
+    }
+
+
+}

@@ -1,0 +1,170 @@
+package com.yixin.kepler.v1.service.capital.yntrust;
+
+import javax.annotation.Resource;
+
+import org.apache.commons.lang.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
+
+import com.alibaba.fastjson.JSON;
+import com.yixin.common.utils.JsonObjectUtils;
+import com.yixin.dsc.util.PropertiesManager;
+import com.yixin.dsc.v1.service.capital.yntrust.YTCommonService;
+import com.yixin.kepler.common.RestTemplateUtil;
+import com.yixin.kepler.common.UrlConstant;
+import com.yixin.kepler.common.enums.AssetStateEnum;
+import com.yixin.kepler.common.enums.BankPhaseEnum;
+import com.yixin.kepler.core.constant.CommonConstant;
+import com.yixin.kepler.core.service.BankResultService;
+import com.yixin.kepler.dto.BaseMsgDTO;
+import com.yixin.kepler.enity.AssetBankTran;
+import com.yixin.kepler.enity.AssetMainInfo;
+import com.yixin.kepler.enity.AssetOrderFlow;
+import com.yixin.kepler.enity.AssetResultTask;
+import com.yixin.kepler.v1.common.enumpackage.YNTrustUrlEnum;
+import com.yixin.kepler.v1.datapackage.dto.other.LoanInfoDTO;
+import com.yixin.kepler.v1.datapackage.dto.yntrust.YTCommonStatusDTO;
+import com.yixin.kepler.v1.datapackage.dto.yntrust.YTPaymentBankResultRequestDTO;
+import com.yixin.kepler.v1.datapackage.dto.yntrust.YTPaymentResultDTO;
+
+/**
+ * 云南信托放款结果主动查询
+ * Package : com.yixin.kepler.v1.service.capital.yntrust
+ * 
+ * @author YixinCapital -- wangwenlong
+ *		   2018年9月20日 上午10:32:59
+ *
+ */
+@Service("YNTRUSTResultService")
+public class PaymentBankResultServiceImpl implements BankResultService {
+
+	private final Logger logger = LoggerFactory.getLogger(PaymentBankResultServiceImpl.class);
+	
+	@Resource
+	private YTCommonService commonService;
+	
+	@Resource
+	private PropertiesManager propertiesManager;
+	
+	@Override
+	public BaseMsgDTO selectResult(AssetResultTask assetResultTask) {
+		BaseMsgDTO resultMsg = BaseMsgDTO.processData("进行中");
+		String applyNo = assetResultTask.getApplyNo();
+		logger.info("云南信托放款结果主动查询任务开始，订单编号:{}",applyNo);
+		AssetMainInfo assetMainInfo = AssetMainInfo.getByApplyNo(applyNo);
+		logger.info("云南信托放款结果主动查询任务,订单编号:{},银行交互主表数据assetMainInfo:{}", applyNo,JsonObjectUtils.objectToJson(assetMainInfo));
+		if(assetMainInfo == null){
+			logger.error("云南信托放款结果主动查询任务,业务主表数据为空,订单编号:{}", applyNo);
+			return BaseMsgDTO.failureData(String.format("云南信托放款结果主动查询任务,业务主表数据为空,订单编号:%s", applyNo));
+		}
+		if(!CommonConstant.BankName.YNTRUST_BANK.equals(assetMainInfo.getFinancialCode())){
+			logger.error("云南信托放款结果主动查询任务,业务主表数据资方不是云南信托，不可查询,订单编号:{}", applyNo);
+			return BaseMsgDTO.failureData(String.format("云南信托请款,业务主表数据资方不是云南信托,不可查询,订单编号:%s", applyNo));
+		}
+		/*if(!AssetStateEnum.DOING.getState().equals(assetMainInfo.getPaymentState())){
+			logger.error("云南信托放款结果主动查询任务,订单并未请款或请款成功，不可查询,订单编号:{}", applyNo);
+			return BaseMsgDTO.failureData(String.format("云南信托放款结果主动查询任务,订单并未请款或请款成功，不可查询,订单编号:%s", applyNo));
+		}*/
+		String uniqueId = assetMainInfo.getVenusApplyNo();
+		if(StringUtils.isBlank(uniqueId)){ //云南信托唯一标识，在信审阶段(创建订单处生成)
+			logger.error("云南信托放款结果主动查询任务,云南信托唯一标识UniqueId为空，不可查询,订单编号:{}", applyNo);
+			return BaseMsgDTO.failureData(String.format("云南信托放款结果主动查询任务,云南信托唯一标识UniqueId为空，不可查询,订单编号:%s", applyNo));
+		}
+		YTPaymentBankResultRequestDTO requestDto = new YTPaymentBankResultRequestDTO();
+		requestDto.setUrl(YNTrustUrlEnum.QUERY_TRADING_STATUS.getUrl()); // 第三方合作伙伴查询放款状态 /Loan/QueryTradingStatus
+		requestDto.setUniqueId(uniqueId);//云南信托唯一标识
+		requestDto.setRequestId(commonService.getRequestId()); //标示请求唯一性的值,不能为空和重复的值，可以防止重复请求和追踪和排查问题。
+		
+		String osbUrl = this.propertiesManager.getOsbEnvironment() + UrlConstant.OsbSystemUrl.ynTrustInterface;
+		
+		//添加银行交易信息
+        AssetBankTran assetBankTran = new AssetBankTran();
+        assetBankTran.setReqBody(JsonObjectUtils.objectToJson(requestDto)); //请求报文
+        assetBankTran.setApplyNo(assetMainInfo.getApplyNo()); //订单编号
+        assetBankTran.setAssetId(assetMainInfo.getId()); //银行交易主表ID
+        assetBankTran.setAssetNo(assetMainInfo.getVenusApplyNo()); 
+        assetBankTran.setTranNo(requestDto.getRequestId()); //交易流水号
+        assetBankTran.setBankOrderNo(assetMainInfo.getBankOrderNo()); //云信订单唯一标识
+        assetBankTran.setPhase(BankPhaseEnum.PAYMENT_RESULT_QUERY.getPhase()); //请款结果查询阶段
+        assetBankTran.setReqUrl(osbUrl); //请求osb URL
+        assetBankTran.setApiCode(requestDto.getUrl()); //云信请求接口
+        assetBankTran.setSender(CommonConstant.SenderType.YIXIN); //发送方为易鑫
+        assetBankTran.create();
+        
+        //发送银行请求并获取返回结果json
+        logger.info("\n云南信托放款结果主动查询任务，发送查询请求开始,订单编号:{},请求参数为{}",assetMainInfo.getApplyNo(),assetBankTran.getReqBody());
+        String result = RestTemplateUtil.sendRequest(osbUrl, assetBankTran.getReqBody(),CommonConstant.BankName.YNTRUST_BANK);
+        logger.info("\n云南信托放款结果主动查询任务，发送查询请求结束,订单编号:{},返回结果为{}",assetMainInfo.getApplyNo(),result);
+        
+		if(StringUtils.isBlank(result)){
+			this.updateBankTran(result, null, "云南信托放款结果主动查询任务返回结果为空", assetBankTran);
+			logger.error("云南信托放款结果主动查询任务返回结果为空，等待下次继续发送查询请求,订单编号:{}",assetMainInfo.getApplyNo());
+			return new BaseMsgDTO(CommonConstant.PROCESSING,"进行中");
+		}
+		String jsonResponse = commonService.parseResponse(result);
+		YTPaymentResultDTO paymentDto = null;
+		try {
+			paymentDto = JSON.parseObject(jsonResponse, YTPaymentResultDTO.class);
+		} catch (Exception e) {
+			logger.error("云南信托放款结果主动查询任务返回报文解析异常，返回报文:{},异常信息:{}",jsonResponse,e.getMessage(),e);
+			return BaseMsgDTO.failureData(String.format("云南信托放款结果主动查询任务返回报文解析异常,订单编号:%s", applyNo));
+		}
+		if(paymentDto == null || paymentDto.getStatus() == null){
+        	this.updateBankTran(result, null, "云南信托放款结果主动查询任务返回报文错误，解析为空", assetBankTran);
+        	logger.error("云南信托放款结果主动查询任务返回报文错误 解析结果为空，等待下次继续发送放款指令,订单编号:{}",assetMainInfo.getApplyNo());
+        	return resultMsg;
+        }
+		YTCommonStatusDTO status = paymentDto.getStatus();
+		this.updateBankTran(result, status.getResponseCode(), status.getResponseMessage(), assetBankTran);
+		if(status.getIsSuccess()!=null && status.getIsSuccess()){ //请求成功
+			LoanInfoDTO loanInfo = paymentDto.getLoanInfo();
+			if(loanInfo == null){
+				logger.info("云南信托放款结果主动查询任务,解析云信放款信息为空,订单编号:{},UniqueId:{}",assetMainInfo.getApplyNo(),paymentDto.getUniqueId());
+				return resultMsg;
+			}
+			if(CommonConstant.ZERO.equals(loanInfo.getProcessStatus())){ //查询是否在放款中
+				return resultMsg;
+			}
+			if(!loanInfo.getLoanSuccess()){ //放款没有成功
+				logger.info("云南信托放款结果主动查询任务 ,解析云信放款信息放款状态为失败,订单编号:{},UniqueId:{}",assetMainInfo.getApplyNo(),paymentDto.getUniqueId());
+				return BaseMsgDTO.successData("success");
+			}
+			
+			assetMainInfo.setPaymentState(AssetStateEnum.SUCCESS.getState());
+			assetMainInfo.update();
+			logger.info("云南信托请款结果回调,订单编号:{},UniqueId：{},更新请款状态为成功",assetMainInfo.getApplyNo(),paymentDto.getUniqueId());
+			
+			//============== 向结算推送订单放款信息 =========================
+			loanInfo.setApplyNo(assetMainInfo.getApplyNo()); //订单编号
+			loanInfo.setFinancialCode(CommonConstant.BankName.YNTRUST_BANK);
+			logger.info("云南信托放款结果主动查询任务-向结算推送订单放款信息 ,订单编号:{},UniqueId:{},解析云信放款信息:{}",assetMainInfo.getApplyNo(),paymentDto.getUniqueId(),JSON.toJSONString(loanInfo));
+			commonService.pushSettleLoanInfo(loanInfo);
+			
+			//============== 更新k_asset_order_flow 放款时间 ===============
+			AssetOrderFlow.recordLoanInfo(assetMainInfo.getApplyNo(), paymentDto.getPaymentDetails(), loanInfo.getLoanDime());
+			logger.info("云南信托放款结果主动查询任务-更新k_asset_order_flow 放款时间,订单编号:{}",assetMainInfo.getApplyNo());
+			return BaseMsgDTO.successData("success");
+		}
+		logger.info("云南信托放款结果主动查询任务结束，订单编号:{}",applyNo);
+		return resultMsg;
+	}
+	
+	
+	/**
+	 * 更新银行交易结果
+	 * @param result
+	 * @param code
+	 * @param errorMsg
+	 * @param assetBankTran 
+	 * @author YixinCapital -- wangwenlong
+	 *	       2018年9月19日 下午3:28:05
+	 */
+	private void updateBankTran(String result,String code,String errorMsg,AssetBankTran assetBankTran){
+		assetBankTran.setRepBody(result); //响应报文
+        assetBankTran.setApprovalCode(code); //错误码
+        assetBankTran.setApprovalDesc(errorMsg); //错误描述
+        assetBankTran.update();
+	}
+
+}

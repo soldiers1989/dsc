@@ -1,0 +1,97 @@
+package com.yixin.kepler.v1.service.capital.yntrust;
+
+import org.apache.commons.lang3.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.alibaba.fastjson.JSON;
+import com.alibaba.fastjson.JSONObject;
+import com.yixin.kepler.common.enums.BankPhaseEnum;
+import com.yixin.kepler.core.constant.CommonConstant;
+import com.yixin.kepler.enity.AssetBankTran;
+import com.yixin.kepler.enity.AssetMainInfo;
+import com.yixin.kepler.enity.AssetOrderFlow;
+import com.yixin.kepler.enity.AssetResultTask;
+import com.yixin.kepler.v1.datapackage.dto.yntrust.YTPaymentResultDTO;
+
+@Service("YNTRUSTPaymentCallBackStrategy")
+public class PaymentCallBackStrategy {
+
+	private static final Logger LOGGER = LoggerFactory.getLogger(PaymentCallBackStrategy.class);
+	
+	@Transactional
+	public String execute(String callbackjson) {
+		JSONObject returnJson = new JSONObject();
+		returnJson.put("success", false); //回调是否成功
+		if(StringUtils.isBlank(callbackjson)){
+			LOGGER.error("云南信托请款结果回调报文为空，返回资方结果为false");
+			return returnJson.toJSONString();
+		}
+		YTPaymentResultDTO paymentDto = null;
+		try {
+			paymentDto = JSON.parseObject(callbackjson, YTPaymentResultDTO.class);
+		} catch (Exception e) {
+			LOGGER.error("云南信托请款结果回调报文解析异常，返回资方结果为false，回调报文:{},异常信息:{}",callbackjson,e.getMessage(),e);
+			return returnJson.toJSONString();
+		}
+		if(paymentDto == null || StringUtils.isBlank(paymentDto.getUniqueId())){
+			LOGGER.error("云南信托请款结果回调报文解析异常，返回资方结果为false，回调报文:{}",callbackjson);
+			return returnJson.toJSONString();
+		}
+		
+		AssetMainInfo assetMainInfo = AssetMainInfo.getByVenusApplyNo(paymentDto.getUniqueId());
+		if(assetMainInfo == null){
+			LOGGER.error("云南信托请款结果回调报文通过UniqueId获取不到银行交互主表assetMainInfo，返回资方结果为false，UniqueId:{},回调报文:{},",paymentDto.getUniqueId(),callbackjson);
+			return returnJson.toJSONString();
+		}
+		LOGGER.info("云南信托请款结果回调,通过UniqueId：{}，获取到银行交互主表assetMainInfo：{}",paymentDto.getUniqueId(),JSON.toJSONString(assetMainInfo));
+		
+		//============= 保存 回调报文 =============================
+		this.saveAssetBankTran(paymentDto, callbackjson,assetMainInfo);
+		
+		/*if(AssetStateEnum.SUCCESS.getState().equals(assetMainInfo.getPaymentState())){ //请款成功
+			LOGGER.info("云南信托请款结果回调,请款结果已经成功，不再处理，直接返云南信托为true");
+			returnJson.put("success", true); //回调是否成功
+			LOGGER.info("云南信托请款结果回调,订单编号:{},UniqueId:{},返回结果:{}",assetMainInfo.getApplyNo(),paymentDto.getUniqueId(),returnJson.toJSONString());
+			return returnJson.toJSONString();
+		}*/
+		
+		/*//============= 向alix推送请款结果消息  =============================
+		DscFlowResultForAlixDto messageDto = DscFlowResultForAlixDto.createForAliDto(assetMainInfo.getApplyNo(), true, "请款成功", DscAlixLinkEnum.REQUEST_FUNDS);
+		ioc.publishEvent(new ResultNotifyEvent(messageDto));
+		LOGGER.info("云南信托请款结果回调处理成功,订单编号:{},UniqueId:{},向alix推送请款结果消息:{}",
+				assetMainInfo.getApplyNo(),paymentDto.getUniqueId(),JsonObjectUtils.objectToJson(messageDto));*/
+		
+		//============== 停用请款结果主动查询任务 ==================
+		Boolean stopResult = AssetResultTask.stopTaskByApplyNo(assetMainInfo.getApplyNo());
+		LOGGER.info("云南信托请款结果回调-停用请款结果主动查询任务,订单编号:{},UniqueId:{},操作结果:{}",assetMainInfo.getApplyNo(),paymentDto.getUniqueId(),stopResult);
+		
+		//============== 更新k_asset_order_flow 放款时间 ===============
+		AssetOrderFlow.recordLoanInfo(assetMainInfo.getApplyNo(), paymentDto.getPaymentDetails(), paymentDto.getActExcutedTime());
+		LOGGER.info("云南信托请款结果回调-更新k_asset_order_flow 放款时间,订单编号:{},UniqueId:{}",assetMainInfo.getApplyNo(),paymentDto.getUniqueId());
+		returnJson.put("success", true); //回调是否成功
+		LOGGER.info("云南信托请款结果回调,订单编号:{},UniqueId:{},返回结果:{}",assetMainInfo.getApplyNo(),paymentDto.getUniqueId(),returnJson.toJSONString());
+		return returnJson.toJSONString();
+	}
+	
+	private void saveAssetBankTran(YTPaymentResultDTO paymentDto,String json,AssetMainInfo assetMainInfo){
+		LOGGER.info("云南信托请款结果回调，唯一标识uniqueId：{},保存 回调报文 ",paymentDto.getUniqueId());
+		AssetBankTran callbackTran = new AssetBankTran();
+		callbackTran.setTranNo(null); //业务流水
+		callbackTran.setReqBody(json);
+		callbackTran.setApplyNo(assetMainInfo.getApplyNo());
+		callbackTran.setAssetId(assetMainInfo.getId());
+		callbackTran.setBankOrderNo(assetMainInfo.getBankOrderNo()); //云信唯一交互标识
+		
+		callbackTran.setPhase(BankPhaseEnum.PAYMENT.getPhase());
+		callbackTran.setReqUrl(null);
+		callbackTran.setApiCode(null); //
+		callbackTran.setSender(CommonConstant.SenderType.BANK); 
+		callbackTran.setRepBody(null); //相应
+		callbackTran.setApprovalCode(null); //错误码
+		callbackTran.setApprovalDesc(null); //错误描述
+		callbackTran.create();
+	}
+}

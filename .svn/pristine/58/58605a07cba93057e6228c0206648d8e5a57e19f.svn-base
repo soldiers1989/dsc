@@ -1,0 +1,7 @@
+mysqldb.url=jdbc:mysql://10.1.2.12:3306/dsc?useUnicode=true&characterEncoding=UTF-8
+mysqldb.username=dsc_writer
+mysqldb.password=nopass.2
+
+mongodb.uri=mongodb://dsc_rw:dsc#123uhb@10.1.2.12:27017,10.1.2.14:27017/dsc
+
+redis.nodes=redis-g1-01.uat.bd.dk:6379,redis-g1-04.uat.bd.dk:6379,redis-g1-06.uat.bd.dk:6379

@@ -1,0 +1,831 @@
+package com.yixin.kepler.core.attachment;/**
+ * Created by liushuai2 on 2017/8/9.
+ */
+
+import java.util.Date;
+import java.util.List;
+import java.util.Objects;
+import java.util.UUID;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.Assert;
+import org.springframework.util.StringUtils;
+
+import com.yixin.common.system.ioc.SpringContextUtil;
+import com.yixin.common.utils.DateUitls;
+import com.yixin.common.utils.JsonObjectUtils;
+import com.yixin.dsc.util.PropertiesManager;
+import com.yixin.kepler.common.JacksonUtil;
+import com.yixin.kepler.common.MD5Utils;
+import com.yixin.kepler.common.PropertiesFactory;
+import com.yixin.kepler.common.RabbitMQConstants;
+import com.yixin.kepler.common.RestUtil;
+import com.yixin.kepler.common.SerialNumberUtil;
+import com.yixin.kepler.common.enums.AssetStateEnum;
+import com.yixin.kepler.common.enums.BankPhaseEnum;
+import com.yixin.kepler.core.constant.CommonConstant;
+import com.yixin.kepler.enity.AssetPaymentTask;
+import com.yixin.kepler.enity.MQMsg;
+import com.yixin.kepler.enity.OsbFile;
+import com.yixin.kepler.enity.OsbFileLog;
+import com.yixin.kepler.v1.common.constants.BankRequestConstant;
+import com.yixin.kepler.v1.common.core.bankReq.BankRespResultHandle;
+import com.yixin.kepler.v1.datapackage.entity.AssetBankRequest;
+
+import net.sf.json.JSONArray;
+import net.sf.json.JSONObject;
+import net.sf.json.util.JSONUtils;
+
+
+/**
+ * Package : com.yixin.creditfront.application.domain.common
+ *
+ * @author YixinCapital -- liushuai2
+ *         2017年08月09日 10:59
+ */
+
+@Service("osbFileDomain")
+public class OsbFileDomain {
+
+    private static Logger logger = LoggerFactory.getLogger(OsbFileDomain.class);
+    private static final String SERVER_TYPE = "%s.server.type";
+    private static final String SERVER_IP = "%s.server.ip";
+    private static final String SERVER_PORT = "%s.server.port";
+    private static final String SERVER_UNAME = "%s.server.uname";
+    private static final String SERVER_PWD = "%s.server.pwd";
+    public  static final String OSB_UPLOAD_HOST = "file.osb.host";
+    public  static final String OSB_DOWNLOAD_HOST = "file.osb.host";
+    private static final String SERVER_FILE_PATH = "%s.server.filepath";
+    private static final String SERVER_ENCRYPT_TYPE = "%s.server.encrypt.type";
+    private static final String SERVER_ENCRYPT_KEY = "%s.server.encrypt.key";
+    private static final String RABBITMQ_ID = "rabbitmq.id";
+    private static final String CODE = "code";
+    private static final String MESSAGE = "message";
+    private static final String SERIAL_NUMBER = "serialNumber";
+    private static final String SUCCESS = "0000";
+    public  static final String ICBC_OSB_UPLOAD_HOST = "icbc.file.osb.host";
+    public  static final String ICBC_OSB_DOWNLOAD_HOST = "icbc.file.osb.host";
+	private static final String SUFFIX = "RespResultHandle";
+
+    @Autowired
+    private SftpConfig sftpConfig;
+
+
+    /**
+     * 最大重试次数
+     */
+    private static final int MAX_RETRY_TIMES = 10;
+
+    @Value("${spring.rabbitmq.osb.file.queue}")
+    private String osbRabbitMQQueue;
+
+    @Value("${compress.url}")
+    private String compressUrl;
+
+//    @Value("${spring.rabbitmq.compress.routing.key}")
+    private String compressRoutingKey;
+
+    @Autowired
+    private PropertiesFactory propertiesFactory;
+    //初始化sftp信息
+
+    
+    @Autowired
+    private PropertiesManager propertiesManager;
+    
+/*    private String getUploadUrl(){
+        String uploadUrl = sftpConfig.getSftp().get(OSB_UPLOAD_URL);
+        logger.debug("[osb文件处理]获取到的上传url：{}", uploadUrl);
+        return uploadUrl;
+    }*/
+    
+    public String getDownloadUrl(){
+        String downloadUrl = sftpConfig.getSftp().get(
+        		OSB_DOWNLOAD_HOST) + OsbFileUrl.OSB_DOWNLOAD_URI;
+        return downloadUrl;
+    }
+    
+    private String getProKey(String keyFormat, String bankCode){
+        String key = String.format(keyFormat, bankCode);
+        return key;
+    }
+
+    private String getProVal(String keyFormat, String bankCode){
+        String key = getProKey(keyFormat, bankCode);
+        String val = sftpConfig.getSftp().get(key);
+        logger.info("获取到的配置{}={}",key,val);
+        return val;
+    }
+    
+    
+    
+    
+
+    /**
+     *  使用uuid来完成
+     * @param bzId
+     * @return
+     */
+    private String getCompressPwd(String bzId){
+        logger.info("[osb文件处理]压缩密码使用uuid");
+        String compressPwd;
+        try {
+            compressPwd = UUID.randomUUID().toString();
+        } catch (Exception e) {
+            logger.error("[osb文件处理]压缩密码获取失败" ,e);
+            logger.info("[osb文件处理]使用bzId作为压缩密码");
+            compressPwd = bzId;
+        }
+        try {
+            compressPwd = MD5Utils.encoderByMd5(compressPwd);
+        } catch (Exception e) {
+            logger.error("MD5进行加密异常",e);
+        }
+
+        logger.info("[osb文件处理]压缩密码为 compressPwd：{}", compressPwd);
+        compressPwd = "123456";
+        return compressPwd;
+    }
+
+
+    private String getServerType(String providerCode, String consumerCode){
+        String configCode = providerCode + "2" + consumerCode;
+        return getProVal(SERVER_TYPE, configCode);
+    }
+    private String getServerIp(String providerCode, String consumerCode){
+        String configCode = providerCode + "2" + consumerCode;
+        return getProVal(SERVER_IP, configCode);
+    }
+
+    private int getServerPort(String providerCode, String consumerCode){
+        String configCode = providerCode + "2" + consumerCode;
+
+        return Integer.valueOf(getProVal(SERVER_PORT, configCode));
+    }
+    private String getServerUname(String providerCode, String consumerCode){
+        String configCode = providerCode + "2" + consumerCode;
+
+        return getProVal(SERVER_UNAME, configCode);
+    }
+    private String getServerPwd(String providerCode, String consumerCode){
+        String configCode = providerCode + "2" + consumerCode;
+        return getProVal(SERVER_PWD, configCode);
+    }
+    private String getEncryptType(String providerCode, String consumerCode){
+        String configCode = providerCode + "2" + consumerCode;
+        return getProVal(SERVER_ENCRYPT_TYPE, configCode);
+    }
+    private String getEncryptKey(String providerCode, String consumerCode){
+        String configCode = providerCode + "2" + consumerCode;
+        return getProVal(SERVER_ENCRYPT_KEY, configCode);
+    }
+
+    private String getServerFilePath(String providerCode, String consumerCode){
+        String configCode = providerCode + "2" + consumerCode;
+        return getProVal(SERVER_FILE_PATH, configCode);
+    }
+
+
+    /**
+     * 获取交易流水号
+     *
+     *      如果交易流水号失败，那么会直接使用纳秒作为交易流水号
+     *
+     * @return
+     */
+    private String getTranNo(){
+        String tranNo = SerialNumberUtil.generate();
+        logger.info("[osb文件处理]获取到的交易流水号tranNo：{}", tranNo);
+        return tranNo;
+    }
+
+
+    public static String uploadFileJson(String fileId, String fileName, JSONArray jsonArray){
+        JSONObject o = new JSONObject();
+        o.accumulate("fileId", fileId);
+        o.accumulate("fileName", fileName);
+        if(jsonArray == null) {
+            jsonArray = new JSONArray();
+        }
+        jsonArray.add(o);
+        return jsonArray.toString();
+    }
+    public static String uploadFileJson(String fileId, String fileName){
+        return uploadFileJson(fileId, fileName, null);
+    }
+
+
+    /**
+     *
+     * @param fileName
+     * @return
+     */
+    public static String downFileJson(String fileName){
+        JSONArray jsonArray = new JSONArray();
+        JSONObject o = new JSONObject();
+        o.accumulate("fileName", fileName);
+        jsonArray.add(o);
+        return jsonArray.toString();
+    }
+
+    /**
+     *
+     * @param bankCode
+     * @param compress
+     * @param compressFormat
+     * @param compressName
+     * @aram archives
+     * @param fileJson
+     * @param folder
+     */
+    public OsbFileLog createOsbFileLog(String bzId, String bzType, String bankCode,
+    		boolean compress, String compressFormat,
+    		String compressName,boolean archives,
+    		String fileJson, String folder){
+    	
+        OsbFileLog osbFileLog = new OsbFileLog();
+        osbFileLog.setRoutingKey(propertiesManager.getOsbFileRoutingKey());
+        osbFileLog.setArchives(archives);
+        osbFileLog.setBzId(bzId);
+        osbFileLog.setBzType(bzType);
+        osbFileLog.setCompress(compress);
+        osbFileLog.setCompressFormat(compressFormat);
+        osbFileLog.setCompressName(compressName);
+        //设置压缩密码
+        //osbFileLog.setCompressPwd(getCompressPwd(bzId));
+        osbFileLog.setFileJson(fileJson);
+        //设置需要上传的服务器文件目录
+        folder = folder.startsWith("/") ? folder : "/".concat(folder);
+        String yxCode = CommonConstant.YIXIN_CODE;
+        osbFileLog.setServerFilePath(folder);
+        osbFileLog.setServerIp(getServerIp(bankCode, yxCode));
+        osbFileLog.setServerPort(getServerPort(bankCode, yxCode));
+        osbFileLog.setServerType(getServerType(bankCode, yxCode));
+        osbFileLog.setServerUname(getServerUname(bankCode, yxCode));
+        osbFileLog.setServerPwd(getServerPwd(bankCode, yxCode));
+        osbFileLog.setEncryptKey(getEncryptKey(bankCode, yxCode));
+        osbFileLog.setEncryptType(getEncryptType(bankCode, yxCode));
+        //设置交易流水
+        osbFileLog.setTranNo(getTranNo());
+        //动作(上传/下载)
+        osbFileLog.setType(CommonConstant.UPLOAD_TYPE);
+        osbFileLog.create();
+        return osbFileLog;
+    }
+    
+    
+    public void uploadOsbData(OsbFileLog osbFileLog,String reqData,String url) {
+        String body = upload(reqData,url);
+        ackUpload(body, osbFileLog.getTranNo());
+    }
+    
+ 
+
+    public void downloadTask(String bzId, String bzType, String bankCode, boolean decompress,String decompressFormat,
+                             boolean archives, String fileJson, String folder, String decomressPassword, String sourceFileJson){
+        OsbFileLog osbFileLog = new OsbFileLog();
+//        osbFileLog.setMqId(RabbitMQConstants.getOsbFileDownloadQueue());
+        osbFileLog.setRoutingKey(RabbitMQConstants.getOsbFileRoutingKey());
+        osbFileLog.setArchives(archives);
+
+        osbFileLog.setBzId(bzId);
+        osbFileLog.setBzType(bzType);
+        osbFileLog.setCompress(decompress);
+        osbFileLog.setCompressFormat(decompressFormat);
+//        osbFileLog.setCompressName(compressName);
+        //设置压缩密码,这里是银行返回给的
+        osbFileLog.setCompressPwd(decomressPassword);
+
+        osbFileLog.setFileJson(fileJson);
+        if(StringUtils.hasText(folder) && folder.startsWith("/")) {
+            folder = folder.substring(1);
+        }
+        String yxCode = CommonConstant.YIXIN_CODE;
+        osbFileLog.setServerFilePath(getServerFilePath(yxCode, bankCode)  + folder);
+        osbFileLog.setServerIp(getServerIp(yxCode,bankCode ));
+        osbFileLog.setServerPort(getServerPort(yxCode,bankCode ));
+        osbFileLog.setServerType(getServerType(yxCode,bankCode ));
+        osbFileLog.setServerUname(getServerUname(yxCode,bankCode ));
+        osbFileLog.setServerPwd(getServerPwd(yxCode,bankCode ));
+        //设置交易流水
+        osbFileLog.setTranNo(getTranNo());
+        //上传类型
+        osbFileLog.setType(CommonConstant.DOWNLOAD_TYPE);
+        osbFileLog.setSourceFileJson(sourceFileJson);
+        //开始创建osbFile对象
+        String id = osbFileLog.create();
+        //开始通知osb进行文件处理
+        downloadReq(id);
+    }
+
+    public void downloadTask(String bzId, String bzType, String bankCode, boolean decompress,String decompressFormat,
+                           boolean archives, String fileJson, String folder, String decomressPassword){
+        this.downloadTask(bzId, bzType,bankCode, decompress, decompressFormat,archives,fileJson,folder,decomressPassword, "");
+    }
+
+ 
+
+    /**
+     * 重试
+     * @param id
+     */
+    public void retry(String id){
+        logger.info("[osb文件处理]开始向重新向osb发送文件上传请求 OsbFileLog.id：{}", id);
+        OsbFileLog osbFileLog = OsbFileLog.get(OsbFileLog.class, id);
+        if(osbFileLog == null){
+            logger.error("[osb文件处理]找不到对应的osbfilelog  id：{}", id);
+            return ;
+        }
+        //判断类型
+        switch (osbFileLog.getType()){
+            case CommonConstant.UPLOAD_TYPE:
+                logger.info("[osb文件处理]开始处理上传retry");
+                retryUploadReq(osbFileLog);
+                break;
+            case CommonConstant.DOWNLOAD_TYPE:
+                logger.info("[osb文件处理]开始处理下载retry");
+                retryDownloadReq(osbFileLog);
+                break;
+            default:
+        }
+    }
+
+
+
+    /**
+     * 克隆并保存
+     * @param osbFileLog
+     * @return
+     */
+    private String cloneAndSave(OsbFileLog osbFileLog){
+        logger.info("[osb文件处理]开始克隆原有的请求记录，obsFileLog={}", JacksonUtil.fromObjectToJson(osbFileLog));
+        OsbFileLog cloned = osbFileLog.clone();
+        cloned.setTranNo(getTranNo());
+        //删除原纪录
+        //标记为osb处理失败，等待下次调度重新请求
+        cloned.setDealStatus(CommonConstant.DEAL_STATUS_OSB_FAILURE);
+        cloned.setDeleted(false);
+        return cloned.create();
+    }
+
+    private boolean isOverTimes(String bzId, String bzType, int type){
+        long num = OsbFileLog.beDeletedCount(bzId, bzType, type);
+        logger.info("[osb文件处理]检验是否超过最大重试日志，bzId：{}，bzType：{}，type：{}，num：{}，maxRetryTimes：{}", bzId, bzType,type, num, MAX_RETRY_TIMES);
+        return num >= MAX_RETRY_TIMES;
+    }
+    /**
+     *  重新处理osb处理异常的任务
+     * @param id
+     */
+    public void retryUploadReq(String id) {
+    }
+    /**
+     *  重新处理osb处理异常的任务
+     * @param osbFileLog
+     */
+    public void retryUploadReq(OsbFileLog osbFileLog) {
+    }
+
+    /**
+     *  重新处理osb处理异常的任务
+     * @param id
+     */
+    public void retryDownloadReq(String id) {
+        logger.info("[osb文件处理]开始向重新向osb发送文件下载请求 OsbFileLog.id：{}", id);
+        downloadReq(id);
+    }
+    /**
+     *  重新处理osb处理异常的任务
+     * @param osbFileLog
+     */
+    public void retryDownloadReq(OsbFileLog osbFileLog) {
+        logger.info("[osb文件处理]开始向重新向osb发送文件下载请求 OsbFileLog.id：{}", osbFileLog.getId());
+        downloadReq(osbFileLog);
+    }
+
+    /**
+     * 将需要压缩文件生成压缩流水号并上传至压缩服务
+     * @param id 需要压缩文件id
+     * @return 异步处理压缩是否成功
+     */
+    private boolean compressReq(String id) {
+        OsbFileLog osbFileLog = OsbFileLog.get(OsbFileLog.class, id);
+        // 生成压缩流水号并更新
+        osbFileLog.setCompressTranNo(SerialNumberUtil.generate());
+        osbFileLog.update();
+        // 准备数据
+        String data = getCompressData(osbFileLog);
+        // 调用压缩服务
+        logger.info("[压缩处理]REST请求压缩服务, bzId: {}, data: {}", osbFileLog.getBzId(), data);
+        String result = (String) RestUtil.postJson(compressUrl, data, String.class);
+        logger.info("[压缩处理]REST请求压缩服务返回, bzId: {}, result: {}", osbFileLog.getBzId(), result);
+        if (!StringUtils.isEmpty(result)) {
+            JSONObject resultJsonObj = JSONObject.fromObject(result);
+            return resultJsonObj.getBoolean("success");
+        }
+        return false;
+    }
+
+    /**
+     *
+     * @param id
+     */
+    private void downloadReq(String id) {
+        logger.info("[osb文件处理]开始向osb发送文件下载请求 OsbFileLog.id：{}", id);
+        OsbFileLog osbFileLog = OsbFileLog.get(OsbFileLog.class, id);
+        downloadReq(osbFileLog);
+    }
+
+    /**
+     * 下载请求
+     * @param osbFileLog
+     */
+    private void downloadReq(OsbFileLog osbFileLog) {
+        Assert.notNull(osbFileLog, "[osb文件处理]找不到对用的log对象");
+        logger.info("[osb文件处理]开始向osb发送文件下载请求 OsbFileLog.id：{}", osbFileLog.getId());
+        String data = getDownloadData(osbFileLog);
+        String body = download(data);
+        ackDownload(body, osbFileLog.getTranNo());
+
+    }
+
+   
+
+    /**
+     * 获取压缩请求数据
+     * @param osbFileLog
+     * @return
+     */
+    private String getCompressData(OsbFileLog osbFileLog){
+        JSONObject data = new JSONObject();
+        data.put("applyNo", osbFileLog.getBzId());
+        data.put("items", osbFileLog.getFileJson()); // rap文档错误 fileIds 修改为 items
+        data.put("routingKey", compressRoutingKey);
+        data.put("tranNo", osbFileLog.getCompressTranNo());
+        return data.toString();
+    }
+
+    /**
+     * 获取下载数据
+     * @param osbFileLog
+     * @return
+     */
+    private String getDownloadData(OsbFileLog osbFileLog){
+        Assert.notNull(osbFileLog, "osbFileLog cannot be null！");
+        logger.info("[osb文件处理]需要处理的osbFileLog：{}", JacksonUtil.fromObjectToJson(osbFileLog));
+        JSONObject data = new JSONObject();
+        data.put("archives", osbFileLog.isArchives());
+        data.put("decompress", osbFileLog.isCompress());
+        //解压方式
+        data.put("decompressFormat", osbFileLog.getCompressFormat());
+        data.put("filePath", osbFileLog.getServerFilePath());
+        data.put("password", osbFileLog.getCompressPwd());
+        data.put("serialNumber", osbFileLog.getTranNo());
+        data.put("server", osbFileLog.getServerType());
+        data.put("serverIP", osbFileLog.getServerIp());
+        data.put("serverPassword", osbFileLog.getServerPwd());
+        data.put("serverPort", osbFileLog.getServerPort());
+        data.put("serverUserName", osbFileLog.getServerUname());
+        data.put("systemId", osbFileLog.getRoutingKey());
+        data.put("filesName", osbFileLog.getFileJson());
+        logger.info("[osb文件处理]即将传递给osb的参数信息JSON：{}", data.toString());
+        return data.toString();
+    }
+
+    /**
+     * 处理上传受理结果通知
+     * @param body
+     */
+    private void ackUpload(String body, String tranNo){
+        logger.info("[osb文件处理]处理上传受理收妥通知");
+        if(StringUtils.hasText(body) && JSONUtils.mayBeJSON(body)){
+            JSONObject bodyJson = JSONObject.fromObject(body);
+            String code = bodyJson.getString(CODE);
+            String serialNumber = tranNo;
+            if(SUCCESS.equals(code)){
+                logger.info("[osb文件处理]osb受理文件处理成功，具体返回内容body：{}", body);
+                //更新表状态，等待mq消息
+                OsbFileLog.acknowledge(serialNumber);
+                return ;
+            }
+        }
+        //等待下次处理, 会根据设置的超时时间再次请求
+        logger.info("[osb文件处理]osb受理文件处理失败，将OsbFileLog的状态更新为‘osb处理失败-{}‘，等待下次定时调度重新请求", CommonConstant.DEAL_STATUS_OSB_FAILURE);
+        OsbFileLog.osbFailureByTranNo(tranNo);
+        logger.error("[osb文件处理]osb受理文件处理失败,具体返回内容body：{}，接收消息时间time：{}", body, DateUitls.dateToStr(new Date()));
+    }
+
+    /**
+     * 处理下载受理结果通知
+     * @param body
+     */
+    private void ackDownload(String body, String tranNo){
+        logger.info("[osb文件处理]处理下载受理收妥通知");
+        if(StringUtils.hasText(body) && JSONUtils.mayBeJSON(body)){
+            JSONObject bodyJson = JSONObject.fromObject(body);
+            String code = bodyJson.getString(CODE);
+            String serialNumber = tranNo;
+            if(SUCCESS.equals(code)){
+                logger.info("[osb文件处理]osb受理下载处理成功，具体返回内容body：{}", body);
+                //更新表状态，等待mq消息
+                OsbFileLog.acknowledge(serialNumber);
+                return;
+            }
+        }
+
+        //等待下次处理, 会根据设置的超时时间再次请求
+        logger.info("[osb文件处理]osb受理文件处理失败，将OsbFileLog的状态更新为‘osb处理失败-{}‘，等待下次定时调度重新请求", CommonConstant.DEAL_STATUS_OSB_FAILURE);
+        OsbFileLog.osbFailureByTranNo(tranNo);
+        logger.error("[osb文件处理]osb受理下载处理失败,具体返回内容body：{}，接收消息时间time：{}", body, DateUitls.dateToStr(new Date()));
+
+
+    }
+
+    /**
+     * 请求osb上传
+     * @param data
+     * @param url 
+     * @return
+     */
+    private String upload(String data, String url){
+        logger.info("[osb文件处理]请求osb上传文件处理url：{}，data：{}", url, data);
+        String body = null;
+        try {
+			body = RestUtil.postJson(url, data);
+            logger.info("[osb文件处理]请求osb上传文件处理返回结果url：{}，data：{}，body：{}", url, data, body);
+        } catch (Exception e) {
+            logger.error("[osb文件处理]请求osb上传文件处理失败url：{}，data：{}，body：{}", url, data, e);
+        }
+        return body;
+    }
+
+    private String baffle(String serialNumber){
+		String reqResult = String.format("{\"code\":\"0000\",\"message\":\"调用成功！\",\"serialNumber\":\"%s\"}", serialNumber);
+		logger.info("[osb文件处理]挡板返回serialNumber：{}：{}", serialNumber, reqResult);
+
+		logger.info("[osb文件处理]开始手动插入mq消息记录");
+		String mqMsgBody = "{\"code\":\"0000\",\"files\":[{\"MD5\":\"55759756a290689bb0754b9783e68841\",\"fileId\":\"group1/M00/08/0B/wKiRIVnIwdeVy5p3ABx9IHRs5s0611.zip\",\"fileSize\":1867040,\"sourceFile\":false}],\"serialNumber\":\"%s\"}";
+		logger.info("[osb文件处理]挡板的mq消息体，serialNumber：{}，msg：{}", serialNumber, mqMsgBody);
+		MQMsg cfMQMsg = new MQMsg(osbRabbitMQQueue, serialNumber, String.format(mqMsgBody, serialNumber));
+		cfMQMsg.create();
+		return reqResult;
+	}
+    /**
+     * 请求osb下载
+     * @param data
+     * @return
+     */
+    private String download(String data){
+        String url = getDownloadUrl();
+        logger.info("[osb文件处理]请求osb下载文件处理url：{}，data：{}", url, data);
+        String body = null;
+        try{
+            body = RestUtil.postJson(getDownloadUrl(), data);
+            logger.info("[osb文件处理]请求osb下载文件处理返回结果url：{}，data：{}，body：{}", url, data, body);
+            return body;
+        }catch (Exception e){
+            logger.info("[osb文件处理]请求osb下载文件处理失败url：{}，data：{}，body：{}", url, data, e);
+            return null;
+        }
+    }
+
+    /**
+     * 处理mq消息
+     *
+     *      区分上传下载来完成不同的处理方式
+     *
+     * @param untreatedMsgList
+     */
+    public void dealMQMsg(List<MQMsg> untreatedMsgList) {
+
+        try {
+            for (MQMsg untreatedMsg : untreatedMsgList) {
+                    logger.info("[处理mq消息]开始处理流水号serialNumber：{}的mq消息", untreatedMsg.getBzId());
+                    OsbFileLog log = OsbFileLog.getByTranNo(untreatedMsg.getBzId());
+                    if(log.getType() == CommonConstant.UPLOAD_TYPE){
+                        //上传任务
+                        dealUploadMQMsg(untreatedMsg);
+                    }else if(log.getType() == CommonConstant.DOWNLOAD_TYPE){
+                        //下载任务
+                        dealDownloadMQMsg(untreatedMsg);
+                    }
+            }
+        } catch (Exception e) {
+           logger.error("处理mq消息异常，异常信息为",e);
+        }
+    }
+
+    /**
+     * 处理上传结果的mq消息
+     *
+     *      处理方式
+     *          1：osb返回的失败（非0000）
+     *              a）克隆记录，并更新新纪录状态为{@link CommonConstant}.DEAL_STATUS_OSB_FAILURE
+     *              b）逻辑删除旧记录
+     *              c）更新消息状态为已处理{@link CommonConstant}.DEAL_STATUS_DEALED
+     *          2：log is null
+     *              a）更新消息状态为已处理{@link CommonConstant}.DEAL_STATUS_DEALED
+     *          3：成功
+     *              a）保存OsbFile
+     *              b）更新OsbFileLog状态为已处理
+     *              c）根据业务类型来发起不通的请求
+     *              d）更新消息状态为已处理{@link CommonConstant}.DEAL_STATUS_DEALED
+     *
+     * @param msg
+     *
+     */
+    public void dealUploadMQMsg(MQMsg msg) {
+        OsbFileLog log = OsbFileLog.getByTranNo(msg.getBzId());
+        
+        if (log == null) {
+			return;
+		}
+        if(CommonConstant.DEAL_STATUS_DEALED == log.getDealStatus()){
+        	return;
+        }
+        //开始处理业务系统
+        logger.info("[osb上传文件处理]开始处理流水号{}的mq消息", msg.getBzId());
+        
+        //失败处理 @todo 发送预警或者添加重试
+        if(repayable(msg, log)){
+            logger.error("[osb文件上传处理]osb返回状态是失败的，业务系统需要重试");
+            String id = cloneAndSave(log);
+            logger.info("[osb文件上传处理]克隆文件成功id：{}", id);
+            logger.info("[osb文件上传处理]删除母体数据id：{}", log.getId());
+            log.delete();
+            logger.info("[osb文件上传处理]克隆对象结束，开始将log状态更新为osb失败，等待下次重试。");
+        
+        //成功处理
+        }else{
+        	logger.info("[osb文件上传处理]开始处理成功消息{}",
+        			JsonObjectUtils.objectToJson(log));
+            //将log标记为已处理
+            log.dealed();
+            
+            //如果是请款更新请款任务表文件上传状态
+            paymentTaskUpdate(log);
+            
+            //添加osbfile纪录
+            toOsbFile(msg.getMsg());
+            
+            //路由到不同银行处理
+            AssembleBankRequest(log.getBzId(), log.getBzType(), log);
+        }
+    }
+
+    private void paymentTaskUpdate(OsbFileLog log) {
+		if (Objects.equals(BankPhaseEnum.PAYMENT.getPhase(),log.getBzType())) {
+			AssetPaymentTask paymentTask = AssetPaymentTask.getByApplyNo(log.getBzId());
+			if (paymentTask != null) {
+				paymentTask.setFileStatus(AssetStateEnum.SUCCESS.getState());
+				paymentTask.update();
+			}
+		}
+	}
+
+	private boolean repayable(MQMsg msg, OsbFileLog log){
+        boolean isOverTimes = isOverTimes(log.getBzId(), log.getBzType(), log.getType());
+        logger.info("[osb文件上传/下载处理]文件是否超过重试次数bzId:{},bzType:{},type:{},isOverTimes:{}", log.getBzId(), log.getBzType(), log.getBzType(), isOverTimes);
+        boolean isOsbSuccess = isOsbSuccess(msg.getMsg());
+        logger.info("[osb文件上传/下载处理]文件是否上传/下载成功bzId:{},bzType:{},type:{},isOsbSuccess:{}", log.getBzId(), log.getBzType(), log.getBzType(), isOsbSuccess);
+        return !isOsbSuccess && !isOverTimes;
+    }
+    /**
+     * 处理下载结果的mq消息
+     * @param msg
+     */
+    public void dealDownloadMQMsg(MQMsg msg){
+        OsbFileLog log = OsbFileLog.getByTranNo(msg.getBzId());
+        //开始处理业务系统
+        logger.info("[osb下载文件处理]开始处理流水号{}的mq消息", msg.getBzId());
+        //判断osb是否处理成功
+
+        if(repayable(msg, log)){
+            logger.error("[osb文件下载处理]osb返回状态是失败的，业务系统需要重试");
+            String id = cloneAndSave(log);
+            logger.info("[osb文件下载处理]克隆文件成功id：{}", id);
+            logger.info("[osb文件下载处理]删除母体数据id：{}", log.getId());
+            log.delete();
+            logger.info("[osb文件下载处理]克隆对象结束，开始将log状态更新为osb失败，等待下次重试。");
+            //更新消息状态为已处理
+        }else{
+            if(log != null){
+                //并发
+                if(CommonConstant.DEAL_STATUS_DEALED == log.getDealStatus()){
+                    //任务已经处理，忽略该消息
+                    logger.info("[osb文件下载]OsbFileLog状态为已处理({})，改消息无效");
+                }else{
+
+                    logger.info("[osb下载文件处理]开始处理bzId：{}，bzType：{}", log.getBzId(), log.getBzType());
+                    //处理完记得更新状态呀
+                    String bzId = log.getBzId();
+                    String bzType = log.getBzType();
+                    logger.info("[osb文件下载处理]开始处理bzId：{}，bzType：{}", bzId, bzType);
+                    //标记为已处理
+                    log.dealed();
+                    toOsbFile(msg.getMsg());
+                }
+
+            }else{
+                logger.error("[osb下载文件处理]找不到流水号{}对应OsbFileLog，直接将该消息设置为无效");
+            }
+        }
+    }
+
+    private boolean isOsbSuccess(String msg){
+        if(StringUtils.hasText(msg) && JSONUtils.mayBeJSON(msg)) {
+            JSONObject body = JSONObject.fromObject(msg);
+            String result = body.getString("code");
+            logger.info("[osb文件处理]osb返回的mq消息msg：{}", msg);
+            return CommonConstant.OSB_SUCCESS.equals(result);
+        }
+        return false;
+    }
+
+
+
+    /**
+     * 转换并保存数据
+     * @param msg
+     * @return
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    private boolean toOsbFile(String msg) {
+        if (StringUtils.hasText(msg) && JSONUtils.mayBeJSON(msg)) {
+
+            JSONObject body = JSONObject.fromObject(msg);
+            String tranNo = body.getString("serialNumber");
+            String result = body.getString("code");
+            logger.info("[osb文件处理]osb返回的mq消息msg：{}", msg);
+            if (CommonConstant.OSB_SUCCESS.equals(result)) {
+                JSONArray files = body.getJSONArray("files");
+                for (int i = 0; i < files.size(); ++i) {
+                    JSONObject file = files.getJSONObject(i);
+
+
+                    String fileSize = file.getString("fileSize");
+                    String md5 = file.getString("MD5");
+                    String sourceFile = file.getString("sourceFile");
+                    OsbFile osbFile = new OsbFile();
+                    osbFile.setTranNo(tranNo);
+                    String fileId;
+                    if(file.containsKey("fileId") && StringUtils.hasText((fileId = file.getString("fileId")))){
+                        osbFile.setFileId(fileId);
+                    }
+                    if(StringUtils.hasText(fileSize)){
+                        osbFile.setFileSize(Integer.valueOf(fileSize));
+                    }
+                    osbFile.setMd5(md5);
+                    if(StringUtils.hasText(sourceFile)){
+                        osbFile.setSourceFile(Boolean.valueOf(sourceFile));
+                    }
+
+                    //上传不需要fileName
+                    if(file.containsKey("fileName")){
+                        String fileName = file.getString("fileName");
+                        osbFile.setFileName(fileName);
+
+                    }
+
+                    osbFile.create();
+                }
+                logger.info("[osbfile转换]转换成功");
+                return true;
+            }
+        }
+        return false;
+    }
+
+    
+    /**
+     * 组装请求任务数据
+     * @param bzId
+     * @param bzType
+     * @param log 
+     * @author YixinCapital -- chen.lin
+     *	       2018年9月19日 上午11:10:36
+     */
+    @Transactional
+    private void AssembleBankRequest(String bzId, String bzType, OsbFileLog log) {
+   	 	AssetBankRequest bankRequest = AssetBankRequest.getOnlyApplyOnWay(bzId, bzType);
+        if(null != bankRequest){
+        	// 路由到具体的实现
+    		BankRespResultHandle bean = SpringContextUtil.getBean(
+    				bankRequest.getAssetNo().concat(SUFFIX), BankRespResultHandle.class);
+    		// 处理结果
+    		String result = bean.assembleOsb(bankRequest, log);
+    		logger.info("异步处理银行返回结果结束，result{}", result);
+    		if(result != null){
+    			bankRequest.setAssetReqBody(result);
+    			bankRequest.setOsbState(BankRequestConstant.OSB_SUCCESS);
+    			bankRequest.update();
+    		}
+        }		
+	}
+}

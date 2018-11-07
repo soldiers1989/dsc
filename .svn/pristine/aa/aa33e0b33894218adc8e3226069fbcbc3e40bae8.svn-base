@@ -1,0 +1,17 @@
+package com.yixin.web.service.monitor.impl;
+
+import com.yixin.web.service.monitor.BusinessMonitorService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
+
+/**
+ * @description:
+ * @date: 2018-10-17 16:21
+ */
+@Service
+public class BusinessMonitorServiceImpl implements BusinessMonitorService {
+
+    private final Logger logger = LoggerFactory.getLogger(getClass());
+
+}

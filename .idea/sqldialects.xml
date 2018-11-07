@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="SqlDialectMappings">
+    <file url="file://$PROJECT_DIR$/src/test/SysLog.sql" dialect="MySQL" />
+    <file url="file://$PROJECT_DIR$/src/test/k_asset_afterloan_task.sql" dialect="MySQL" />
+    <file url="file://$PROJECT_DIR$/src/test/local-sql.sql" dialect="MySQL" />
+    <file url="file://$PROJECT_DIR$/src/test/yn/k_asset_contract_task.sql" dialect="MySQL" />
+  </component>
+</project>

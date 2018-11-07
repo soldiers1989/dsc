@@ -1,0 +1,172 @@
+package com.yixin.kepler.core.domain.webank;
+
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+
+import javax.annotation.Resource;
+
+import org.apache.commons.lang3.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
+
+import com.alibaba.fastjson.JSONObject;
+import com.yixin.common.exception.BzException;
+import com.yixin.common.utils.InvokeResult;
+import com.yixin.common.utils.JsonObjectUtils;
+import com.yixin.dsc.dto.DscElecActionInfoDto;
+import com.yixin.dsc.dto.DscElecSignDto;
+import com.yixin.dsc.dto.DscOperateEnvDto;
+import com.yixin.dsc.dto.DscSignContractDto;
+import com.yixin.dsc.dto.DscUserActionDto;
+import com.yixin.dsc.entity.order.DscSalesApplyCust;
+import com.yixin.dsc.entity.order.DscSalesApplyMain;
+import com.yixin.dsc.service.common.DscWbCommonService;
+import com.yixin.dsc.util.PropertiesManager;
+import com.yixin.kepler.common.RestTemplateUtil;
+import com.yixin.kepler.common.UrlConstant;
+import com.yixin.kepler.common.enums.AssetStateEnum;
+import com.yixin.kepler.common.enums.BankPhaseEnum;
+import com.yixin.kepler.common.enums.WBTransCodeEnum;
+import com.yixin.kepler.core.constant.CommonConstant;
+import com.yixin.kepler.dto.BaseMsgDTO;
+import com.yixin.kepler.dto.webank.WBCommonRespDTO;
+import com.yixin.kepler.dto.webank.WBContractDTO;
+import com.yixin.kepler.dto.webank.WBElectronContractSaveRequstDTO;
+import com.yixin.kepler.enity.AssetBankTran;
+import com.yixin.kepler.enity.AssetMainInfo;
+
+/**
+ *
+ * Package : com.yixin.kepler.core.domain.webank
+ *
+ * @author YixinCapital -- wanghonglin
+ * 2018/7/9 16:17
+ */
+@Service
+public class WBEleContractRequest{
+    private static final Logger logger = LoggerFactory.getLogger(WBEleContractRequest.class);
+    @Resource
+    private PropertiesManager propertiesManager;
+    @Resource
+    private DscWbCommonService dscWbCommonService;
+    @Resource
+    private DscWbCommonService commonService;
+
+    /**
+     * 请求银行电子签约存正
+     * @param signDto
+     */
+    public InvokeResult<BaseMsgDTO> sendResult(DscElecSignDto signDto){
+
+        logger.info("微众订单请求银行电子签证处理开始，入参：{}",JSONObject.toJSONString(signDto));
+        WBElectronContractSaveRequstDTO requstDTO = this.conversionBankReqDTO(signDto);
+        AssetMainInfo mainInfo = AssetMainInfo.getByApplyNo(signDto.getApplyNo());
+        String osbUrl = this.propertiesManager.getOsbEnvironment()+UrlConstant.WB_ELECONTRACT_URL;
+        //存储银行交易信息
+        AssetBankTran assetBankTran = new AssetBankTran();
+        assetBankTran.setApplyNo(signDto.getApplyNo());
+        assetBankTran.setAssetId(mainInfo.getId());
+        assetBankTran.setReqBody(net.sf.json.JSONObject.fromObject(requstDTO).toString());
+//        assetBankTran.setAssetNo(chnlTxNo);
+        assetBankTran.setPhase(BankPhaseEnum.WB_ELECONTRACT_SAVE.getPhase());
+        assetBankTran.setReqUrl(osbUrl);
+        assetBankTran.setTranNo(WBTransCodeEnum.WB_ELECTRON_CONTRACT_SAVE.getTransCode());
+        assetBankTran.setSender(1);
+        assetBankTran.create();
+        logger.info("微众银行电子签约存证,URL:{}, 请求参数为{}",osbUrl, JsonObjectUtils.objectToJson(requstDTO));
+        String result = RestTemplateUtil.sendRequest(osbUrl, requstDTO,CommonConstant.BankName.WB_BANK);
+        logger.info("微众银行电子签约存证,申请编号:{},返回参数为{}",signDto.getApplyNo(),result);
+        assetBankTran.setRepBody(result);
+
+        if(StringUtils.isBlank(result)){
+           return new InvokeResult<BaseMsgDTO>(new BaseMsgDTO(CommonConstant.FAILURE,"电子签约存证失败"));
+        }
+        String jsonResponse = commonService.parseResponse(result);
+        WBCommonRespDTO response = (WBCommonRespDTO) JsonObjectUtils.jsonToObject(jsonResponse, new WBCommonRespDTO());
+        assetBankTran.setApprovalCode(response.getCode()); //错误码
+        assetBankTran.setApprovalDesc(response.getDesc()); //错误描述
+        assetBankTran.update();
+        if(response.getCode().contains(CommonConstant.WB_RESP_CODE)){
+            mainInfo.setContractSignState(AssetStateEnum.SUCCESS.getState());//更新合同签署状态
+            mainInfo.update();
+            return new InvokeResult<BaseMsgDTO>(new BaseMsgDTO(CommonConstant.SUCCESS,response.getDesc()));
+        }
+        return new InvokeResult<BaseMsgDTO>(new BaseMsgDTO(CommonConstant.FAILURE,response.getDesc()));
+
+    }
+
+    /**
+     * 包装银行请求体
+     * @param signDto
+     * @return
+     */
+    private WBElectronContractSaveRequstDTO conversionBankReqDTO(DscElecSignDto signDto){
+        AssetMainInfo assetMainInfo = AssetMainInfo.getByApplyNo(signDto.getApplyNo());
+        DscSalesApplyMain main = DscSalesApplyMain.getByApplyNo(signDto.getApplyNo());
+        if (main == null) {
+            throw new BzException("客户申请数据为空");
+        }
+        if (assetMainInfo == null) {
+            throw new BzException("客户信息不存在");
+        }
+        DscSalesApplyCust cust = DscSalesApplyCust.getApplyCostByMianId(main.getId());
+        WBElectronContractSaveRequstDTO requestDto = new WBElectronContractSaveRequstDTO();
+        requestDto.setTxnId(WBTransCodeEnum.WB_ELECTRON_CONTRACT_SAVE.getTransCode());
+        requestDto.setOpId(main.getCreatorId());//操作员号
+        requestDto.setMerchantId(dscWbCommonService.getMerchantIdByCompanyCode(main.getRentingCompanyCode()));//平台id
+        requestDto.setChannel(dscWbCommonService.getWbChannelByOrderSource(main.getOrderSource())); //渠道
+        requestDto.setReqTime(new Date());
+
+        requestDto.setMerOrderNo(main.getApplyNo()); //平台订单号
+        requestDto.setNbsOrderNo(assetMainInfo.getBankOrderNo());//微众订单号
+        requestDto.setPsCode(dscWbCommonService.getPsCodeByApplyNo(main.getApplyNo())); //产品结构
+        requestDto.setName(cust.getAkhxm()); //客户名称
+        requestDto.setIdType(dscWbCommonService.codeConvert("azjlx", cust.getAzjlx()));//证件类型
+        requestDto.setIdNo(cust.getAzjhm()); //证件号码
+        requestDto.setAppType("A"); //应用提交类型，A:应用账号
+
+
+        DscElecActionInfoDto infoDto = signDto.getSignInfo();//签约信息
+        if(infoDto != null){
+            DscOperateEnvDto envDto = infoDto.getOperateEnvDto();//操作环境
+            if(envDto != null){
+                requestDto.setOsType(StringUtils.isBlank(envDto.getOsType())?"PC":envDto.getOsType());//操作类型
+                requestDto.setMobileBrands(envDto.getMobileBrands());//手机品牌
+                requestDto.setIosIdFa(envDto.getIosIdfa());//ios设备必须填写idfa
+                requestDto.setAndroidImei(envDto.getAndroidIMEI());//andriod设备必须填写
+                requestDto.setIp(StringUtils.isBlank(envDto.getIp())?commonService.getServerIp():envDto.getIp());//IP地址, 如易贷通没有，则传后台服务器地址
+                requestDto.setMacAddr(envDto.getMacAddr());// mac地址
+
+            }
+            DscUserActionDto userActionDto = infoDto.getUserActionDto();//用户行为
+            if(userActionDto != null){
+                requestDto.setSignDate(userActionDto.getSignDate());//签约日
+                requestDto.setSignChannel(requestDto.getChannel());//签署渠道 和 渠道 要保持一致
+                requestDto.setCongirmLoanTime(userActionDto.getConfirmLoanTime());//确认借据时间
+                requestDto.setClickApplyLimitTime(userActionDto.getClickApplyLimitTime());//点击“申请额度”时间
+                requestDto.setClickSmsTime(userActionDto.getClickSmsTime());//点击“获取验证码”时间
+                requestDto.setSysSendSmsTime(userActionDto.getSysSendSmsTime());//系统发送验证码时间
+                requestDto.setCheckSmsMobile(userActionDto.getCheckSmsMobile());//接收验证码手机号码
+                requestDto.setCheckSmsSucTime(userActionDto.getCheckSmsSucTime());//验短通过时间
+                requestDto.setCheckPwdSucTime(userActionDto.getCheckPwdSucTime());//验密通过时间
+                requestDto.setApplyTime(userActionDto.getApplyTime());//提交申请时间
+                requestDto.setOtpSendTime(userActionDto.getOtpSendTime()==null?0:userActionDto.getOtpSendTime());//OTP验证发送次数
+                requestDto.setOtpErrTime(userActionDto.getOtpErrTime()==null?0:userActionDto.getOtpErrTime());//OTP验证失败次数
+            }
+            List<DscSignContractDto> list =  infoDto.getSignContractList();//合同协议
+            List<WBContractDTO> requestList = new ArrayList<WBContractDTO>(){{
+                list.forEach(DscSignContractDto ->{
+                    WBContractDTO contractDTO = new WBContractDTO();
+                    contractDTO.setCheckTime(DscSignContractDto.getCheckTime());//勾选合同时间
+                    contractDTO.setContractName(DscSignContractDto.getContractName());//合同名称
+                    contractDTO.setContractVer(DscSignContractDto.getContractVersion());//合同版本号
+                    add(contractDTO);
+                });
+            }};
+            requestDto.setWbContractList(requestList);
+        }
+        return requestDto;
+    }
+}

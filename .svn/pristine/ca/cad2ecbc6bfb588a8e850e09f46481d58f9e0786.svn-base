@@ -1,0 +1,365 @@
+package com.yixin.kepler.v1.service.capital.yntrust;
+
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+
+import javax.annotation.Resource;
+
+import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationContext;
+import org.springframework.stereotype.Service;
+
+import com.alibaba.fastjson.JSONObject;
+import com.yixin.common.exception.BzException;
+import com.yixin.common.utils.InvokeResult;
+import com.yixin.common.utils.JsonObjectUtils;
+import com.yixin.dsc.entity.order.DscSalesApplyBondsman;
+import com.yixin.dsc.entity.order.DscSalesApplyCar;
+import com.yixin.dsc.entity.order.DscSalesApplyContact;
+import com.yixin.dsc.entity.order.DscSalesApplyCost;
+import com.yixin.dsc.entity.order.DscSalesApplyCust;
+import com.yixin.dsc.entity.order.DscSalesApplyFinancing;
+import com.yixin.dsc.entity.order.DscSalesApplyMain;
+import com.yixin.dsc.util.PropertiesManager;
+import com.yixin.dsc.v1.service.capital.yntrust.YTCommonService;
+import com.yixin.kepler.common.UrlConstant;
+import com.yixin.kepler.common.enums.AssetPhaseEnum;
+import com.yixin.kepler.common.enums.AssetStateEnum;
+import com.yixin.kepler.common.enums.BankPhaseEnum;
+import com.yixin.kepler.common.enums.ConstantKeyEnum;
+import com.yixin.kepler.core.base.AbstractBaseDealDomain;
+import com.yixin.kepler.core.constant.CommonConstant;
+import com.yixin.kepler.core.domain.SysDIcMapped;
+import com.yixin.kepler.dto.BaseMsgDTO;
+import com.yixin.kepler.enity.AssetFinanceInfo;
+import com.yixin.kepler.enity.AssetMainInfo;
+import com.yixin.kepler.enity.ConstantConfig;
+import com.yixin.kepler.v1.common.constants.BankRequestConstant;
+import com.yixin.kepler.v1.common.enumpackage.YNTrustUrlEnum;
+import com.yixin.kepler.v1.datapackage.dto.yntrust.YTCreateOrderBorrowerDto;
+import com.yixin.kepler.v1.datapackage.dto.yntrust.YTCreateOrderDto;
+import com.yixin.kepler.v1.datapackage.dto.yntrust.YTCreateOrderLoanDto;
+import com.yixin.kepler.v1.datapackage.dto.yntrust.YTCreateOrderPaymentBankCardsDto;
+import com.yixin.kepler.v1.datapackage.dto.yntrust.YTCreateOrderSpreadInfo;
+import com.yixin.kepler.v1.datapackage.entity.AssetBankRequest;
+import com.yixin.kepler.v1.datapackage.entity.SysStandardCity;
+
+/**
+ * 云南信托信审
+ *
+ * @author YixinCapital -- chenjiacheng
+ *         2018年09月19日 15:40
+ **/
+@Service("YNTRUSTLastTrialRequestStrategy")
+public class LastTrialRequestStrategy extends AbstractBaseDealDomain<Object, BaseMsgDTO> {
+
+	private static final Logger logger = LoggerFactory.getLogger(LastTrialRequestStrategy.class);
+
+	private ThreadLocal<YTCreateOrderDto> createOrderDtoThreadLocal = new ThreadLocal<>();
+
+	@Resource
+	private PropertiesManager propertiesManager;
+
+	@Resource
+	private ApplicationContext ioc;
+
+	@Resource
+	private SysDIcMapped sysDIcMapped;
+
+	@Resource
+	private YTCommonService ytCommonService;
+
+	@Resource
+	private DscCommonService dscCommonService;
+
+
+	@Override
+	protected void getData() throws BzException {
+		String applyNo = (String) this.inputDto.get(); //订单编号
+		//=============== 获取业务数据 ==========================================
+		DscSalesApplyMain main = DscSalesApplyMain.getByApplyNo(applyNo);
+		DscSalesApplyCar car = DscSalesApplyCar.getBymainId(main.getId());
+		DscSalesApplyCust cust = DscSalesApplyCust.getApplyCostByMianId(main.getId());
+		DscSalesApplyCost cost = DscSalesApplyCost.getByMainId(main.getId());
+		List<DscSalesApplyContact> contract = DscSalesApplyContact.getListByParms(main.getId());
+		//融资项
+		List<DscSalesApplyFinancing> financingList = DscSalesApplyFinancing.getByMainId(main.getId());
+		List<DscSalesApplyBondsman> bondsmanList = DscSalesApplyBondsman.getListByParms(main.getId());
+		//=============== 获取业务数据 ==========================================
+		AssetMainInfo mainInfo = AssetMainInfo.getByApplyNo(applyNo);
+		if (mainInfo == null) {
+			mainInfo = createMainInfo(applyNo,main);
+		} else {
+			mainInfo.setVenusApplyNo(ytCommonService.getUniqueId());
+			mainInfo.update();
+		}
+		
+		
+		YTCreateOrderDto createOrderDto = new YTCreateOrderDto();
+		YTCreateOrderBorrowerDto createOrderBorrowerDto = new YTCreateOrderBorrowerDto();
+		YTCreateOrderLoanDto createOrderLoanDto = new YTCreateOrderLoanDto();
+		List<YTCreateOrderPaymentBankCardsDto> paymentBankCardsDtoList = new ArrayList<>();
+		YTCreateOrderPaymentBankCardsDto paymentBankCardsDto = new YTCreateOrderPaymentBankCardsDto();
+		createOrderDto.setBorrower(createOrderBorrowerDto);  //借款人信息
+		createOrderDto.setLoan(createOrderLoanDto); //合同信息
+		createOrderLoanDto.setPaymentBankCards(paymentBankCardsDtoList); //放款信息集合 
+		paymentBankCardsDtoList.add(paymentBankCardsDto);
+		
+		createOrderDto.setUniqueId(mainInfo.getVenusApplyNo());
+		createOrderDto.setRequestId(ytCommonService.getRequestId());
+		createOrderDto.setUrl(YNTrustUrlEnum.CREATE_ORDER.getUrl());
+		
+		// ---借款人信息
+		createOrderBorrowerDto.setShortName("易鑫"); //固定名称-易鑫
+		createOrderBorrowerDto.setBankReservedPhoneNo(main.getAckrsjhm()); //银行开户预留手机号
+		createOrderBorrowerDto.setIdCardNo(cust.getAzjhm()); //身份证号码
+		createOrderBorrowerDto.setMaritalStatus(getMaritalStatus(cust.getAhyzk())); //字典映射 ---- 婚姻状况  
+		createOrderBorrowerDto.setTelephoneNo(cust.getAsjhm()); //手机号码
+		String standCity = SysStandardCity.checkNumber(createOrderBorrowerDto.getIdCardNo());
+		createOrderBorrowerDto.setCity(StringUtils.isBlank(standCity)?"310115":standCity); //居住城市
+		createOrderBorrowerDto.setAddress(cust.getAxjzddz()); //现居住\地详细地址
+		createOrderBorrowerDto.setZipCode(StringUtils.isBlank(cust.getAxjzdyb()) ? "999999" : cust.getAxjzdyb()); //邮编
+		createOrderBorrowerDto.setCommunicationAddress(cust.getAxjzddz()); //现居住详细地址
+		createOrderBorrowerDto.setCommunicationAddressZipCode(StringUtils.isBlank(cust.getAxjzdyb()) ? "999999" : cust.getAxjzdyb()); //现居住地邮编
+		createOrderBorrowerDto.setJobType(codeConvert("asqrzy", cust.getAsqrzy())); //字典映射 ---- 职业分类
+		createOrderBorrowerDto.setAccountNo(main.getAhkrjjkzh()); //借记卡账号
+		createOrderBorrowerDto.setBankCode(ytCommonService.parseBankCode(main.getBankCode()).get("bankCode")); //借款人开户银行
+		createOrderBorrowerDto.setBranchBankName(ytCommonService.parseBankCode(main.getBankCode()).get("bankName")); //银行名称
+		createOrderBorrowerDto.setBankCardAttribution(createOrderBorrowerDto.getCity()); //同居住城市
+		createOrderBorrowerDto.setEmergencyContactPerson(CollectionUtils.isEmpty(contract) ? null : contract.get(0).getAlxrxm()); //联系人姓名
+		createOrderBorrowerDto.setEmergencyContact(CollectionUtils.isEmpty(contract) ? null : contract.get(0).getAsjhm()); //联系人手机号
+		createOrderBorrowerDto.setProductCode(""); //云南信托TCMP系统中的产品编码（可向信托经理索要）
+
+
+		createOrderBorrowerDto.setRoleType("1"); //固定传1 贷款借款人
+		//----------- 组装 AssetInfo 附加资产信息 开始------------
+		createOrderBorrowerDto.setAssetInfo(getSpreadInfo(main, cost, cust, car, bondsmanList,financingList,mainInfo)); //附加资产信息
+		//----------- 组装 AssetInfo 附加资产信息 结束------------
+		createOrderBorrowerDto.setHigestEducation(Integer.parseInt(codeConvert("asqrxl", cust.getAsqrxw()))); //字典映射 ---- 最高学历
+		createOrderBorrowerDto.setHigestDegree(Integer.parseInt(cust.getAsqrxw())); // 字典映射 ---- 最高学历 Alix码值和云信一致，直接传即可
+		//createOrderBorrowerDto.setCompanyType(Integer.parseInt(codeConvert("asqrzy", cust.getAsqrzy()))); //所属行业
+		createOrderBorrowerDto.setJobDuty(Integer.parseInt(codeConvert("asqrzw", cust.getAsqrzw()))); //字典映射 ---- 职务
+		createOrderBorrowerDto.setJobTitle(Integer.parseInt(codeConvert("asqrzc", cust.getAsqrzc()))); //字典映射 ---- 职称
+		createOrderBorrowerDto.setLivingConditions(Integer.parseInt(cust.getAjzzk())); //字典映射 ---- 居住状况 Alix码值和云信一致，直接传即可
+		createOrderBorrowerDto.setCompanyName(cust.getApogzdw()); //单位名称
+
+		// --合同信息
+		createOrderLoanDto.setLoanContractNumber(mainInfo.getVenusApplyNo()); //alix申请编号
+		createOrderLoanDto.setContractAmount(cost.getFrze()/*.subtract(cost.getFsfje())*/); //客户融资额
+		createOrderLoanDto.setSignDate(main.getAtbrq()); //提报日期
+		createOrderLoanDto.setBeginDate(getBeginDate(main.getAtbrq())); //开始日期
+		createOrderLoanDto.setSignRate(dscCommonService.convertBigDecimal(cost.getFkhll(), CommonConstant.TO_POIOT_FOUR)); //签约利率 - 客户利率
+		createOrderLoanDto.setRepaymentCycle("1"); //1:按月结算
+		createOrderLoanDto.setRepaymentMode("1"); //1：等额本息
+		createOrderLoanDto.setRepaymentPeriod(Integer.parseInt(main.getArzqx())); //还款期数
+		createOrderLoanDto.setLoanUsage("车抵贷"); //贷款用途
+
+		//========================== 放款信息集 ========================================================
+		//放款信息 -- 以下为生产数据，测试时不可用 todo 下面配置项可放到配置表中，数据待确认
+		ConstantConfig paymentConfig = ConstantConfig.getConstantConfigByKey(ConstantKeyEnum.YT_PAYMENTBANKCARDS.getKey());
+		if (paymentConfig == null) {
+			throw new BzException("易鑫放款信息配置未找到");
+		}
+		JSONObject paymentJson = JSONObject.parseObject(paymentConfig.getValueString());
+		paymentBankCardsDto.setAccountNo(paymentJson.getString("AccountNo")); //放款银行账号
+		paymentBankCardsDto.setBankCode(paymentJson.getString("BankCode")); //银行编码
+		paymentBankCardsDto.setBranchBankName(paymentJson.getString("BranchBankName")); //支行名称
+		paymentBankCardsDto.setBankCardAttribution(paymentJson.getString("BankCardAttribution")); //银行卡归属地
+		paymentBankCardsDto.setAccountName(paymentJson.getString("AccountName")); //账户开户名
+		paymentBankCardsDto.setAmount(cost.getFrze()/*.subtract(cost.getFsfje())*/); //客户融资额
+		paymentBankCardsDto.setType(paymentJson.getString("Type")); //默认3 受托支付-非金融机构
+
+		createOrderDtoThreadLocal.set(createOrderDto);
+		
+		this.inputDto.set(mainInfo);
+	}
+
+
+	@Override
+	protected void assembler() throws BzException {
+
+	}
+
+	@Override
+	protected InvokeResult<BaseMsgDTO> message() throws BzException {
+		AssetMainInfo mainInfo = (AssetMainInfo) inputDto.get();
+		YTCreateOrderDto createOrderDto = createOrderDtoThreadLocal.get();
+		
+		inputDto.remove();
+		createOrderDtoThreadLocal.remove();
+		String applyNo = mainInfo.getApplyNo(); //订单编号
+		String osbUrl = this.propertiesManager.getOsbEnvironment() + UrlConstant.OsbSystemUrl.ynTrustInterface;
+		
+		logger.info("云南信托信审创建订单(终审)组装报文创建任务记录开始,申请编号:{}", applyNo);
+		AssetBankRequest request = new AssetBankRequest();
+		request.setApplyNo(applyNo);//申请编号
+		request.setBankOrderNo(createOrderDto.getUniqueId());//银行申请编号
+		request.setAssetNo(mainInfo.getFinancialCode());//资产编号
+		request.setAssetReqBody(JsonObjectUtils.objectToJson(createOrderDto));//资管请求报文
+		request.setPhase(BankPhaseEnum.LAST_TRIAL.getPhase());//所属阶段-信审
+		request.setReqUrl(osbUrl);//请求的url地址
+		request.setRepState(BankRequestConstant.UN_REQ_BANK);//向银行发起请求状态 0-未发起
+		request.setRetryMark(BankRequestConstant.RETRY_INIT_COUNT);//请求重试标记初始化
+		request.setOsbState(BankRequestConstant.OSB_SUCCESS); //osb状态默认成功
+		request.setBzId(mainInfo.getId());
+		String taskId = request.create();
+		logger.info("云南信托信审创建订单(终审)组装报文创建任务记录结束,申请编号:{},任务表ID:{}", applyNo,taskId);
+		
+		mainInfo.setPreState(AssetStateEnum.INIT.getState()); //预审默认初始化
+		mainInfo.setFirstState(AssetStateEnum.INIT.getState()); //初审状态默认初始化
+		mainInfo.setLastState(AssetStateEnum.DOING.getState()); //终审进行中
+		mainInfo.update();
+		logger.info("云南信托信审创建订单(终审)创建任务记录成功后更新终审状态为处理中,申请编号:{}", applyNo);
+		return new InvokeResult<>(new BaseMsgDTO(CommonConstant.SUCCESS, "SUCCESS"));
+	}
+
+	private String codeConvert(String code, String value) {
+		return sysDIcMapped.getMappingValue(code, value, CommonConstant.BankName.YNTRUST_BANK);
+	}
+
+	private Integer getMaritalStatus(String ahyzk) {
+		if (StringUtils.isBlank(ahyzk)) {
+			return 90;
+		}
+		String maritalStatus = codeConvert("ahyzk", ahyzk);
+		return StringUtils.isBlank(maritalStatus) ? 90 : Integer.parseInt(maritalStatus);
+	}
+
+	private Date getBeginDate(Date atbrq) {
+		Date beginDate = new Date();
+		beginDate.setTime(atbrq.getTime() + 1000 * 60L);
+		return beginDate;
+	}
+
+
+	private AssetMainInfo createMainInfo(String applyNo,DscSalesApplyMain main) {
+		AssetMainInfo mainInfo = new AssetMainInfo();
+		mainInfo.setApplyNo(applyNo);
+		mainInfo.setAssetPhase(AssetPhaseEnum.TRIAL.getPhase());
+		mainInfo.setCreditSignState(AssetStateEnum.SUCCESS.getState()); //电子征信默认为成功
+		mainInfo.setContractSignState(AssetStateEnum.INIT.getState());
+		mainInfo.setFirstState(AssetStateEnum.INIT.getState());
+		mainInfo.setLastState(AssetStateEnum.INIT.getState());
+		mainInfo.setPreState(null);
+		mainInfo.setPaymentState(AssetStateEnum.INIT.getState());
+		mainInfo.setChannelCode(main.getDealerChannelCode()); // 渠道编号
+		mainInfo.setChannelName(main.getDealerChannelName()); // 渠道名称
+		mainInfo.setCompanyCode(main.getRentingCompanyCode()); // 发起融资公司编号
+		mainInfo.setFinancialId(main.getCapitalId());
+		mainInfo.setFinancialCode(AssetFinanceInfo.getById(main.getCapitalId()).getCode());
+		mainInfo.setVenusApplyNo(ytCommonService.getUniqueId()); //生成唯一标识
+		mainInfo.create();
+		return mainInfo;
+	}
+
+
+	private String getSpreadInfo(DscSalesApplyMain main,DscSalesApplyCost cost,DscSalesApplyCust cust,
+			DscSalesApplyCar car,List<DscSalesApplyBondsman> bondsmanList,List<DscSalesApplyFinancing> financingList,AssetMainInfo mainInfo) {
+		String defaultStr = "N/A";
+		YTCreateOrderSpreadInfo spreadInfo = new YTCreateOrderSpreadInfo();
+		spreadInfo.setDownpayment(cost.getFsfje().toString()); //首付金额
+		spreadInfo.setDownpaymentRatio(dscCommonService.convertBigDecimal(cost.getFsfbl(), CommonConstant.TO_POIOT_TWO).toString()); //首付比例
+		spreadInfo.setTailpayment(cost.getFwfje()==null?defaultStr:cost.getFwfje().toString()); //尾付金额
+		spreadInfo.setTailpaymentRatio(cost.getFwfbl() == null ?defaultStr:
+			dscCommonService.convertBigDecimal(cost.getFwfbl(), CommonConstant.TO_POIOT_TWO).toString()); //尾付比例
+		spreadInfo.setPoundage(cost.getFsxf() == null?defaultStr:cost.getFsxf().toString()); //手续费
+		spreadInfo.setPoundageRatio(cost.getFsxfl() == null?defaultStr:cost.getFsxfl().toString()); //手续费率
+		spreadInfo.setPoundagePayType(1);//手续费扣款方式
+		spreadInfo.setSettlementPoundageRatio(cost.getFjssxfl() == null? defaultStr:
+				dscCommonService.convertBigDecimal(cost.getFjssxfl(), CommonConstant.TO_POIOT_TWO).toString()); //结算手续费率
+		spreadInfo.setSubsidyPoundage(defaultStr); //补贴手续费
+		spreadInfo.setDiscount(defaultStr); //贴息金额
+		spreadInfo.setDepositRatio(defaultStr); //保证金比例
+		spreadInfo.setDeposit(defaultStr); // 保证金
+		spreadInfo.setDepositOffsetType(1); //保证金冲抵方式
+		spreadInfo.setManagementFee(getMoney(financingList, CommonConstant.FinanceType.F011)); //账户管理费
+		spreadInfo.setShopProvince(main.getAsfName()); //渠道所在省
+		spreadInfo.setShopCity(main.getAcsName()); //渠道所在市
+		spreadInfo.setBorrowerSalary(cust.getFshnx().multiply(new BigDecimal("10000")).toString()); //年收入
+		
+		if (CollectionUtils.isNotEmpty(bondsmanList) && CommonConstant.ONE.equals(bondsmanList.get(0).getAdbrlx())) {
+			spreadInfo.setContactRoleType(2);
+			spreadInfo.setContactName(bondsmanList.get(0).getAxm()); //姓名
+			spreadInfo.setContactIDCardNo(bondsmanList.get(0).getAzjhm()); //证件号码
+			spreadInfo.setContactTelephoneNo(bondsmanList.get(0).getAsj()); //手机号
+			spreadInfo.setContactRelationType(Integer.parseInt(codeConvert("aysqrgx", bondsmanList.get(0).getAysqrgx()))); //字典码映射 - -与申请人关系
+			spreadInfo.setContactJob("无业");
+			spreadInfo.setContactSalary(CommonConstant.ZERO); //关联人年收入
+			spreadInfo.setContactPostalAddress(defaultStr); //关联人通讯地址
+			spreadInfo.setContactCompanyAddress(defaultStr); //关联人单位地址
+			spreadInfo.setContactCompanyTelephoneNo(defaultStr); //关联人单位联系地
+		} else {
+			spreadInfo.setContactRoleType(3);
+		}
+		spreadInfo.setMortgageNumber(mainInfo.getVenusApplyNo()); //抵押物系统编号--申请编号
+		spreadInfo.setCarMortgageState(3); //抵押办理状态
+		spreadInfo.setCarNatureType(4); //车辆性质
+		spreadInfo.setFinancingType(2); //融资方式-反租
+		spreadInfo.setGuaranteeType(4); //担保方式
+		spreadInfo.setCarPrice(car.getAppraisalprice() == null?null:car.getAppraisalprice().toString()); //二手车评估价
+		spreadInfo.setCarSalePrice(car.getFescpgjebg()==null?null:car.getFescpgjebg().toString()); //提报预估价
+		spreadInfo.setCarMarketPrice(car.getFzdj()==null?null:car.getFzdj().toString());//二手车评估价
+		spreadInfo.setCarTotalPrice(cost.getFrze()==null?null:cost.getFrze().toString()); //客户融资额
+		spreadInfo.setCarPurchaseTax(CommonConstant.ZERO); //购置金额
+		spreadInfo.setCarTotalPremium(CommonConstant.ZERO); //汽车保险总费用
+		spreadInfo.setCarTransferTotalCount(0); //累计过户次数
+		spreadInfo.setCarTransferYearCount(0); //一年内车辆过户次数
+		spreadInfo.setCarType(2); //车辆类型
+		spreadInfo.setCarFrameNumber(car.getAcjh());//车架号
+		spreadInfo.setCarEngineNumber(car.getAfdjh()); //发送机号
+		spreadInfo.setGpsFee(getGpsMoney(financingList)); //gps费用  todo gps
+		spreadInfo.setCarNumber(car.getAcarnojc()); //牌照
+		spreadInfo.setCarBrand(car.getAppName()); //品牌
+		spreadInfo.setCarSeries(car.getAcxiName()); //车系
+		spreadInfo.setCarModel(car.getAcxName()); //车型
+		
+		spreadInfo.setCarAge(new BigDecimal(car.getIcl()/12.00).setScale(2, BigDecimal.ROUND_DOWN).toString()); //车龄（月）转换为年保留两位小数，第三位舍去
+
+		return JsonObjectUtils.objectToJson(spreadInfo);
+	}
+
+
+	private String getMoney(List<DscSalesApplyFinancing> financingList, String type) {
+		BigDecimal money = null;
+		if (CollectionUtils.isNotEmpty(financingList)) {
+			for (DscSalesApplyFinancing financing : financingList) {
+				if (type.equals(financing.getArzxmid())) {
+					money = financing.getFkhrzje();
+				}
+			}
+		}
+		return money == null?null:money.toString();
+	}
+
+	/**
+	 * 获取GPS费用
+	 * @param financingList
+	 * @return 
+	 * @author YixinCapital -- wangwenlong
+	 *	       2018年10月10日 下午4:09:40
+	 */
+	private String getGpsMoney(List<DscSalesApplyFinancing> financingList) {
+		//Gps基础价+gps加价+责信保基础价+责信保加价（GPS费用+gps升级方案 
+		//GPS费用F060+F014 责信保基础价+ F066  责信保加价
+		BigDecimal gps = BigDecimal.ZERO; //gps
+		BigDecimal liabilityBase = BigDecimal.ZERO; //责信保基础价
+		BigDecimal liabilityAdd = BigDecimal.ZERO; //责信保加价
+		if (CollectionUtils.isNotEmpty(financingList)) {
+			for (DscSalesApplyFinancing financing : financingList) {
+				if ("F060".equals(financing.getArzxmid())) {  //gps
+					gps = financing.getFkhrzje();
+				} else if("F014".equals(financing.getArzxmid())){ //责信保基础价
+					liabilityBase = financing.getFkhrzje();
+				} else if("F066".equals(financing.getArzxmid())){ //责信保加价
+					liabilityAdd = financing.getFkhrzje();
+				}
+			}
+		}
+		return gps.add(liabilityBase).add(liabilityAdd).toString();
+	}
+}

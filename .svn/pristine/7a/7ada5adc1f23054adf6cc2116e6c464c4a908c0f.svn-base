@@ -1,0 +1,131 @@
+package com.yixin.dsc.entity.rule;
+
+import javax.persistence.Column;
+import javax.persistence.Entity;
+import javax.persistence.Table;
+
+import com.alibaba.fastjson.JSON;
+import com.yixin.common.system.domain.BZBaseEntiy;
+import com.yixin.dsc.dto.own.RuleDetailOperateDTO;
+import com.yixin.kepler.enity.AssetProductFinancialRel;
+
+/**
+ * 规则信息操作日志表
+ * 
+ * Package : com.yixin.dsc.entity.rule
+ * 
+ * @author YixinCapital -- zongzhiping
+ *		   2018年6月4日 下午7:31:51
+ *
+ */
+@Entity
+@Table(name = "dsc_rule_operate_log")
+public class DscRuleOperateLog extends BZBaseEntiy {
+
+	private static final long serialVersionUID = 9167094018193298906L;
+
+	/**
+	 * 规则ID
+	 */
+	@Column(name = "rule_id", columnDefinition = "varchar(64) comment '规则ID'")
+	private String ruleId;
+	/**
+	 * 旧值
+	 */
+	@Column(name = "old_value", columnDefinition = "varchar(5000) comment '旧值'")
+	private String oldValue;
+	/**
+	 * 新值
+	 */
+	@Column(name = "new_value", columnDefinition = "varchar(5000) comment '新值'")
+	private String newValue;
+	/**
+	 * 动作
+	 */
+	@Column(name = "action", columnDefinition = "varchar(100) comment '动作'")
+	private String action;
+	/**
+	 * 备注
+	 */
+	@Column(name = "remark", columnDefinition = "varchar(500) comment '备注'")
+	private String remark;
+
+	public String getRuleId() {
+		return ruleId;
+	}
+
+	public void setRuleId(String ruleId) {
+		this.ruleId = ruleId;
+	}
+
+	public String getOldValue() {
+		return oldValue;
+	}
+
+	public void setOldValue(String oldValue) {
+		this.oldValue = oldValue;
+	}
+
+	public String getNewValue() {
+		return newValue;
+	}
+
+	public void setNewValue(String newValue) {
+		this.newValue = newValue;
+	}
+
+	public String getAction() {
+		return action;
+	}
+
+	public void setAction(String action) {
+		this.action = action;
+	}
+
+	public String getRemark() {
+		return remark;
+	}
+
+	public void setRemark(String remark) {
+		this.remark = remark;
+	}
+
+
+
+	/**
+	 * 创建日志
+	 * 
+	 * @param user
+	 * @param operate
+	 * @param productInfo
+	 * @return 
+	 * @author YixinCapital -- zongzhiping
+	 *	       2018年10月29日 上午10:17:51
+	 */
+	public static String createLog(RuleDetailOperateDTO ruleDTO,String operate){
+		DscRuleOperateLog log = new DscRuleOperateLog();
+		if(ruleDTO!=null){
+			log.setCreatorId(ruleDTO.getCreatorId());
+			log.setCreatorName(ruleDTO.getCreatorName());
+			log.setCreatorDepartmentId(ruleDTO.getCreatorDepartmentId());
+			log.setCreatorDepartmentName(ruleDTO.getCreatorDepartmentName());
+		}
+		log.setAction(operate);
+		log.setRuleId(ruleDTO.getRuleId());
+		RuleDetailOperateDTO ruleDetailOperateDTO = DscRule.getRuleInfoByRuleId(ruleDTO.getRuleId());
+		
+		if(ruleDetailOperateDTO==null){
+			log.setOldValue(null);
+		}else{
+			log.setOldValue(JSON.toJSON(ruleDetailOperateDTO).toString());
+		}
+		log.setNewValue(JSON.toJSON(ruleDetailOperateDTO).toString());
+		return log.create();
+	}
+	
+	
+	
+	
+	
+
+}

@@ -1,0 +1,1358 @@
+package com.yixin.dsc.dto.order;
+
+import java.io.Serializable;
+import java.math.BigDecimal;
+import java.util.Date;
+
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.yixin.common.utils.serializer.JsonDateDeserializer;
+import com.yixin.common.utils.serializer.JsonDateTimeSerializer;
+
+import javax.persistence.Column;
+
+/**
+ * 合同申请客户信息
+ * Package : com.yixin.dsc.entity
+ * 
+ * @author YixinCapital -- wangwenlong
+ *		   2018年6月4日 下午4:27:39
+ *
+ */
+public class DscSalesApplyCustDTO implements Serializable{
+
+
+	/**
+	 * 
+	 */
+	private static final long serialVersionUID = 1L;
+
+
+
+	private String id;
+
+	/**
+	 * 订单主表ID
+	 */
+	private String mainId;
+	//------------------ 基本信息 start ------------------------------
+	/**
+	 * 申请人姓名
+	 */
+	private String akhxm;
+		
+	/**
+	 * 证件类型
+	 */
+	private String azjlx;
+		
+	/**
+	 * 证件号码
+	 */
+	private String azjhm;
+		
+	/**
+	 * 自查征信
+	 */
+	private String azczx;
+		
+	/**
+	 * 申请人性别
+	 */
+	private String akhxb;
+		
+	/**
+	 * 出生日期
+	 */
+	@JsonSerialize(using = JsonDateTimeSerializer.class)
+	@JsonDeserialize(using = JsonDateDeserializer.class)
+	private Date dcsrq;
+	
+	/**
+	 * 手机号码
+	 */
+	private String asjhm;
+
+	/**
+	 * 婚姻状况
+	 */
+	private String ahyzk;
+
+	/**
+	 * 客户渠道二级科目
+	 */
+	private String akhqdlx;
+
+	/**
+	 * 客户属性
+	 */
+	private String akhsx;
+
+	/**
+	 * 申请人学历
+	 */
+	private String asqrxl;
+
+	/**
+	 * 申请人学位
+	 */
+	private String asqrxw;
+
+	/**
+	 * 有无房产
+	 */
+	private String aywfc;
+
+	/**
+	 * QQ号
+	 */
+	private String qqnumber;
+
+	/**
+	 * 微信号
+	 */
+	private String webchatno;
+
+	/**
+	 * 授权书签署日期
+	 */
+	@JsonSerialize(using = JsonDateTimeSerializer.class)
+	@JsonDeserialize(using = JsonDateDeserializer.class)
+	private Date dsqsqsrq;
+
+	/**
+	 * 电核结果
+	 */
+	private String adhjg;
+		
+	/**
+	 * 线索来源
+	 */	
+	private String axsly;
+	
+	/**
+	 * 是否主动提交反欺诈
+	 */
+	private String asffqz;
+	
+	//------------------ 基本信息 end ------------------------------
+	//------------------ 职业信息 start ------------------------------
+
+	/**
+	 * 单位名称
+	 */
+	private String adwmc;
+
+	/**
+	 * 固定电话
+	 */
+	private String adwxxdh;
+
+	/**
+	 * 单位所在省份
+	 */
+	private String adwszsf;
+
+	/**
+	 * 单位所在城市
+	 */
+	private String adwszcs;
+
+	/**
+	 * 企业性质
+	 */
+	private String adwqyxz;
+
+	/**
+	 * 单位详细地址
+	 */
+	private String adwxxdz;
+
+	/**
+	 * 所属行业
+	 */
+	private String adwsshy;
+
+	/**
+	 * 申请人职业
+	 */
+	private String asqrzy;
+
+	/**
+	 * 申请人职务
+	 */
+	private String asqrzw;
+
+	/**
+	 * 申请人职称
+	 */
+	private String asqrzc;
+
+	/**
+	 * 单位在职年限
+	 */
+	private String izznx;
+
+	/**
+	 * 税后年薪(万元)
+	 */
+	private BigDecimal fshnx;
+
+	/**
+	 * 其他税后年收入(万元)
+	 */
+	private BigDecimal fqtshnsr;
+	
+	//------------------ 职业信息 end ------------------------------
+	
+	//------------------ 居住信息 start ------------------------------
+
+	/**
+	 * 现居住地省份
+	 */
+	private String axjzdsf;
+
+	/**
+	 * 现居住地城市
+	 */
+	private String axjzdcs;
+
+	/**
+	 * 现居住地电话
+	 */
+	private String axjzddh;
+
+	/**
+	 * 现居住地详细地址
+	 */
+	private String axjzddz;
+
+	/**
+	 * 居住地址邮编
+	 */
+	private String axjzdyb;
+
+	/**
+	 * 居住状况
+	 */
+	private String ajzzk;
+
+	/**
+	 * 户籍地省份
+	 */
+	private String ahjszsf;
+
+	/**
+	 * 户籍地城市
+	 */
+	private String ahjszcs;
+
+	/**
+	 * 现居住地居住年限
+	 */
+	private String ixjzdjznx;
+
+	/**
+	 * 户籍地详细地址
+	 */
+	private String ahjszdz;
+	//------------------ 居住信息 end ------------------------------
+	
+	//------------------ 配偶信息 start ------------------------------
+
+	/**
+	 * 配偶姓名
+	 */
+	private String apoxm;
+
+	/**
+	 * 配偶证件类型
+	 */
+	private String apozjlx;
+
+	/**
+	 * 配偶证件号码
+	 */
+	private String apozjhm;
+
+	/**
+	 * 配偶单位名称
+	 */
+	private String apogzdw;
+
+	/**
+	 * 配偶手机号码
+	 */
+	private String aposjhm;
+
+	/**
+	 * 配偶单位详细地址
+	 */
+	private String apodwxxdz;
+
+	/**
+	 * 配偶职位
+	 */
+	private String apozw;
+
+	/**
+	 * 配偶单位电话
+	 */
+	private String apodwdh;
+
+	/**
+	 * 配偶税后年薪(万元)
+	 */
+	private BigDecimal aposhnx;
+		
+	//------------------ 配偶信息 end ------------------------------
+	
+	//------------------ 企业信息 start ------------------------------
+
+	/**
+	 * 企业名称
+	 */
+	private String aqymc2;
+
+	/**
+	 * 订单申请类型
+	 */
+	private String applyType;
+
+	/**
+	 * 中征码
+	 */
+	private String medianCode;
+		
+	/*@Column(name = "azczx", columnDefinition = "varchar(64) comment '自查征信'")
+	private String azczx;*/
+
+	/**
+	 * 国别
+	 */
+	private String country;
+
+	/**
+	 * 是否事业单位
+	 */
+	private String publicInstitution;
+
+	/**
+	 * 登记注册号码,统一社会信用代码
+	 */
+	private String aqyyyzz;
+
+	/**
+	 * 组织机构代码
+	 */
+	private String azzjgdm;
+
+	/**
+	 * 纳税人识别号
+	 */
+	private String taxpayerNumber;	
+
+	/**
+	 * 成立日期
+	 */
+	@JsonSerialize(using = JsonDateTimeSerializer.class)
+	@JsonDeserialize(using = JsonDateDeserializer.class)
+	private Date establishDate;
+
+	/**
+	 * 证书到期日期
+	 */
+	@JsonSerialize(using = JsonDateTimeSerializer.class)
+	@JsonDeserialize(using = JsonDateDeserializer.class)
+	private Date certificateMaturityDate;
+
+	/**
+	 * 长期
+	 */
+	private String certificateLong;
+
+	/**
+	 * 组织机构类别
+	 */
+	private String orgCategory;
+
+	/**
+	 * 组织机构类别细分
+	 */
+	private String orgSubcategory;
+
+	/**
+	 * 企业规模
+	 */
+	private String enterpriseScale;
+
+	/**
+	 * 注册资本币种
+	 */
+	private String registeCapitalCurr;
+
+	/**
+	 * 注册资本（万元）
+	 */
+	private BigDecimal registeCapital;
+
+	/**
+	 * 机构状态
+	 */
+	private String institutionalState;
+
+	/**
+	 * 经济类型
+	 */
+	private String aqyxz;
+
+	/**
+	 * 经济行业大类
+	 */
+	private String indCategory;
+
+	/**
+	 * 经济行业小类
+	 */
+	private String indSubcategory;
+
+	/**
+	 * 法人证件类型
+	 */
+	private String legalIdenType;
+
+	/**
+	 * 法人姓名
+	 */
+	private String aqyfrxm;
+
+	/**
+	 * 法人证件号码
+	 */
+	private String aqyfrsfz;
+
+	/**
+	 * 法人持股比例(%)
+	 */
+	private BigDecimal legalShareholdingRatio;
+		
+	/*@Column(name = "asjhm", columnDefinition = "varchar(64) comment '手机号码'")
+	private String asjhm;*/
+
+	/**
+	 * 企业联系人电话
+	 */
+	private String aqylxdh;
+
+	/**
+	 * 企业注册地省份
+	 */
+	private String aqyszsf;
+
+	/**
+	 * 企业注册地城市
+	 */
+	private String aqyszcs;
+
+	/**
+	 * 企业注册地区/县
+	 */
+	private String aqyszqx;
+
+	/**
+	 * 企业注册地详细地址
+	 */
+	private String aqyszdz;
+
+	/**
+	 * 企业经营地省份
+	 */
+	private String aqyjydsf;
+
+	/**
+	 * 企业经营地城市
+	 */
+	private String aqyjydcs;
+
+	/**
+	 * 企业经营地区/县
+	 */
+	private String aqyjydqx;
+
+	/**
+	 * 企业经营地地址
+	 */
+	private String aqyjyddz;
+		
+	/*@Column(name = "akhqdlx", columnDefinition = "varchar(64) comment '客户渠道二级科目'")
+	private String akhqdlx;*/
+		
+	/*@Column(name = "akhsx", columnDefinition = "varchar(64) comment '客户属性'")
+	private String akhsx;*/
+	
+	/*@Column(name = "adhjg", columnDefinition = "varchar(64) comment '电核结果'")
+	private String adhjg;*/
+
+	/**
+	 * 经营（业务）范围
+	 */
+	private String businessScope;
+	
+	/*@Column(name = "asffqz", columnDefinition = "varchar(64) comment '是否主动提交反欺诈'")
+	private String asffqz;*/
+
+	//------------------ 企业信息 end ------------------------------
+
+
+	/**
+	 * 客户类型
+	 * 005900000 个人客户  005900001 企业客户
+	 */
+	private String custType;
+
+	/**
+	 * 证件有效期起
+	 */
+	@JsonSerialize(using = JsonDateTimeSerializer.class)
+	@JsonDeserialize(using = JsonDateDeserializer.class)
+	private String azjyxqq;
+
+	/**
+	 * 证件有效期止
+	 */
+	@JsonSerialize(using = JsonDateTimeSerializer.class)
+	@JsonDeserialize(using = JsonDateDeserializer.class)
+	private String azjyxqz;
+
+	/**
+	 * 税前年收入(元)
+	 */
+	private String asqnsr;
+
+
+	//============== 2018/07/11 新增字段  =============================
+	/**
+	 * 户口类别码值
+	 *  户口类别 【 本市农业 01 /本市非农业 02 /非本市农业 03 /非本市非农业  04】
+	 */
+	private String residenceTypeCode;
+
+	/**
+	 * 户口类别描述
+	 */
+	private String residenceTypeDesc;
+	//============== 2018/07/11 新增字段  =============================
+
+	//============== 2018/09/13  工行新增字段开始  =============================
+	// 配偶信息
+	// 配偶-民族
+	private String ethnic1;
+
+	// 配偶-学历
+	private String education1;
+
+	// 配偶-户籍地址
+	private String regaddr1;
+
+	// 配偶-工作单位类型
+	private String comptype1;
+
+	// 配偶-现单位工作年限，单位（年）
+	private String workyears1;
+
+	// 配偶-月收入（元）
+	private BigDecimal monthincome1;
+	//============== 2018/09/13  工行新增字段结束  =============================
+
+	public String getAkhxm() {
+		return akhxm;
+	}
+
+	public String getResidenceTypeCode() {
+		return residenceTypeCode;
+	}
+
+	public void setResidenceTypeCode(String residenceTypeCode) {
+		this.residenceTypeCode = residenceTypeCode;
+	}
+
+	public String getResidenceTypeDesc() {
+		return residenceTypeDesc;
+	}
+
+	public void setResidenceTypeDesc(String residenceTypeDesc) {
+		this.residenceTypeDesc = residenceTypeDesc;
+	}
+
+	public void setAkhxm(String akhxm) {
+		this.akhxm = akhxm;
+	}
+
+	public String getAzjlx() {
+		return azjlx;
+	}
+
+	public void setAzjlx(String azjlx) {
+		this.azjlx = azjlx;
+	}
+
+	public String getAzjhm() {
+		return azjhm;
+	}
+
+	public void setAzjhm(String azjhm) {
+		this.azjhm = azjhm;
+	}
+
+	public String getAzczx() {
+		return azczx;
+	}
+
+	public void setAzczx(String azczx) {
+		this.azczx = azczx;
+	}
+
+	public String getAkhxb() {
+		return akhxb;
+	}
+
+	public void setAkhxb(String akhxb) {
+		this.akhxb = akhxb;
+	}
+
+	public Date getDcsrq() {
+		return dcsrq;
+	}
+
+	public void setDcsrq(Date dcsrq) {
+		this.dcsrq = dcsrq;
+	}
+
+	public String getAsjhm() {
+		return asjhm;
+	}
+
+	public void setAsjhm(String asjhm) {
+		this.asjhm = asjhm;
+	}
+
+	public String getAhyzk() {
+		return ahyzk;
+	}
+
+	public void setAhyzk(String ahyzk) {
+		this.ahyzk = ahyzk;
+	}
+
+	public String getAkhqdlx() {
+		return akhqdlx;
+	}
+
+	public void setAkhqdlx(String akhqdlx) {
+		this.akhqdlx = akhqdlx;
+	}
+
+	public String getAkhsx() {
+		return akhsx;
+	}
+
+	public void setAkhsx(String akhsx) {
+		this.akhsx = akhsx;
+	}
+
+	public String getAsqrxl() {
+		return asqrxl;
+	}
+
+	public void setAsqrxl(String asqrxl) {
+		this.asqrxl = asqrxl;
+	}
+
+	public String getAsqrxw() {
+		return asqrxw;
+	}
+
+	public void setAsqrxw(String asqrxw) {
+		this.asqrxw = asqrxw;
+	}
+
+	public String getAywfc() {
+		return aywfc;
+	}
+
+	public void setAywfc(String aywfc) {
+		this.aywfc = aywfc;
+	}
+
+	public String getQqnumber() {
+		return qqnumber;
+	}
+
+	public void setQqnumber(String qqnumber) {
+		this.qqnumber = qqnumber;
+	}
+
+	public String getWebchatno() {
+		return webchatno;
+	}
+
+	public void setWebchatno(String webchatno) {
+		this.webchatno = webchatno;
+	}
+
+	public Date getDsqsqsrq() {
+		return dsqsqsrq;
+	}
+
+	public void setDsqsqsrq(Date dsqsqsrq) {
+		this.dsqsqsrq = dsqsqsrq;
+	}
+
+	public String getAdhjg() {
+		return adhjg;
+	}
+
+	public void setAdhjg(String adhjg) {
+		this.adhjg = adhjg;
+	}
+
+	public String getAsffqz() {
+		return asffqz;
+	}
+
+	public void setAsffqz(String asffqz) {
+		this.asffqz = asffqz;
+	}
+
+	public String getAdwmc() {
+		return adwmc;
+	}
+
+	public void setAdwmc(String adwmc) {
+		this.adwmc = adwmc;
+	}
+
+	public String getAdwxxdh() {
+		return adwxxdh;
+	}
+
+	public void setAdwxxdh(String adwxxdh) {
+		this.adwxxdh = adwxxdh;
+	}
+
+	public String getAdwszsf() {
+		return adwszsf;
+	}
+
+	public void setAdwszsf(String adwszsf) {
+		this.adwszsf = adwszsf;
+	}
+
+	public String getAdwszcs() {
+		return adwszcs;
+	}
+
+	public void setAdwszcs(String adwszcs) {
+		this.adwszcs = adwszcs;
+	}
+
+	public String getAdwqyxz() {
+		return adwqyxz;
+	}
+
+	public void setAdwqyxz(String adwqyxz) {
+		this.adwqyxz = adwqyxz;
+	}
+
+	public String getAdwxxdz() {
+		return adwxxdz;
+	}
+
+	public void setAdwxxdz(String adwxxdz) {
+		this.adwxxdz = adwxxdz;
+	}
+
+	public String getAdwsshy() {
+		return adwsshy;
+	}
+
+	public void setAdwsshy(String adwsshy) {
+		this.adwsshy = adwsshy;
+	}
+
+	public String getAsqrzy() {
+		return asqrzy;
+	}
+
+	public void setAsqrzy(String asqrzy) {
+		this.asqrzy = asqrzy;
+	}
+
+	public String getAsqrzw() {
+		return asqrzw;
+	}
+
+	public void setAsqrzw(String asqrzw) {
+		this.asqrzw = asqrzw;
+	}
+
+	public String getAsqrzc() {
+		return asqrzc;
+	}
+
+	public void setAsqrzc(String asqrzc) {
+		this.asqrzc = asqrzc;
+	}
+
+	public String getIzznx() {
+		return izznx;
+	}
+
+	public void setIzznx(String izznx) {
+		this.izznx = izznx;
+	}
+
+	public BigDecimal getFshnx() {
+		return fshnx;
+	}
+
+	public void setFshnx(BigDecimal fshnx) {
+		this.fshnx = fshnx;
+	}
+
+	public BigDecimal getFqtshnsr() {
+		return fqtshnsr;
+	}
+
+	public void setFqtshnsr(BigDecimal fqtshnsr) {
+		this.fqtshnsr = fqtshnsr;
+	}
+
+	public String getAxjzdsf() {
+		return axjzdsf;
+	}
+
+	public void setAxjzdsf(String axjzdsf) {
+		this.axjzdsf = axjzdsf;
+	}
+
+	public String getAxjzdcs() {
+		return axjzdcs;
+	}
+
+	public void setAxjzdcs(String axjzdcs) {
+		this.axjzdcs = axjzdcs;
+	}
+
+	public String getAxjzddh() {
+		return axjzddh;
+	}
+
+	public void setAxjzddh(String axjzddh) {
+		this.axjzddh = axjzddh;
+	}
+
+	public String getAxjzddz() {
+		return axjzddz;
+	}
+
+	public void setAxjzddz(String axjzddz) {
+		this.axjzddz = axjzddz;
+	}
+
+	public String getAxjzdyb() {
+		return axjzdyb;
+	}
+
+	public void setAxjzdyb(String axjzdyb) {
+		this.axjzdyb = axjzdyb;
+	}
+
+	public String getAjzzk() {
+		return ajzzk;
+	}
+
+	public void setAjzzk(String ajzzk) {
+		this.ajzzk = ajzzk;
+	}
+
+	public String getAhjszsf() {
+		return ahjszsf;
+	}
+
+	public void setAhjszsf(String ahjszsf) {
+		this.ahjszsf = ahjszsf;
+	}
+
+	public String getAhjszcs() {
+		return ahjszcs;
+	}
+
+	public void setAhjszcs(String ahjszcs) {
+		this.ahjszcs = ahjszcs;
+	}
+
+	public String getIxjzdjznx() {
+		return ixjzdjznx;
+	}
+
+	public void setIxjzdjznx(String ixjzdjznx) {
+		this.ixjzdjznx = ixjzdjznx;
+	}
+
+	public String getAhjszdz() {
+		return ahjszdz;
+	}
+
+	public void setAhjszdz(String ahjszdz) {
+		this.ahjszdz = ahjszdz;
+	}
+
+	public String getApoxm() {
+		return apoxm;
+	}
+
+	public void setApoxm(String apoxm) {
+		this.apoxm = apoxm;
+	}
+
+	public String getApozjlx() {
+		return apozjlx;
+	}
+
+	public void setApozjlx(String apozjlx) {
+		this.apozjlx = apozjlx;
+	}
+
+	public String getApozjhm() {
+		return apozjhm;
+	}
+
+	public void setApozjhm(String apozjhm) {
+		this.apozjhm = apozjhm;
+	}
+
+	public String getApogzdw() {
+		return apogzdw;
+	}
+
+	public void setApogzdw(String apogzdw) {
+		this.apogzdw = apogzdw;
+	}
+
+	public String getAposjhm() {
+		return aposjhm;
+	}
+
+	public void setAposjhm(String aposjhm) {
+		this.aposjhm = aposjhm;
+	}
+
+	public String getApodwxxdz() {
+		return apodwxxdz;
+	}
+
+	public void setApodwxxdz(String apodwxxdz) {
+		this.apodwxxdz = apodwxxdz;
+	}
+
+	public String getApozw() {
+		return apozw;
+	}
+
+	public void setApozw(String apozw) {
+		this.apozw = apozw;
+	}
+
+	public String getApodwdh() {
+		return apodwdh;
+	}
+
+	public void setApodwdh(String apodwdh) {
+		this.apodwdh = apodwdh;
+	}
+
+	public BigDecimal getAposhnx() {
+		return aposhnx;
+	}
+
+	public void setAposhnx(BigDecimal aposhnx) {
+		this.aposhnx = aposhnx;
+	}
+
+	public String getAqymc2() {
+		return aqymc2;
+	}
+
+	public void setAqymc2(String aqymc2) {
+		this.aqymc2 = aqymc2;
+	}
+
+	public String getApplyType() {
+		return applyType;
+	}
+
+	public void setApplyType(String applyType) {
+		this.applyType = applyType;
+	}
+
+	public String getMedianCode() {
+		return medianCode;
+	}
+
+	public void setMedianCode(String medianCode) {
+		this.medianCode = medianCode;
+	}
+
+	public String getCountry() {
+		return country;
+	}
+
+	public void setCountry(String country) {
+		this.country = country;
+	}
+
+	public String getPublicInstitution() {
+		return publicInstitution;
+	}
+
+	public void setPublicInstitution(String publicInstitution) {
+		this.publicInstitution = publicInstitution;
+	}
+
+	public String getAqyyyzz() {
+		return aqyyyzz;
+	}
+
+	public void setAqyyyzz(String aqyyyzz) {
+		this.aqyyyzz = aqyyyzz;
+	}
+
+	public String getAzzjgdm() {
+		return azzjgdm;
+	}
+
+	public void setAzzjgdm(String azzjgdm) {
+		this.azzjgdm = azzjgdm;
+	}
+
+	public String getTaxpayerNumber() {
+		return taxpayerNumber;
+	}
+
+	public void setTaxpayerNumber(String taxpayerNumber) {
+		this.taxpayerNumber = taxpayerNumber;
+	}
+
+	public Date getEstablishDate() {
+		return establishDate;
+	}
+
+	public void setEstablishDate(Date establishDate) {
+		this.establishDate = establishDate;
+	}
+
+	public Date getCertificateMaturityDate() {
+		return certificateMaturityDate;
+	}
+
+	public void setCertificateMaturityDate(Date certificateMaturityDate) {
+		this.certificateMaturityDate = certificateMaturityDate;
+	}
+
+	public String getCertificateLong() {
+		return certificateLong;
+	}
+
+	public void setCertificateLong(String certificateLong) {
+		this.certificateLong = certificateLong;
+	}
+
+	public String getOrgCategory() {
+		return orgCategory;
+	}
+
+	public void setOrgCategory(String orgCategory) {
+		this.orgCategory = orgCategory;
+	}
+
+	public String getOrgSubcategory() {
+		return orgSubcategory;
+	}
+
+	public void setOrgSubcategory(String orgSubcategory) {
+		this.orgSubcategory = orgSubcategory;
+	}
+
+	public String getEnterpriseScale() {
+		return enterpriseScale;
+	}
+
+	public void setEnterpriseScale(String enterpriseScale) {
+		this.enterpriseScale = enterpriseScale;
+	}
+
+	public String getRegisteCapitalCurr() {
+		return registeCapitalCurr;
+	}
+
+	public void setRegisteCapitalCurr(String registeCapitalCurr) {
+		this.registeCapitalCurr = registeCapitalCurr;
+	}
+
+	public BigDecimal getRegisteCapital() {
+		return registeCapital;
+	}
+
+	public void setRegisteCapital(BigDecimal registeCapital) {
+		this.registeCapital = registeCapital;
+	}
+
+	public String getInstitutionalState() {
+		return institutionalState;
+	}
+
+	public void setInstitutionalState(String institutionalState) {
+		this.institutionalState = institutionalState;
+	}
+
+	public String getAqyxz() {
+		return aqyxz;
+	}
+
+	public void setAqyxz(String aqyxz) {
+		this.aqyxz = aqyxz;
+	}
+
+	public String getIndCategory() {
+		return indCategory;
+	}
+
+	public void setIndCategory(String indCategory) {
+		this.indCategory = indCategory;
+	}
+
+	public String getIndSubcategory() {
+		return indSubcategory;
+	}
+
+	public void setIndSubcategory(String indSubcategory) {
+		this.indSubcategory = indSubcategory;
+	}
+
+	public String getLegalIdenType() {
+		return legalIdenType;
+	}
+
+	public void setLegalIdenType(String legalIdenType) {
+		this.legalIdenType = legalIdenType;
+	}
+
+	public String getAqyfrxm() {
+		return aqyfrxm;
+	}
+
+	public void setAqyfrxm(String aqyfrxm) {
+		this.aqyfrxm = aqyfrxm;
+	}
+
+	public String getAqyfrsfz() {
+		return aqyfrsfz;
+	}
+
+	public void setAqyfrsfz(String aqyfrsfz) {
+		this.aqyfrsfz = aqyfrsfz;
+	}
+
+	public BigDecimal getLegalShareholdingRatio() {
+		return legalShareholdingRatio;
+	}
+
+	public void setLegalShareholdingRatio(BigDecimal legalShareholdingRatio) {
+		this.legalShareholdingRatio = legalShareholdingRatio;
+	}
+
+	public String getAqylxdh() {
+		return aqylxdh;
+	}
+
+	public void setAqylxdh(String aqylxdh) {
+		this.aqylxdh = aqylxdh;
+	}
+
+	public String getAqyszsf() {
+		return aqyszsf;
+	}
+
+	public void setAqyszsf(String aqyszsf) {
+		this.aqyszsf = aqyszsf;
+	}
+
+	public String getAqyszcs() {
+		return aqyszcs;
+	}
+
+	public void setAqyszcs(String aqyszcs) {
+		this.aqyszcs = aqyszcs;
+	}
+
+	public String getAqyszqx() {
+		return aqyszqx;
+	}
+
+	public void setAqyszqx(String aqyszqx) {
+		this.aqyszqx = aqyszqx;
+	}
+
+	public String getAqyszdz() {
+		return aqyszdz;
+	}
+
+	public void setAqyszdz(String aqyszdz) {
+		this.aqyszdz = aqyszdz;
+	}
+
+	public String getAqyjydsf() {
+		return aqyjydsf;
+	}
+
+	public void setAqyjydsf(String aqyjydsf) {
+		this.aqyjydsf = aqyjydsf;
+	}
+
+	public String getAqyjydcs() {
+		return aqyjydcs;
+	}
+
+	public void setAqyjydcs(String aqyjydcs) {
+		this.aqyjydcs = aqyjydcs;
+	}
+
+	public String getAqyjydqx() {
+		return aqyjydqx;
+	}
+
+	public void setAqyjydqx(String aqyjydqx) {
+		this.aqyjydqx = aqyjydqx;
+	}
+
+	public String getAqyjyddz() {
+		return aqyjyddz;
+	}
+
+	public void setAqyjyddz(String aqyjyddz) {
+		this.aqyjyddz = aqyjyddz;
+	}
+
+	public String getBusinessScope() {
+		return businessScope;
+	}
+
+	public void setBusinessScope(String businessScope) {
+		this.businessScope = businessScope;
+	}
+
+	public String getAxsly() {
+		return axsly;
+	}
+
+	public void setAxsly(String axsly) {
+		this.axsly = axsly;
+	}
+
+	public String getId() {
+		return id;
+	}
+
+	public void setId(String id) {
+		this.id = id;
+	}
+
+	public String getMainId() {
+		return mainId;
+	}
+
+	public void setMainId(String mainId) {
+		this.mainId = mainId;
+	}
+
+	public String getCustType() {
+		return custType;
+	}
+
+	public void setCustType(String custType) {
+		this.custType = custType;
+	}
+
+	public String getAzjyxqq() {
+		return azjyxqq;
+	}
+
+	public void setAzjyxqq(String azjyxqq) {
+		this.azjyxqq = azjyxqq;
+	}
+
+	public String getAzjyxqz() {
+		return azjyxqz;
+	}
+
+	public void setAzjyxqz(String azjyxqz) {
+		this.azjyxqz = azjyxqz;
+	}
+
+	public String getAsqnsr() {
+		return asqnsr;
+	}
+
+	public void setAsqnsr(String asqnsr) {
+		this.asqnsr = asqnsr;
+	}
+
+	public String getEthnic1() {
+		return ethnic1;
+	}
+
+	public void setEthnic1(String ethnic1) {
+		this.ethnic1 = ethnic1;
+	}
+
+	public String getEducation1() {
+		return education1;
+	}
+
+	public void setEducation1(String education1) {
+		this.education1 = education1;
+	}
+
+	public String getRegaddr1() {
+		return regaddr1;
+	}
+
+	public void setRegaddr1(String regaddr1) {
+		this.regaddr1 = regaddr1;
+	}
+
+	public String getComptype1() {
+		return comptype1;
+	}
+
+	public void setComptype1(String comptype1) {
+		this.comptype1 = comptype1;
+	}
+
+	public String getWorkyears1() {
+		return workyears1;
+	}
+
+	public void setWorkyears1(String workyears1) {
+		this.workyears1 = workyears1;
+	}
+
+	public BigDecimal getMonthincome1() {
+		return monthincome1;
+	}
+
+	public void setMonthincome1(BigDecimal monthincome1) {
+		this.monthincome1 = monthincome1;
+	}
+}

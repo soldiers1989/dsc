@@ -1,0 +1,632 @@
+package com.yixin.dsc.api;
+
+
+import java.util.List;
+import java.util.Map;
+
+import javax.annotation.Resource;
+
+import com.yixin.web.common.enums.OrderOperate;
+import com.yixin.web.service.monitor.OrderOperateService;
+import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.assertj.core.util.Lists;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.alibaba.fastjson.JSON;
+import com.alibaba.fastjson.JSONObject;
+import com.yixin.common.utils.InvokeResult;
+import com.yixin.common.utils.JsonObjectUtils;
+import com.yixin.dsc.annotation.DscOrderFlowLog;
+import com.yixin.dsc.common.DscContant;
+import com.yixin.dsc.common.exception.BzException;
+import com.yixin.dsc.dto.DscActionParamDTO;
+import com.yixin.dsc.dto.DscActionResultDTO;
+import com.yixin.dsc.dto.DscAdmittanceReturnDto;
+import com.yixin.dsc.dto.DscCapitalDto;
+import com.yixin.dsc.dto.DscComputerParamDto;
+import com.yixin.dsc.dto.DscComputerResultDto;
+import com.yixin.dsc.dto.DscContractCancelDto;
+import com.yixin.dsc.dto.DscElecCreditEvidenceDto;
+import com.yixin.dsc.dto.DscElecSignDto;
+import com.yixin.dsc.dto.DscFlowResultForAlixDto;
+import com.yixin.dsc.dto.DscModifyRepayDTO;
+import com.yixin.dsc.dto.DscReverseFlowForAlixDto;
+import com.yixin.dsc.dto.DscSupplyDto;
+import com.yixin.dsc.entity.kepler.DscOrderTrack;
+import com.yixin.dsc.entity.order.DscSalesApplyMain;
+import com.yixin.dsc.enumpackage.DscAlixLinkEnum;
+import com.yixin.dsc.enumpackage.DscRuleTypeEnum;
+import com.yixin.dsc.enumpackage.OrderTrackTypeEnum;
+import com.yixin.dsc.service.common.DscKeplerCommonService;
+import com.yixin.dsc.service.common.DscSettleCommonService;
+import com.yixin.dsc.service.flow.DscFlowService;
+import com.yixin.dsc.service.shunt.DscShuntService;
+import com.yixin.kepler.common.enums.BankPhaseEnum;
+import com.yixin.kepler.common.enums.CreditfrontResultEnum;
+import com.yixin.kepler.core.constant.CommonConstant;
+import com.yixin.kepler.core.domain.webank.WBEleContractRequest;
+import com.yixin.kepler.dto.BaseMsgDTO;
+
+/**
+ * 流程api
+ * Package : com.yixin.dsc.api
+ *
+ * @author YixinCapital -- huguoxing
+ *         2018年6月4日 下午3:13:28
+ */
+@RestController
+@RequestMapping(value = "/api/dscFlowApi")
+public class DscFlowApi {
+
+	private static final Logger LOGGER = LoggerFactory.getLogger(DscFlowApi.class);
+
+	@Autowired
+	private DscKeplerCommonService dscKeplerCommonService;
+
+	@Autowired
+	private DscFlowService dscFlowService;
+
+	@Autowired
+	private DscShuntService dscShuntService;
+
+	@Autowired
+	private WBEleContractRequest wbEleContractRequest;
+
+	@Resource
+	private DscSettleCommonService dscSettleCommonService;
+
+	@Resource
+	private OrderOperateService orderOperateService;
+
+	/**
+	 * alix 取消、提回、退回订单  请求接口
+	 * type：1：取消，2：提回 ,3：退回 , 4 拒绝
+	 *
+	 * @param dscReverseFlowForAlixDto
+	 * @return
+	 * @author YixinCapital -- wangxulong
+	 * 2018年6月3日 下午10:06:59
+	 */
+	@RequestMapping("/reverseFlowForAlix")
+	public InvokeResult<DscReverseFlowForAlixDto> reverseFlowForAlix(@RequestBody DscReverseFlowForAlixDto dscReverseFlowForAlixDto) {
+		InvokeResult<DscReverseFlowForAlixDto> result = new InvokeResult<>();
+		if (dscReverseFlowForAlixDto == null) {
+			return result.failure("入参为空");
+		}
+		String applyNo = dscReverseFlowForAlixDto.getApplyNo();
+		String ctype = dscReverseFlowForAlixDto.getCtype();
+		if (StringUtils.isBlank(ctype)) {
+			return result.failure("操作类型为空");
+		}
+		if (StringUtils.isBlank(applyNo)) {
+			return result.failure("申请编号为空");
+		}
+		try {
+			result.setData(dscKeplerCommonService.keplerControl(applyNo, ctype));
+		} catch (BzException e) {
+			LOGGER.error("取消、提回、退回订单请求接口异常{}", e.getMessage());
+			result.failure(e.getMessage());
+		} catch (Exception e) {
+			LOGGER.error("取消、提回、退回订单请求接口异常.", e);
+			result.failure("取消、提回、退回订单请求接口异常");
+		}
+
+		return result;
+	}
+
+
+	/**
+	 * 资方审核 结果反推 alix 接口
+	 *
+	 * @param dscFlowResultForAlixDto
+	 * @return
+	 * @author YixinCapital -- wangxulong
+	 * 2018年6月3日 下午10:14:11
+	 */
+	@RequestMapping("/flowResultNoticeForAlix")
+	public InvokeResult<DscFlowResultForAlixDto> flowResultNoticeForAlix(@RequestBody DscFlowResultForAlixDto dscFlowResultForAlixDto) {
+		return dscFlowService.flowResultNoticeForAlix(dscFlowResultForAlixDto);
+	}
+
+	/**
+	 * 发起银行信审
+	 *
+	 * @param dscActionParamDTO
+	 * @return
+	 * @author YixinCapital -- wangwenlong
+	 * 2018年6月4日 上午10:10:32
+	 */
+	@RequestMapping("/sendBankCreditfront")
+	@DscOrderFlowLog
+	public InvokeResult<DscActionResultDTO> sendBankCreditfront(@RequestBody DscActionParamDTO dscActionParamDTO) {
+		InvokeResult<DscActionResultDTO> result = new InvokeResult<>();
+		if (dscActionParamDTO == null) {
+			return result.failure("入参为空");
+		}
+		LOGGER.info("发起银行信审,入参:{}",JSON.toJSONString(dscActionParamDTO));
+		String applyNo = dscActionParamDTO.getApplyNo();
+		if (StringUtils.isBlank(applyNo)) {
+			return result.failure("申请编号为空");
+		}
+
+		/**
+		 * 发起信审前校验资方准入字段是否合格
+		 */
+		DscSalesApplyMain applyMain = DscSalesApplyMain.getOneByApplyNo(applyNo);
+		if (applyMain == null) {
+			return result.failure("没有对应申请信息");
+		}
+		String capitalId = applyMain.getCapitalId();
+		if (StringUtils.isBlank(capitalId)) {
+			return result.failure("没有对应申请信息.");
+		}
+
+        orderOperateService.recordOrderOperate(applyNo, OrderOperate.REC_ALIX_AUDIT_APPLY, null);
+
+        String shuntId = DscOrderTrack.recordTrack(applyNo, OrderTrackTypeEnum.CREDITFRONT_SEND,null);
+		Map<String,Object> sourceMap = dscShuntService.getOrderDataSource(applyNo); //属性取值来源
+		DscActionResultDTO resultDTO = new DscActionResultDTO();
+		try {
+			List<DscCapitalDto> capitalList = Lists.newArrayList();
+			capitalList.add(new DscCapitalDto(capitalId, null, null));
+			LOGGER.info("准入规则校验-遍历资方列表准入规则匹配-开始。 订单编号:{}", applyNo);
+			List<DscCapitalDto> matchedCapitalList = dscShuntService.capitalShuntMatch(capitalList, applyNo, sourceMap, shuntId);
+			LOGGER.info("准入规则校验-遍历资方列表准入规则匹配-结束。 订单编号:{}，待匹配资方个数：{},匹配通过资方个数：{}", applyNo, capitalList.size(), matchedCapitalList.size());
+			if (CollectionUtils.isEmpty(matchedCapitalList)) {
+				/*LOGGER.error("准入规则校验,遍历资方列表准入规则匹配,未获取到匹配的资方，订单编号：{}",applyNo);
+				throw new BzException("未获取到匹配的资方");*/
+
+				DscFlowResultForAlixDto alixDto = new DscFlowResultForAlixDto();
+				alixDto.setApplyNo(applyNo);
+				alixDto.setCode(CreditfrontResultEnum.REFUSE.getCode());
+				alixDto.setLink(DscAlixLinkEnum.CREDITFRONT.getCode());
+				alixDto.setMessage("发起银行信审 准入规则不通过");
+				dscFlowService.flowResultNoticeForAlix(alixDto);
+				LOGGER.info("发起银行信审前 准入规则不通过:{} 信审请求收妥成功 100001/信审拒绝,发推alix结果：{}",applyNo,JSON.toJSONString(alixDto));
+
+				resultDTO.setResultCode(DscContant.KeplerCode.SUCCESS);
+				resultDTO.setResultMessage("信审请求收妥成功");
+				result.setData(resultDTO);
+				return result;
+			}
+		} catch (BzException e) {
+			LOGGER.error("发起银行信审 准入校验 失败，订单编号:{},错误：{}", applyNo, e.getMessage());
+			resultDTO.setResultCode(DscContant.KeplerCode.FAILD);
+			resultDTO.setResultMessage(e.getMessage());
+			result.setData(resultDTO);
+			return result;
+		} catch (Exception e) {
+			LOGGER.error("发起银行信审 准入校验 异常, 订单编号:{},", applyNo, e);
+			return result.failure("发起银行信审 准入校验失败");
+		}
+		try {
+			DscCapitalDto finalCapitalDto = new DscCapitalDto();
+			finalCapitalDto.setCapitalId(capitalId);
+
+			// ====20181012-xjt-信审时校验补充规则/文档，并返回给alix
+			DscAdmittanceReturnDto admittanceReturnDto = new DscAdmittanceReturnDto();
+			admittanceReturnDto.setDscCapitalDto(finalCapitalDto); //最终推荐的资方信息
+			admittanceReturnDto.setLink(DscAlixLinkEnum.CREDITFRONT.getCode()); //信审阶段
+
+			// TODO 后期需待民生、微众与alix沟通加入返回字段无误后，进行调整，屏蔽特殊化代码，并检查规则逻辑是否满足(属性校验需JSCompile)
+			if (CommonConstant.BankName.ICBC_BANK.equals(finalCapitalDto.getCapitalCode())) {
+				dscShuntService.capitalSupplyRuleMatch(admittanceReturnDto, finalCapitalDto, applyNo, DscRuleTypeEnum.CREDITFRONT_SHUNT.getType(), sourceMap);
+			} else {
+				admittanceReturnDto.setNeedSupply(dscShuntService.capitalSupplyRuleMatch(finalCapitalDto,applyNo,DscRuleTypeEnum.CREDITFRONT_SHUNT.getType(),sourceMap)); //是否需要补充
+				//根据资金方id获取补充信息
+				DscSupplyDto supplyDto = this.dscKeplerCommonService.keplerSupplyByCapitalId(finalCapitalDto.getCapitalId());
+				admittanceReturnDto.setDscSupply(supplyDto);
+			}
+			// Boolean flag = dscShuntService.capitalSupplyRuleMatch(finalCapitalDto, applyNo, DscRuleTypeEnum.CREDITFRONT_SHUNT.getType(), sourceMap);
+			if (admittanceReturnDto.getNeedSupply()) {
+				/*LOGGER.error("发起银行信审检查需要补充字段：{}",applyNo);
+				throw new BzException("发起银行信审 补充字段校验失败");*/
+
+				DscFlowResultForAlixDto alixDto = new DscFlowResultForAlixDto();
+				alixDto.setApplyNo(applyNo);
+				alixDto.setCode(CreditfrontResultEnum.REFUSE.getCode());
+				alixDto.setLink(DscAlixLinkEnum.CREDITFRONT.getCode());
+				// ====20181012-xjt-信审补充规则/文档校验失败，返回给alix增加对应字段--start
+				alixDto.setNeedSupply(admittanceReturnDto.getNeedSupply());
+				alixDto.setDscSupply(admittanceReturnDto.getDscSupply());
+				// ====20181012-xjt-信审补充规则/文档校验失败，返回给alix增加对应字段--end
+				alixDto.setMessage("发起银行信审 补充字段校验未通过");
+				dscFlowService.flowResultNoticeForAlix(alixDto);
+				LOGGER.info("发起银行信审前 补充规则校验未通过:{} 信审请求收妥成功 100001/信审拒绝,发推alix结果：{}",applyNo,JSON.toJSONString(alixDto));
+
+				resultDTO.setResultCode(DscContant.KeplerCode.SUCCESS);
+				resultDTO.setResultMessage("信审请求收妥成功");
+				result.setData(resultDTO);
+				return result;
+			}
+		} catch (BzException e) {
+			LOGGER.error("发起银行信审检查需要补充字段 失败：{}", applyNo, e);
+			resultDTO.setResultCode(DscContant.KeplerCode.FAILD);
+			resultDTO.setResultMessage(e.getMessage());
+			result.setData(resultDTO);
+			return result;
+		} catch (Exception e) {
+			LOGGER.error("发起银行信审检查需要补充字段 异常：{}", e);
+			return result.failure("发起银行信审 补充字段校验异常");
+		}
+		//============== add by wangwenlong on 2018-07-23 增加发起信审前最后的校验规则 ===========================
+		try {
+			Boolean creFlag = dscShuntService.capitalRuleMatch(capitalId, applyNo, DscRuleTypeEnum.CREDITFRONT_BEFORE, sourceMap);
+			if (!creFlag) {
+				DscFlowResultForAlixDto alixDto = new DscFlowResultForAlixDto();
+				alixDto.setApplyNo(applyNo);
+				alixDto.setCode(CreditfrontResultEnum.REFUSE.getCode());
+				alixDto.setLink(DscAlixLinkEnum.CREDITFRONT.getCode());
+				alixDto.setMessage(CreditfrontResultEnum.REFUSE.getMsg());
+				dscFlowService.flowResultNoticeForAlix(alixDto);
+				LOGGER.info("发起银行信审前规则校验未通过:{} 信审请求收妥成功 100001/信审拒绝,发推alix结果：{}",applyNo,JSON.toJSONString(alixDto));
+
+				resultDTO.setResultCode(DscContant.KeplerCode.SUCCESS);
+				resultDTO.setResultMessage("信审请求收妥成功");
+				result.setData(resultDTO);
+				return result;
+			}
+		} catch (BzException e) {
+			LOGGER.error("发起银行信审前规则校验 失败：{}", applyNo, e);
+			resultDTO.setResultCode(DscContant.KeplerCode.FAILD);
+			resultDTO.setResultMessage(e.getMessage());
+			result.setData(resultDTO);
+			return result;
+		} catch (Exception e) {
+			LOGGER.error("发起银行信审前规则校验 异常：{}", applyNo, e);
+			return result.failure("发起银行信审前规则校验异常");
+		}
+
+		try {
+			result.setData(dscKeplerCommonService.keplerApply(applyNo));
+		} catch (BzException e) {
+			LOGGER.error("发起银行信审异常 applyNo:{},错误信息:{}", applyNo, e.getMessage());
+			return result.failure(e.getMessage());
+		} catch (Exception e) {
+			LOGGER.error("发起银行信审异常.applyNo:{}", applyNo, e);
+			return result.failure("发起银行信审异常");
+		}
+		LOGGER.info("发起银行信审,订单编号:{},返参:{}",applyNo,JSON.toJSONString(dscActionParamDTO));
+
+        //向银行发起信审
+		orderOperateService.recordOrderOperate(applyNo, OrderOperate.WAIT_BANK_AUDIT, null);
+		return result;
+	}
+
+
+	/**
+	 * 发起银行请款
+	 *
+	 * @param dscActionParamDTO
+	 * @return
+	 * @author YixinCapital -- wangwenlong
+	 * 2018年6月4日 上午10:10:32
+	 */
+	@RequestMapping("/sendBankRequestFunds")
+	@DscOrderFlowLog
+	public InvokeResult<DscActionResultDTO> sendBankRequestFunds(@RequestBody DscActionParamDTO dscActionParamDTO) {
+		InvokeResult<DscActionResultDTO> result = new InvokeResult<>();
+		if(dscActionParamDTO==null){
+			return result.failure("入参为空");
+		}
+		LOGGER.info("DscFlowApi发起请款,入参:{}",JsonObjectUtils.objectToJson(dscActionParamDTO));
+		String applyNo = dscActionParamDTO.getApplyNo();
+		if (StringUtils.isBlank(applyNo)) {
+			return result.failure("申请编号为空");
+		}
+		if (dscActionParamDTO.getDealerCollectAmount() == null) {
+			return result.failure("经销商收款额为空.");
+		}
+		if (dscActionParamDTO.getAlixLoanDate() == null) {
+			return result.failure("alix放款日期为空.");
+		}
+		DscSalesApplyMain applyMain = DscSalesApplyMain.getOneByApplyNo(dscActionParamDTO.getApplyNo());
+		if (applyMain == null) {
+			return result.failure("申请编号为空.");
+		}
+		try {
+			applyMain.setDealerCollectAmount(dscActionParamDTO.getDealerCollectAmount());
+			applyMain.setAlixLoanDate(dscActionParamDTO.getAlixLoanDate());
+			applyMain.update();
+
+			DscActionResultDTO checkResult = this.dscFlowService.phaseCheck(applyNo, BankPhaseEnum.PAYMENT);
+			if (checkResult != null && checkResult.getNeedSupply() != null && checkResult.getNeedSupply()) { //请款阶段需要补充信息
+				result.setData(checkResult);
+				return result;
+			}
+			result.setData(dscKeplerCommonService.keplerRequest(applyNo));
+		} catch (BzException e) {
+			LOGGER.error("发起银行请款异常,订单编号：{},异常信息:{}",applyNo, e.getMessage());
+			result.failure(e.getMessage());
+		} catch (Exception e) {
+			LOGGER.error("发起银行请款异常,订单编号：{}",applyNo, e);
+			result.failure("发起银行请款异常");
+		}
+		LOGGER.info("DscFlowApi发起请款,订单编号:{},返参:{}",applyNo,JsonObjectUtils.objectToJson(result));
+		return result;
+	}
+
+
+	/***
+	 * 确认 授权书签署状态接口 是否 完成
+	 * true签署 
+	 *
+	 * @param dscActionParamDTO
+	 * @return
+	 * @author YixinCapital -- wangxulong
+	 *	       2018年6月6日 上午10:25:36
+	 */
+	@RequestMapping("/isAuthorizationSucessByApplyNo")
+	public InvokeResult<Boolean> isAuthorizationSucessByApplyNo(@RequestBody DscActionParamDTO dscActionParamDTO) {
+		InvokeResult<Boolean> iResult = new InvokeResult<>();
+		LOGGER.info("DscFlowApi确认授权书签署状态是否完成  入参:{}", JSONObject.toJSONString(dscActionParamDTO));
+		if (dscActionParamDTO == null || StringUtils.isBlank(dscActionParamDTO.getApplyNo())) {
+			return iResult.failure("订单编号为空");
+		}
+		String applyNo = dscActionParamDTO.getApplyNo();
+		try {
+			iResult.setData(this.dscFlowService.isAuthorizationSucessByApplyNo(applyNo));
+		} catch (BzException e) {
+			LOGGER.error("DscFlowApi确认授权书签署状态是否完成 失败，订单编号:{},错误：{}", applyNo, e.getMessage());
+			return iResult.failure(e.getMessage());
+		} catch (Exception e) {
+			LOGGER.error("DscFlowApi确认授权书签署状态是否完成 异常,订单编号:{},", applyNo, e);
+			return iResult.failure("未获取到授权书签署状态");
+		}
+		LOGGER.info("DscFlowApi确认授权书签署状态是否完成，订单编号：{},返参:{}", applyNo, JSONObject.toJSONString(iResult));
+		return iResult;
+	}
+
+	/**
+	 * 获取银行合同签署状态接口
+	 * true签署
+	 *
+	 * @param dscActionParamDTO
+	 * @return
+	 * @author YixinCapital -- wangxulong
+	 * 2018年6月6日 上午10:44:47
+	 */
+	@RequestMapping("/isSignContractByApplyNo")
+	public InvokeResult<Boolean> isSignContractByApplyNo(@RequestBody DscActionParamDTO dscActionParamDTO) {
+		InvokeResult<Boolean> iResult = new InvokeResult<>();
+		LOGGER.info("DscFlowApi获取银行合同签署状态是否完成  入参:{}", JSONObject.toJSONString(dscActionParamDTO));
+		if (dscActionParamDTO == null || StringUtils.isBlank(dscActionParamDTO.getApplyNo())) {
+			return iResult.failure("订单编号为空");
+		}
+		String applyNo = dscActionParamDTO.getApplyNo();
+		try {
+			iResult.setData(this.dscFlowService.isSignContractByApplyNo(applyNo));
+		} catch (BzException e) {
+			LOGGER.error("DscFlowApi获取银行合同签署状态是否完成 失败，订单编号:{},错误：{}", applyNo, e.getMessage());
+			return iResult.failure(e.getMessage());
+		} catch (Exception e) {
+			LOGGER.error("DscFlowApi获取银行合同签署状态是否完成 异常,订单编号:{},", applyNo, e);
+			return iResult.failure("未获取到银行合同签署状态");
+		}
+		LOGGER.info("DscFlowApi获取银行合同签署状态是否完成，订单编号：{},返参:{}", applyNo, JSONObject.toJSONString(iResult));
+		return iResult;
+	}
+
+	/**
+	 * 确认银行请款是否成功接口
+	 * true成功
+	 *
+	 * @param dscActionParamDTO
+	 * @return
+	 * @author YixinCapital -- wangxulong
+	 * 2018年6月6日 上午10:44:54
+	 */
+	@RequestMapping("/isRequestFundsByApplyNo")
+	public InvokeResult<Boolean> isRequestFundsByApplyNo(@RequestBody DscActionParamDTO dscActionParamDTO) {
+		InvokeResult<Boolean> iResult = new InvokeResult<>();
+		LOGGER.info("DscFlowApi确认银行请款是否成功  入参:{}", JSONObject.toJSONString(dscActionParamDTO));
+		if (dscActionParamDTO == null || StringUtils.isBlank(dscActionParamDTO.getApplyNo())) {
+			return iResult.failure("订单编号为空");
+		}
+		String applyNo = dscActionParamDTO.getApplyNo();
+		try {
+			iResult.setData(this.dscFlowService.isRequestFundsByApplyNo(applyNo));
+		} catch (BzException e) {
+			LOGGER.error("DscFlowApi确认银行请款是否成功 失败，订单编号:{},错误：{}", applyNo, e.getMessage());
+			return iResult.failure(e.getMessage());
+		} catch (Exception e) {
+			LOGGER.error("DscFlowApi确认银行请款是否成功 异常, 订单编号:{},", applyNo, e);
+			return iResult.failure("未获取到银行请款状态");
+		}
+		LOGGER.info("DscFlowApi确认银行请款是否成功，订单编号：{},返参:{}", applyNo, JSONObject.toJSONString(iResult));
+		return iResult;
+	}
+
+	/**
+	 * 确认订单信审是否成功
+	 *
+	 * @param dscActionParamDTO
+	 * @return
+	 * @author YixinCapital -- wangwenlong
+	 * 2018年6月7日 上午10:59:42
+	 */
+	@RequestMapping("/isCreditfrontSuccessByApplyNo")
+	public InvokeResult<Boolean> isCreditfrontSuccessByApplyNo(@RequestBody DscActionParamDTO dscActionParamDTO) {
+		InvokeResult<Boolean> iResult = new InvokeResult<>();
+		LOGGER.info("DscFlowApi确认订单信审是否成功 入参:{}", JSONObject.toJSONString(dscActionParamDTO));
+		if (dscActionParamDTO == null || StringUtils.isBlank(dscActionParamDTO.getApplyNo())) {
+			return iResult.failure("订单编号为空");
+		}
+		String applyNo = dscActionParamDTO.getApplyNo();
+		try {
+			iResult.setData(this.dscFlowService.isRequestFundsByApplyNo(applyNo));
+		} catch (BzException e) {
+			LOGGER.error("DscFlowApi确认订单信审是否成功 失败，订单编号:{},错误：{}", applyNo, e.getMessage());
+			return iResult.failure(e.getMessage());
+		} catch (Exception e) {
+			LOGGER.error("DscFlowApi确认订单信审是否成功 异常, 订单编号:{},", applyNo, e);
+			return iResult.failure("未获取订单信审状态");
+		}
+		LOGGER.info("DscFlowApi确认订单信审是否成功，订单编号：{},返参:{}", applyNo, JSONObject.toJSONString(iResult));
+		return iResult;
+	}
+
+	/**
+	 * 电子征信存证
+	 *
+	 * @param elecCreditDto
+	 * @return
+	 * @author YixinCapital -- wangwenlong
+	 * 2018年7月4日 下午5:09:56
+	 */
+	@RequestMapping("/elecCreditStoreEvidence")
+	public InvokeResult<Boolean> elecCreditStoreEvidence(@RequestBody DscElecCreditEvidenceDto elecCreditDto) {
+		InvokeResult<Boolean> iResult = new InvokeResult<>();
+		LOGGER.info("DscFlowApi电子征信存证 入参:{}", JSONObject.toJSONString(elecCreditDto));
+		if (elecCreditDto == null || StringUtils.isBlank(elecCreditDto.getApplyNo())) {
+			return iResult.failure("订单编号为空");
+		}
+		String applyNo = elecCreditDto.getApplyNo();
+		try {
+			iResult.setData(dscKeplerCommonService.saveElecCreditInfo(elecCreditDto));
+		} catch (BzException e) {
+			LOGGER.error("DscFlowApi电子征信存证 失败，订单编号:{},错误：{}", applyNo, e.getMessage());
+			return iResult.failure(e.getMessage());
+		} catch (Exception e) {
+			LOGGER.error("DscFlowApi电子征信存证 异常, 订单编号:{},", applyNo, e);
+			return iResult.failure("电子征信存证失败");
+		}
+		LOGGER.info("DscFlowApi电子征信存证，订单编号：{},返参:{}", applyNo, JSONObject.toJSONString(iResult));
+		return iResult;
+	}
+
+
+	/**
+	 * 电子合同签约存证
+	 *
+	 * @param
+	 * @return
+	 * @author YixinCapital -- wangwenlong
+	 * 2018年7月4日 下午5:09:56
+	 */
+	@RequestMapping("/elecContractStoreEvidence")
+	public InvokeResult<BaseMsgDTO> elecContractStoreEvidence(@RequestBody DscElecSignDto signDto) {
+		InvokeResult<BaseMsgDTO> iResult = new InvokeResult<>();
+		LOGGER.info("DscFlowApi电子合同签约存证 入参:{}", JSONObject.toJSONString(signDto));
+		if (signDto == null || StringUtils.isBlank(signDto.getApplyNo())) {
+			return iResult.failure("订单编号为空");
+		}
+		String applyNo = signDto.getApplyNo();
+		try {
+			iResult = wbEleContractRequest.sendResult(signDto);
+		} catch (BzException e) {
+			LOGGER.error("DscFlowApi电子合同签约存证 失败，订单编号:{},错误：{}", applyNo, e.getMessage());
+			return iResult.failure(e.getMessage());
+		} catch (Exception e) {
+			LOGGER.error("DscFlowApi电子合同签约存证 异常, 订单编号:{},", applyNo, e);
+			return iResult.failure("电子合同签约存证失败");
+		}
+		LOGGER.info("DscFlowApi电子合同签约存证，订单编号：{},返参:{}", applyNo, JSONObject.toJSONString(iResult));
+		return iResult;
+	}
+
+
+	/**
+	 * 试算费用明细
+	 *
+	 * @param paramDto
+	 * @return
+	 * @author YixinCapital -- wangwenlong
+	 * 2018年7月4日 下午8:04:12
+	 */
+	@RequestMapping("/computerSchedules")
+	public InvokeResult<DscComputerResultDto> computerSchedules(@RequestBody DscComputerParamDto paramDto) {
+		InvokeResult<DscComputerResultDto> result = new InvokeResult<>();
+		if (StringUtils.isBlank(paramDto.getApplyNo())) {
+			return result.failure("申请编号为空");
+		}
+		LOGGER.info("借据试算开始,applyNo={},params={}", paramDto.getApplyNo(), JSON.toJSONString(paramDto));
+		try {
+			result.setData(dscFlowService.computerSchedules(paramDto));
+		} catch (Exception e) {
+			LOGGER.error("借据试算失败,applyNo={}", paramDto.getApplyNo(), e);
+			result.failure("借据试算失败,原因：" + e.getMessage());
+		}
+		LOGGER.info("借据试算结束,applyNo={},result={}", paramDto.getApplyNo(), JSON.toJSONString(result));
+		return result;
+	}
+
+	/**
+	 * 合同取消接口
+	 *
+	 * @param dscActionParamDTO
+	 * @return
+	 * @author YixinCapital -- wangwenlong
+	 * 2018年9月10日 下午5:10:00
+	 */
+	@RequestMapping("/contractCancel")
+	public InvokeResult<DscContractCancelDto> contractCancel(@RequestBody DscActionParamDTO dscActionParamDTO) {
+		InvokeResult<DscContractCancelDto> iResult = new InvokeResult<>();
+		LOGGER.info("DscFlowApi合同取消接口入参:{}", JSONObject.toJSONString(dscActionParamDTO));
+		if (dscActionParamDTO == null || StringUtils.isBlank(dscActionParamDTO.getApplyNo())) {
+			return iResult.failure("订单编号为空");
+		}
+		String applyNo = dscActionParamDTO.getApplyNo();
+		try {
+			iResult.setData(dscFlowService.contractCancel(applyNo));
+		} catch (BzException e) {
+			LOGGER.error("DscFlowApi合同取消接口 失败，订单编号:{},错误：{}", applyNo, e.getMessage());
+			return iResult.failure(e.getMessage());
+		} catch (Exception e) {
+			LOGGER.error("DscFlowApi合同取消接口 异常, 订单编号:{},", applyNo, e);
+			return iResult.failure("合同取消接口失败");
+		}
+		LOGGER.info("DscFlowApi合同取消接口，订单编号：{},返参:{}", applyNo, JSONObject.toJSONString(iResult));
+		return iResult;
+
+	}
+
+	/**
+	 * 贷后修改还款信息
+	 *
+	 * @param dscModifyRepayDTO 还款信息
+	 * @return 修改结果
+	 * @author YixinCapital -- chenjiacheng
+	 * 2018/9/26 14:48
+	 */
+	@RequestMapping(value = "/modifyRepayInfo")
+	public InvokeResult<BaseMsgDTO> modifyRepayInfo(@RequestBody DscModifyRepayDTO dscModifyRepayDTO) {
+		InvokeResult<BaseMsgDTO> invokeResult = new InvokeResult<>();
+		LOGGER.info("贷后修改还款信息,params={}", JSON.toJSONString(dscModifyRepayDTO));
+		if (dscModifyRepayDTO == null) {
+			return invokeResult.failure("入参为空");
+		}
+		if (StringUtils.isBlank(dscModifyRepayDTO.getApplyNo())) {
+			return invokeResult.failure("申请编号为空");
+		}
+		if (StringUtils.isBlank(dscModifyRepayDTO.getBankCode())) {
+			return invokeResult.failure("银行编号为空");
+		}
+		if (StringUtils.isBlank(dscModifyRepayDTO.getBankAccount())) {
+			return invokeResult.failure("银行账号为空");
+		}
+		if (StringUtils.isBlank(dscModifyRepayDTO.getSignNo())) {
+			return invokeResult.failure("签约协议编号为空");
+		}
+		try {
+			invokeResult.setData(dscFlowService.modifyRepay(dscModifyRepayDTO));
+			LOGGER.info("贷后修改还款信息成功,applyNo={}", dscModifyRepayDTO.getApplyNo());
+		} catch (com.yixin.common.exception.BzException e) {
+			LOGGER.error("贷后取消还款信息失败,applyNo:{},错误信息:{}", dscModifyRepayDTO.getApplyNo(), e.getMessage());
+			invokeResult.setData(BaseMsgDTO.failureData(e.getMessage()));
+			return invokeResult;
+		} catch (Exception e) {
+			LOGGER.error("贷后取消还款信息异常,applyNo={}", dscModifyRepayDTO.getApplyNo(), e);
+			return invokeResult.failure("贷后更换还款信息失败");
+		}
+		return invokeResult;
+	}
+
+
+}

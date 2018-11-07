@@ -1,0 +1,49 @@
+package com.yixin.dsc.assembler;
+
+import java.util.List;
+import java.util.Map;
+
+import com.alibaba.dubbo.common.utils.CollectionUtils;
+import com.yixin.common.system.util.BaseAssembler;
+import com.yixin.dsc.dto.own.RuleDetailOperateDTO;
+
+/**
+ * 规则转换
+ * Package : com.yixin.dsc.assembler
+ * 
+ * @author YixinCapital -- zongzhiping
+ *		   2018年10月30日16:13:19
+ *
+ */
+public class DscRuleOperateAssembler extends BaseAssembler {
+	
+	/**
+	 * 转换DTO
+	 * 
+	 * @param list
+	 * @return
+	 * @author YixinCapital -- zongzhiping 2018年10月30日 下午4:14:36
+	 */
+	public static RuleDetailOperateDTO toDTO(List<Object[]> list) {
+		if (CollectionUtils.isEmpty(list)) {
+			return null;
+		}
+		Object[] objects = list.get(0);
+		
+		
+		RuleDetailOperateDTO ruleDTO = new RuleDetailOperateDTO();
+		ruleDTO.setRuleId(String.valueOf(objects[0]));
+		ruleDTO.setRuleName(String.valueOf(objects[1]));
+		ruleDTO.setRuleType(String.valueOf(objects[2]));
+		ruleDTO.setMatchType(String.valueOf(objects[3]));
+		ruleDTO.setIsValid(String.valueOf(objects[4]));
+		ruleDTO.setMessage(String.valueOf(objects[5]));
+		ruleDTO.setRuleFormula(String.valueOf(objects[6]));
+		ruleDTO.setDetailEnable(String.valueOf(objects[7]));
+		ruleDTO.setRelationId(String.valueOf(objects[8]));
+		ruleDTO.setFieldCode(String.valueOf(objects[9]));
+		ruleDTO.setCapitalId(String.valueOf(objects[10]));
+		return ruleDTO;
+	}
+
+}

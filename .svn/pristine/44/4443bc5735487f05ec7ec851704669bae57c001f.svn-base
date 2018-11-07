@@ -1,0 +1,470 @@
+package com.yixin.kepler.v1.service.impl.yntrust;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Collectors;
+
+import javax.annotation.Resource;
+
+import com.yixin.common.system.ioc.SpringContextUtil;
+import com.yixin.common.utils.JsonObjectUtils;
+import com.yixin.kepler.common.SerialNumberUtil;
+import com.yixin.kepler.common.enums.AssetStateEnum;
+import com.yixin.kepler.common.enums.BankPhaseEnum;
+import com.yixin.kepler.enity.*;
+import com.yixin.kepler.v1.common.core.compress.CompressDomain;
+import com.yixin.kepler.v1.datapackage.dto.CompressHandleDTO;
+import org.apache.commons.collections.CollectionUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Lookup;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.Assert;
+
+import com.yixin.common.exception.BzException;
+import com.yixin.common.utils.InvokeResult;
+import com.yixin.dsc.dto.DscBankContractDTO;
+import com.yixin.dsc.dto.DscContractSignFileDTO;
+import com.yixin.dsc.dto.DscContractSignRespDTO;
+import com.yixin.dsc.dto.order.DscFileAttachmentDTO;
+import com.yixin.dsc.v1.service.capital.yntrust.YTCommonService;
+import com.yixin.kepler.common.FileUtils;
+import com.yixin.kepler.common.RestTemplateUtil;
+import com.yixin.kepler.core.constant.CommonConstant;
+import com.yixin.kepler.dto.BaseMsgDTO;
+import com.yixin.kepler.dto.fileserver.YxFileUrlInfoDTO;
+import com.yixin.kepler.v1.datapackage.dto.yntrust.YTFileUploadRequestDTO;
+import com.yixin.kepler.v1.datapackage.dto.yntrust.YTImageContentDTO;
+
+import com.yixin.kepler.v1.service.capital.yntrust.*;
+import net.sf.json.JSONArray;
+import net.sf.json.JSONObject;
+import org.apache.commons.lang.StringUtils;
+
+import com.yixin.kepler.v1.service.capital.yntrust.BankContractStrategy;
+import com.yixin.kepler.v1.service.capital.yntrust.FileUploadRequestStrategy;
+import com.yixin.kepler.v1.service.capital.yntrust.GetContractFileRequestStrategy;
+import com.yixin.kepler.v1.service.capital.yntrust.VerificationCodeStrategy;
+import com.yixin.kepler.v1.service.capital.yntrust.YnContractService;
+
+
+
+/**
+ *
+ * 签约
+ * 验证
+ * 文件上传
+ * 获取签章合同
+ *
+ * @author sukang
+ */
+@Service(value = "YNTRUSTContractService")
+public class YnContractServiceImpl implements YnContractService,ContractSignService{
+
+    private final Logger logger = LoggerFactory.getLogger(getClass());
+
+
+    @Value("${spring.fileserver.http.upload.url}")
+    private String fileHttpUpload;
+
+    private BankContractStrategy bankContractStrategy;
+
+    private VerificationCodeStrategy verificationCodeStrategy;
+
+    private GetContractFileRequestStrategy getContractFileRequestStrategy;
+
+    private FileUploadRequestStrategy fileUploadRequestStrategy;
+
+    @Resource
+    private YTCommonService ytCommonService;
+
+    @Resource
+    private CompressDomain compressDomain;
+
+    @Autowired
+    public YnContractServiceImpl(BankContractStrategy bankContractStrategy,
+                                 VerificationCodeStrategy verificationCodeStrategy,
+                                 GetContractFileRequestStrategy getContractFileRequestStrategy,
+                                 FileUploadRequestStrategy fileUploadRequestStrategy) {
+        this.bankContractStrategy = bankContractStrategy;
+        this.verificationCodeStrategy = verificationCodeStrategy;
+        this.getContractFileRequestStrategy = getContractFileRequestStrategy;
+        this.fileUploadRequestStrategy = fileUploadRequestStrategy;
+    }
+
+    /**
+     * 获取短信验证码
+     */
+    @Override
+    @Deprecated
+    public BaseMsgDTO getBankContractId(DscBankContractDTO dscBankContractDTO){
+        try {
+            InvokeResult<BaseMsgDTO> result = bankContractStrategy
+                    .doIt(dscBankContractDTO);
+
+            logger.info("订单号{}获取短信验证码结果为{}"
+                    ,dscBankContractDTO.getApplyNo(), JSONObject.fromObject(result).toString());
+
+            return (BaseMsgDTO)result.getData();
+        } catch (BzException e) {
+            logger.error("订单号{},获取短信验证码异常",dscBankContractDTO.getApplyNo()
+                    ,e);
+        }
+
+        return BaseMsgDTO.failureData("获取短信验证码异常");
+    }
+
+    @Override
+    @Deprecated
+    public BaseMsgDTO verificationCode(DscBankContractDTO dscBankContractDTO){
+        try {
+            InvokeResult<BaseMsgDTO> result = verificationCodeStrategy.doIt(dscBankContractDTO);
+
+            BaseMsgDTO baseMsgDTO = (BaseMsgDTO) result.getData();
+            logger.info("订单号{},验证短信获取的结果为{}",dscBankContractDTO.getApplyNo()
+                        ,JSONObject.fromObject(result).toString());
+            return baseMsgDTO;
+        }catch (Exception e){
+            logger.error("订单号{}验证短信异常",dscBankContractDTO.getApplyNo(),e);
+        }
+        return BaseMsgDTO.failureData("订单验证短信异常");
+    }
+
+    /**
+     * 签约合同文件
+     * @return 文件状态
+     */
+    @Override
+    public BaseMsgDTO compressFileAndUpload(OsbFileLog osbFileLog){
+        try {
+
+            if (osbFileLog == null || StringUtils.isEmpty(
+                    osbFileLog.getCompressFileJson())){
+                return BaseMsgDTO.failureData("未找到文件fileId");
+            }
+
+            YTFileUploadRequestDTO ytFileUploadRequestDTO = new YTFileUploadRequestDTO();
+            YTImageContentDTO ytImageContentDTO = new YTImageContentDTO();
+
+            //根据序列号获取压缩后的fileId;
+            //将fileId转化成字节数组
+            ytImageContentDTO.setContent(getCompressFileId(osbFileLog));
+
+            ytImageContentDTO.setType(getBanktype(osbFileLog.getSourceFileJson()));
+            List<YTImageContentDTO> ytImageContents = Collections.singletonList(ytImageContentDTO);
+
+            ytFileUploadRequestDTO.setImageContent(ytImageContents);
+            ytFileUploadRequestDTO.setRemark(osbFileLog.getBzId());
+            InvokeResult<BaseMsgDTO> result = fileUploadRequestStrategy.doIt(ytFileUploadRequestDTO);
+
+            BaseMsgDTO baseMsgDTO = (BaseMsgDTO) result.getData();
+            logger.info("订单号{},上传合同文件获取的结果为{}",ytFileUploadRequestDTO.getRemark()
+                    ,JSONObject.fromObject(result).toString());
+
+            if (baseMsgDTO.successed()){
+                //初始化AssetContractTask数据
+                AssetContractTask assetContractTask = new AssetContractTask();
+                assetContractTask.setApplyNo(osbFileLog.getBzId());
+                assetContractTask.setBankFileType(getBanktype(osbFileLog.getSourceFileJson()));
+                assetContractTask.setSignState(0);
+                assetContractTask.setEnd(false);
+                assetContractTask.setSuccess(false);
+                assetContractTask.setDeleted(false);
+                assetContractTask.setAttachSubClass(osbFileLog.getFileJson());
+                assetContractTask.setCompressFileId(getCompressFileId(osbFileLog));
+                assetContractTask.setCompressFileState(AssetStateEnum.SUCCESS.getState());
+                assetContractTask.setCompressNo(osbFileLog.getCompressTranNo());
+                AssetMainInfo mainInfo = AssetMainInfo.getByApplyNo(osbFileLog.getBzId());
+                assetContractTask.setVenusApplyNo(mainInfo.getVenusApplyNo());
+                assetContractTask.create();
+            }
+            return baseMsgDTO;
+        }catch (Exception e){
+            logger.error("上传合同文件异常",e);
+        }
+        return BaseMsgDTO.failureData("上传合同文件异常");
+    }
+
+
+
+    @Override
+    public BaseMsgDTO compressFileAndUpload(YTFileUploadRequestDTO ytFileUploadRequestDTO){
+
+        try {
+            InvokeResult<BaseMsgDTO> result = fileUploadRequestStrategy.doIt(ytFileUploadRequestDTO);
+
+            BaseMsgDTO baseMsgDTO = (BaseMsgDTO) result.getData();
+            logger.info("订单号{},上传文件获取的结果为{}",ytFileUploadRequestDTO.getRemark()
+                    ,JSONObject.fromObject(result).toString());
+            return baseMsgDTO;
+        }catch (Exception e){
+            logger.error("单号{}上传文件异常",ytFileUploadRequestDTO.getRemark(),e);
+        }
+        return BaseMsgDTO.failureData("上传文件异常");
+    }
+
+
+    @Override
+    public BaseMsgDTO getContractFile(AssetContractTask assetContractTask){
+        String applyNo = assetContractTask.getApplyNo();
+
+        try {
+            String bankType = getBanktype(assetContractTask.getAttachSubClass());
+            String fileName = getFileName(applyNo,
+                    assetContractTask.getAttachSubClass(),bankType);
+
+            OsbFile exitOsbFile = OsbFile.getByApplyNoAndName(fileName
+                    .concat(".pdf"), applyNo);
+            if (exitOsbFile != null){
+                return BaseMsgDTO.successData(exitOsbFile.getFileId());
+            }
+
+            InvokeResult<BaseMsgDTO> result = getContractFileRequestStrategy.doIt(assetContractTask);
+                logger.info("订单{}获取文件合同的结果为{}",applyNo,
+                        JSONObject.fromObject(result).toString());
+                BaseMsgDTO baseMsgDTO = (BaseMsgDTO) result.getData();
+
+                if (baseMsgDTO.successed()){
+                    String fileByteArray = baseMsgDTO.getMessage();
+                    String fileId = uploadFile(fileByteArray, fileName.concat(".pdf"),
+                            applyNo);
+                    Assert.notNull(fileId,applyNo
+                            + "上传合同文件到osb异常，请重新上传");
+                    return BaseMsgDTO.successData(fileId);
+                }
+        }catch (Exception e){
+            logger.error("订单{}获取文件合同异常",applyNo,e);
+        }
+        return BaseMsgDTO.failureData("获取合同文件异常");
+    }
+
+
+    public String getFileName(String applyNo,String subClass,
+                               String bankType) {
+
+        AssetMainInfo assetMainInfo = AssetMainInfo.getByApplyNo(applyNo);
+
+        return applyNo.concat("_")
+                .concat(assetMainInfo.getVenusApplyNo()).concat("_")
+                .concat(subClass).concat("_")
+                .concat(bankType);
+    }
+
+    /**
+     * 获取银行的文件类型描述
+     * @param type alix 文件类型
+     * @return 银行文件类型描述
+     */
+    private String getBanktype(String type){
+        return ytCommonService.getYnTrustFileType(type);
+    }
+
+
+    /**
+     * 上传合同文件到osb
+     * @param fileByteArray 文件字节数组
+     * @param fileName 文件名字
+     * @param applyNo 申请编号
+     * @return fileId
+     */
+    private String uploadFile(String fileByteArray, String fileName, String applyNo) {
+
+        OsbFile osbFile = new OsbFile();
+        osbFile.setFileName(fileName);
+        osbFile.setFileSize(fileByteArray.length());
+        osbFile.setTranNo(SerialNumberUtil.generate());
+        osbFile.setBzId(applyNo);
+        osbFile.create();
+
+        Map<String, Object> reqData = new HashMap<String,Object>(4){{
+            put("fileSource", fileByteArray);
+            put("sourceFileName", fileName);
+        }};
+
+        logger.info("订单号{} 获取合同签章文件上传到osb请求报文为{}",
+                applyNo,reqData);
+        String fileId;
+        final String data = "data";
+        String result = RestTemplateUtil.sendRequestV2(fileHttpUpload,reqData);
+
+        logger.info("订单号{},合同签章文件上传获取到的报文为{}",
+                applyNo,result);
+
+        JSONObject fromObject = JSONObject.fromObject(result);
+        if (fromObject.containsKey(data)
+                && (fileId = fromObject.getJSONObject(data)
+                .getString("fileId")) != null) {
+
+            osbFile.setFileId(fileId);
+            osbFile.update();
+            return fileId;
+        }
+        return null;
+    }
+
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public InvokeResult<Object> contractSign(DscContractSignFileDTO dscContractSignFileDTO) {
+
+        InvokeResult<Object> invokeResult = new InvokeResult<>();
+        DscContractSignRespDTO result = new DscContractSignRespDTO();
+        if (CollectionUtils.isEmpty(dscContractSignFileDTO.getFileAttachmentDTOList())){
+            invokeResult.success().setData(result.failure("文件列表为空"));
+            return invokeResult;
+        }
+
+        ArrayList<DscFileAttachmentDTO> fileAttachmentDTOList = getDealData(
+                dscContractSignFileDTO.getFileAttachmentDTOList());
+
+        if (CollectionUtils.isEmpty(fileAttachmentDTOList)){
+            invokeResult.success().setData(result.failure("缺少合同文件"));
+            return invokeResult;
+        }
+
+        try {
+            AssetMainInfo mainInfo = AssetMainInfo.getByApplyNo(dscContractSignFileDTO.getApplyNo());
+            //推送
+            if (Objects.equals(CommonConstant.ZERO,dscContractSignFileDTO.getType())){
+
+                for (DscFileAttachmentDTO dscFileAttachmentDTO : fileAttachmentDTOList) {
+
+                    //处理重复
+                    AssetContractTask task = AssetContractTask.getByVenusNoAndType(
+                            mainInfo.getVenusApplyNo(),dscFileAttachmentDTO.getAttachSubClass());
+
+                    if (task != null){
+                        invokeResult.success().setData(result.failure("合同文件已存在"));
+                        return invokeResult;
+                    }
+
+                    //调用压缩服务处理并保存压缩序列号
+                    String compressNo = compressService(dscFileAttachmentDTO
+                            ,mainInfo.getApplyNo(),
+                            dscFileAttachmentDTO.getAttachSubClass());
+                    logger.info("申请编号{},贷款标识{},小类{},签章文件获取的压缩编号为{}"
+                            ,mainInfo.getApplyNo(),mainInfo.getVenusApplyNo()
+                            ,dscFileAttachmentDTO.getAttachSubClass(),compressNo);
+                }
+                invokeResult.success().setData(BaseMsgDTO.successData("success"));
+            //获取
+            }else {
+
+                DscContractSignRespDTO dscContractSignRespDTO = new DscContractSignRespDTO();
+                List<DscFileAttachmentDTO> fileList = new ArrayList<>(2);
+
+                for (DscFileAttachmentDTO dscFileAttachmentDTO : fileAttachmentDTOList) {
+                    String fileName = getFileName(dscContractSignFileDTO.getApplyNo(),
+                            dscFileAttachmentDTO.getAttachSubClass(),
+                            getBanktype(dscFileAttachmentDTO.getAttachSubClass()));
+
+                    OsbFile osbFile  = OsbFile.getByApplyNoAndName(
+                            fileName.concat(".pdf"),dscContractSignFileDTO.getApplyNo());
+
+                    //@TODO 定时任务未启用，临时手动获取
+                    if (osbFile == null) {
+                        AssetContractTask task = AssetContractTask.getByVenusNoAndType(
+                                mainInfo.getVenusApplyNo(),dscFileAttachmentDTO.getAttachSubClass());
+
+                        YnContractTaskService bean = SpringContextUtil.getBean("ynContractTaskServiceImpl",
+                                YnContractTaskService.class);
+                        bean.getContractFile(task);
+
+                        invokeResult.success().setData(dscContractSignRespDTO.failure("文件签章未完成"));
+                        return invokeResult;
+                    }
+
+                    DscFileAttachmentDTO file = new DscFileAttachmentDTO();
+                    file.setFileType(dscFileAttachmentDTO.getFileType());
+                    file.setAttachSubClass(dscFileAttachmentDTO.getAttachSubClass());
+                    file.setFileId(FileUtils.getFileStoreUrl(osbFile.getFileId()));
+                    file.setFileName(dscFileAttachmentDTO.getFileName());
+                    fileList.add(file);
+                }
+                dscContractSignRespDTO.success("success")
+                        .setFileAttachmentDTOList(fileList);
+                invokeResult.success().setData(dscContractSignRespDTO);
+            }
+        }catch (DataIntegrityViolationException sqlException){
+            logger.error("订单{}合同处理异常",dscContractSignFileDTO.getApplyNo(),sqlException);
+            invokeResult.failure("合同文件已存在");
+        }catch (Exception e){
+            logger.error("订单{}合同处理异常",dscContractSignFileDTO.getApplyNo(),e);
+            invokeResult.failure("合同请求处理异常");
+        }
+        return invokeResult;
+    }
+
+
+    /**
+     * 从请求参数中获取需要签章的文件
+     */
+    private ArrayList<DscFileAttachmentDTO> getDealData(List<DscFileAttachmentDTO> files) {
+
+        //需要签章的文件数量
+        List<AssetAttachmentRule> signRules = AssetAttachmentRule
+                .getRuleByFinancialAndPhase(CommonConstant.BankName.YNTRUST_BANK,
+                        BankPhaseEnum.SIGN_CONTRACT.getPhase());
+        ArrayList<DscFileAttachmentDTO> fileAttachmentDTOList = new ArrayList<>();
+
+        signRules.forEach(t -> {
+            for (DscFileAttachmentDTO file : files) {
+                if (Objects.equals(file.getAttachSubClass(),t.getAttachMainType())){
+                    fileAttachmentDTOList.add(file);
+                }
+            }
+        });
+
+        return fileAttachmentDTOList;
+    }
+
+
+
+    private String getCompressFileId(OsbFileLog osbFileLog){
+        String compressFileJson = osbFileLog.getCompressFileJson();
+        JSONArray jsonArray = JSONArray.fromObject(compressFileJson);
+        return  jsonArray.getJSONObject(0).getString("fileId");
+    }
+
+
+
+
+    private String compressService(DscFileAttachmentDTO dscFileAttachmentDTO,
+                                   String applyNo,String bankType) {
+
+        YxFileUrlInfoDTO yxFileUrlInfoDTO = new YxFileUrlInfoDTO();
+        yxFileUrlInfoDTO.setFileUrl(dscFileAttachmentDTO.getFileId());
+        yxFileUrlInfoDTO.setFileName(dscFileAttachmentDTO.getFileName());
+
+        List<YxFileUrlInfoDTO> yxFileUrlInfoDTOS =
+                Collections.singletonList(yxFileUrlInfoDTO);
+
+        OsbFileLog osbFileLog = OsbFileLog.createOsbFileLog(applyNo, BankPhaseEnum.PAYMENT_QUERY.getPhase()
+                , JsonObjectUtils.objectToJson(yxFileUrlInfoDTOS));
+        osbFileLog.setSourceFileJson(bankType);
+        osbFileLog.update();
+
+        //调用压缩服务接口
+
+        CompressHandleDTO compressHandleDTO = new CompressHandleDTO();
+        compressHandleDTO.setApplyNo(applyNo);
+        compressHandleDTO.setOsbFileLogId(osbFileLog.getId());
+
+        String compressNo = compressDomain.compressExe4Raw(yxFileUrlInfoDTOS,
+                compressHandleDTO, 0.9, FileUtils.MAX_LENGTH);
+
+        if (Objects.equals(CommonConstant.FAILURE,compressNo)){
+            throw new com.yixin.dsc.common.exception.BzException("申请编号" +
+                    applyNo +"调用压缩服务异常");
+        }
+        return compressNo;
+    }
+}

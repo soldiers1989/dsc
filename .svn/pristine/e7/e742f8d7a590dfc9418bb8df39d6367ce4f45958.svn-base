@@ -1,0 +1,8 @@
+package com.yixin.web.service.monitor;
+
+/**
+ * @description:
+ * @date: 2018-10-17 16:21
+ */
+public interface BusinessMonitorService {
+}

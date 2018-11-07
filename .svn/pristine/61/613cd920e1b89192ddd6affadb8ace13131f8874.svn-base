@@ -1,0 +1,801 @@
+package com.yixin.dsc.service.impl.sync;
+
+import java.util.Date;
+import java.util.List;
+
+import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.scheduling.annotation.Async;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.alibaba.fastjson.JSON;
+import com.yixin.common.system.ioc.SpringContextUtil;
+import com.yixin.common.utils.DateUitls;
+import com.yixin.common.utils.InvokeResult;
+import com.yixin.common.utils.JsonObjectUtils;
+import com.yixin.dsc.assembler.DscFileAttachmentAssembler;
+import com.yixin.dsc.assembler.DscSalesApplyBondsmanAssembler;
+import com.yixin.dsc.assembler.DscSalesApplyCarAssembler;
+import com.yixin.dsc.assembler.DscSalesApplyContactAssembler;
+import com.yixin.dsc.assembler.DscSalesApplyCostAssembler;
+import com.yixin.dsc.assembler.DscSalesApplyCustAssembler;
+import com.yixin.dsc.assembler.DscSalesApplyFinancingAssembler;
+import com.yixin.dsc.assembler.DscSalesApplyMainAssembler;
+import com.yixin.dsc.assembler.DscSalesApplyPayeeAssembler;
+import com.yixin.dsc.assembler.DscSalesApplyRiskAssembler;
+import com.yixin.dsc.assembler.DscSalesInsureFinancingAssembler;
+import com.yixin.dsc.assembler.DscSalesInsureInfoAssembler;
+import com.yixin.dsc.assembler.DscSysReceivablesAssembler;
+import com.yixin.dsc.common.DscContant;
+import com.yixin.dsc.common.exception.BzException;
+import com.yixin.dsc.dto.DscActionResultDTO;
+import com.yixin.dsc.dto.DscContractSignFileDTO;
+import com.yixin.dsc.dto.DscRepayScheduleDTO;
+import com.yixin.dsc.dto.order.DscFileAttachmentDTO;
+import com.yixin.dsc.dto.order.DscSaleApplyAttrDTO;
+import com.yixin.dsc.dto.order.DscSalesApplyBondsmanDTO;
+import com.yixin.dsc.dto.order.DscSalesApplyCarDTO;
+import com.yixin.dsc.dto.order.DscSalesApplyContactDTO;
+import com.yixin.dsc.dto.order.DscSalesApplyCostDTO;
+import com.yixin.dsc.dto.order.DscSalesApplyCustDTO;
+import com.yixin.dsc.dto.order.DscSalesApplyFinancingDTO;
+import com.yixin.dsc.dto.order.DscSalesApplyMainDTO;
+import com.yixin.dsc.dto.order.DscSalesApplyPayeeDTO;
+import com.yixin.dsc.dto.order.DscSalesApplyRiskDTO;
+import com.yixin.dsc.dto.order.DscSalesInsureFinancingDTO;
+import com.yixin.dsc.dto.order.DscSalesInsureInfoDTO;
+import com.yixin.dsc.dto.order.DscSyncDTO;
+import com.yixin.dsc.dto.order.DscSysReceivablesDTO;
+import com.yixin.dsc.entity.order.DscFileAttachment;
+import com.yixin.dsc.entity.order.DscSalesApplyBondsman;
+import com.yixin.dsc.entity.order.DscSalesApplyCar;
+import com.yixin.dsc.entity.order.DscSalesApplyContact;
+import com.yixin.dsc.entity.order.DscSalesApplyCost;
+import com.yixin.dsc.entity.order.DscSalesApplyCust;
+import com.yixin.dsc.entity.order.DscSalesApplyFinancing;
+import com.yixin.dsc.entity.order.DscSalesApplyMain;
+import com.yixin.dsc.entity.order.DscSalesApplyPayee;
+import com.yixin.dsc.entity.order.DscSalesApplyRisk;
+import com.yixin.dsc.entity.order.DscSalesInsureFinancing;
+import com.yixin.dsc.entity.order.DscSalesInsureInfo;
+import com.yixin.dsc.entity.order.DscSysReceivables;
+import com.yixin.dsc.enumpackage.RequestPreposeEnum;
+import com.yixin.dsc.service.async.AsyncTaskManagerService;
+import com.yixin.dsc.service.common.DscKeplerCommonService;
+import com.yixin.dsc.service.flow.DscFlowService;
+import com.yixin.dsc.service.sync.DscSyncAlixDataService;
+import com.yixin.kepler.common.enums.AssetStateEnum;
+import com.yixin.kepler.common.enums.BankPhaseEnum;
+import com.yixin.kepler.common.enums.WBCarTypeEnum;
+import com.yixin.kepler.core.constant.CommonConstant;
+import com.yixin.kepler.core.domain.AsyncTask;
+import com.yixin.kepler.core.domain.LoanDomain;
+import com.yixin.kepler.dto.BaseMsgDTO;
+import com.yixin.kepler.dto.OsbAttachmentDTO;
+import com.yixin.kepler.enity.AssetFinanceInfo;
+import com.yixin.kepler.enity.AssetMainInfo;
+import com.yixin.kepler.v1.common.core.bankReq.BankRequestDataHandle;
+
+/**
+ * 同步alix数据
+ * 
+ * Package : com.yixin.dsc.service.impl
+ * 
+ * @author YixinCapital -- wangxulong
+ *		   2018年6月6日 下午2:35:11
+ *
+ */
+@Service("dscSyncAlixDataService")
+public class DscSyncAlixDataImpl implements DscSyncAlixDataService {
+
+	private Logger logger = LoggerFactory.getLogger(DscSyncAlixDataImpl.class);
+
+	@Autowired
+	private AsyncTaskManagerService asyncTaskManagerService;
+	
+	@Autowired
+	private AsyncTask asyncTask;
+
+	@Autowired
+	private DscFlowService dscFlowService;
+	
+	@Autowired
+	private LoanDomain loanDomain;
+	
+	@Autowired
+	private DscKeplerCommonService keplerCommonService;
+
+	/***
+	 * 同步alix 全量数据
+	 * 
+	 * @param dscSyncDTO
+	 * @return 
+	 * @author YixinCapital -- wangxulong
+	 *	       2018年6月6日 下午2:35:24
+	 */
+	@Override
+	public Boolean syncAlixAllData(DscSyncDTO dscSyncDTO) {
+
+		//数据全量同步校验
+		keplerCommonService.syncAllDataVerify(dscSyncDTO.getApplyNo());
+		
+		String dateStr = DateUitls.dateToStr(new Date(), "yyyy-MM-dd_HH:mm:SS");
+    	logger.info("DscSyncDataApi同步订单全量数据开始:{},sign:{}", dscSyncDTO.getApplyNo(),dateStr);
+    	this.asyncTaskManagerService.recordOrderSyncInfo(dscSyncDTO, dateStr);
+
+		String applyNo = dscSyncDTO.getApplyNo();
+		String productNo = dscSyncDTO.getProductNo();
+
+		//删除历史数据
+		removeAllData(applyNo);
+
+		/**
+		 * 合同申请主表
+		 */
+		String mainId = null;
+		DscSalesApplyMainDTO dscSalesApplyMainDTO = dscSyncDTO.getSalesApplyMainDTO();
+		if(dscSalesApplyMainDTO!=null) {
+			mainId = syncApplyMainData(dscSalesApplyMainDTO,applyNo,productNo);
+		}
+
+		/**
+		 * 申请车辆信息
+		 */
+		DscSalesApplyCarDTO salesApplyCarDTO = dscSyncDTO.getSalesApplyCarDTO();
+		if(salesApplyCarDTO!=null){
+			syncApplyCarData(salesApplyCarDTO,mainId);
+		}
+		
+		/**
+		 * 合同申请费用信息表
+		 */
+		String costId = null;
+		DscSalesApplyCostDTO salesApplyCostDTO = dscSyncDTO.getSalesApplyCostDTO();
+		if(salesApplyCostDTO!=null){
+			costId = syncApplyCostData(salesApplyCostDTO,mainId);
+		}
+		
+		/**
+		 * 合同申请保险信息
+		 */
+		String insureId = null;
+		DscSalesInsureInfoDTO salesInsureInfoDTO = dscSyncDTO.getSalesInsureInfoDTO();
+		if(salesInsureInfoDTO!=null){
+			insureId = syncInsureInfoData(salesInsureInfoDTO,mainId);
+		}
+		
+		/**
+		 * 合同申请融资额明细表
+		 */
+		List<DscSalesApplyFinancingDTO> salesApplyFinancingDTOList = dscSyncDTO.getSalesApplyFinancingDTOList();
+		if(salesApplyFinancingDTOList!=null){
+			syncApplyFinancingLisData(salesApplyFinancingDTOList,mainId,costId);
+		}
+
+		/**
+		 * 合同申请收款信息表
+		 */
+		List<DscSalesApplyPayeeDTO> salesApplyPayeeDTOList = dscSyncDTO.getSalesApplyPayeeDTOList();
+		if(salesApplyPayeeDTOList!=null){
+			syncApplyPayeeLisData(salesApplyPayeeDTOList,mainId);
+		}
+
+		/**
+		 * 店面收款方信息表
+		 */
+		List<DscSysReceivablesDTO> sysReceivablesDTOList = dscSyncDTO.getSysReceivablesDTOList();
+		if(sysReceivablesDTOList!=null){
+			syncSysReceivablesLisData(sysReceivablesDTOList,mainId);
+		}
+
+		/**
+		 * 合同申请保险类别明细
+		 */
+		List<DscSalesInsureFinancingDTO> salesInsureFinancingDTOList = dscSyncDTO.getSalesInsureFinancingDTOList();
+		if(salesInsureFinancingDTOList!=null){
+			syncInsureFinancingLisData(salesInsureFinancingDTOList,mainId,insureId);
+		}
+
+		/**
+		 * 合同申请客户信息
+		 */
+		String custId = null;
+		DscSalesApplyCustDTO salesApplyCustDTO = dscSyncDTO.getSalesApplyCustDTO();
+		if(salesApplyCustDTO!=null){
+			custId = syncApplyCustData(salesApplyCustDTO,mainId);
+		}
+
+		/**
+		 * 合同申请担保人信息
+		 */
+		List<DscSalesApplyBondsmanDTO> salesApplyBondsmanDTOList = dscSyncDTO.getSalesApplyBondsmanDTOList();
+		if(salesApplyBondsmanDTOList!=null){
+			syncApplyBondsmanLisData(salesApplyBondsmanDTOList,mainId,custId);
+		}
+
+		/**
+		 * 合同申请联系人信息表
+		 */
+		List<DscSalesApplyContactDTO> salesApplyContactDTOList = dscSyncDTO.getSalesApplyContactDTOList();
+		if(salesApplyContactDTOList!=null){
+			syncApplyContactLisData(salesApplyContactDTOList,mainId,custId);
+		}
+
+		/**
+		 * 申请提报附件表
+		 */
+		List<DscFileAttachmentDTO> fileAttachmentDTOList = dscSyncDTO.getFileAttachmentDTOList();
+		if(fileAttachmentDTOList!=null){
+			syncFileAttachmentLisData(fileAttachmentDTOList,mainId);
+		}
+		/**
+		 * 风控部分银行准入信息
+		 */
+		List<DscSalesApplyRiskDTO> salesApplyRiskDTOList = dscSyncDTO.getSalesApplyRiskDTOList();
+		if(salesApplyRiskDTOList!=null){
+			syncApplyRiskLisData(salesApplyRiskDTOList,mainId,applyNo);
+		}
+
+		logger.info("DscSyncDataApi同步订单全量数据成功:{},sign:{}", dscSyncDTO.getApplyNo(),dateStr);
+		return true;
+	}
+	
+	/**
+	 * 主表数据保存
+	 *
+	 * @param
+	 * @author YixinCapital -- wangxulong
+	 *	       2018年6月6日 下午2:48:36
+	 */
+	private String syncApplyMainData(DscSalesApplyMainDTO dscSalesApplyMainDTO,String applyNo,String productNo) {
+		DscSalesApplyMain dscSalesApplyMain = DscSalesApplyMainAssembler.dto2Entity(dscSalesApplyMainDTO);
+		dscSalesApplyMain.setApplyNo(applyNo);
+		dscSalesApplyMain.setProductNo(productNo);
+		return dscSalesApplyMain.create();
+	}
+
+	/**
+	 * 车辆信息表数据保存
+	 *
+	 * @param
+	 * @author YixinCapital -- wangxulong
+	 *	       2018年6月6日 下午2:48:36
+	 */
+	private String syncApplyCarData(DscSalesApplyCarDTO dscSalesApplyCarDTO,String mainId) {
+		DscSalesApplyCar dscSalesApplyCar = DscSalesApplyCarAssembler.dto2Entity(dscSalesApplyCarDTO);
+		dscSalesApplyCar.setMainId(mainId);
+		return dscSalesApplyCar.create();
+	}
+
+	/**
+	 * 合同申请费用信息表保存
+	 *
+	 * @param
+	 * @author YixinCapital -- wangxulong
+	 *	       2018年6月6日 下午2:48:36
+	 */
+	private String syncApplyCostData(DscSalesApplyCostDTO salesApplyCostDTO,String mainId) {
+		DscSalesApplyCost dscSalesApplyCost = DscSalesApplyCostAssembler.dto2Entity(salesApplyCostDTO);
+		dscSalesApplyCost.setMainId(mainId);
+		return dscSalesApplyCost.create();
+	}
+	/**
+	 * 合同申请保险信息  表保存
+	 *
+	 * @param
+	 * @author YixinCapital -- wangxulong
+	 *	       2018年6月6日 下午2:48:36
+	 */
+	private String syncInsureInfoData(DscSalesInsureInfoDTO salesInsureInfoDTO,String mainId) {
+		DscSalesInsureInfo dscSalesInsureInfo = DscSalesInsureInfoAssembler.dto2Entity(salesInsureInfoDTO);
+		dscSalesInsureInfo.setMainId(mainId);
+		return dscSalesInsureInfo.create();
+	}
+	/**
+	 * 合同申请保险信息  表保存
+	 *
+	 * @param
+	 * @author YixinCapital -- wangxulong
+	 *	       2018年6月6日 下午2:48:36
+	 */
+	private void syncApplyFinancingLisData(List<DscSalesApplyFinancingDTO> salesApplyFinancingDTOList,String mainId,String costId) {
+		for (DscSalesApplyFinancingDTO dto : salesApplyFinancingDTOList){
+			DscSalesApplyFinancing financing = DscSalesApplyFinancingAssembler.dto2Entity(dto);
+			financing.setMainId(mainId);
+			financing.setCostId(costId);
+			financing.create();
+		}
+	}
+	/**
+	 *  合同申请收款信息  表保存
+	 *
+	 * @param
+	 * @author YixinCapital -- wangxulong
+	 *	       2018年6月6日 下午2:48:36
+	 */
+	private void syncApplyPayeeLisData(List<DscSalesApplyPayeeDTO> salesApplyPayeeDTOList,String mainId) {
+		for (DscSalesApplyPayeeDTO dto : salesApplyPayeeDTOList) {
+			DscSalesApplyPayee dscSalesApplyPayee = DscSalesApplyPayeeAssembler.dto2Entity(dto);
+			dscSalesApplyPayee.setMainId(mainId);
+			dscSalesApplyPayee.create();
+		}
+	}
+
+	/**
+	 *  店面收款方信息  表保存
+	 *
+	 * @param
+	 * @author YixinCapital -- wangxulong
+	 *	       2018年6月6日 下午2:48:36
+	 */
+	private void syncSysReceivablesLisData(List<DscSysReceivablesDTO> sysReceivablesDTOList,String mainId) {
+		for (DscSysReceivablesDTO dto : sysReceivablesDTOList) {
+			DscSysReceivables dscSysReceivables = DscSysReceivablesAssembler.dto2Entity(dto);
+			dscSysReceivables.setMainId(mainId);
+			dscSysReceivables.create();
+		}
+	}
+
+	/**
+	 * 合同申请保险类别明细  表保存
+	 *
+	 * @param
+	 * @author YixinCapital -- wangxulong
+	 *	       2018年6月6日 下午2:48:36
+	 */
+	private void syncInsureFinancingLisData(List<DscSalesInsureFinancingDTO> salesInsureFinancingDTOList,String mainId,String insureId) {
+		for (DscSalesInsureFinancingDTO dto : salesInsureFinancingDTOList) {
+			DscSalesInsureFinancing dscSalesInsureFinancing = DscSalesInsureFinancingAssembler.dto2Entity(dto);
+			dscSalesInsureFinancing.setMainId(mainId);
+			dscSalesInsureFinancing.setInsureId(insureId);
+			dscSalesInsureFinancing.create();
+		}
+	}
+
+	/**
+	 * 合同申请客户信息  表保存
+	 *
+	 * @param
+	 * @author YixinCapital -- wangxulong
+	 *	       2018年6月6日 下午2:48:36
+	 */
+	private String syncApplyCustData(DscSalesApplyCustDTO salesApplyCustDTO,String mainId) {
+		DscSalesApplyCust dscsalesApplyCust = DscSalesApplyCustAssembler.dto2Entity(salesApplyCustDTO);
+		dscsalesApplyCust.setMainId(mainId);
+		return dscsalesApplyCust.create();
+	}
+
+
+	/**
+	 * 合同申请担保人信息  表保存
+	 *
+	 * @param
+	 * @author YixinCapital -- wangxulong
+	 *	       2018年6月6日 下午2:48:36
+	 */
+	private void syncApplyBondsmanLisData(List<DscSalesApplyBondsmanDTO> salesApplyBondsmanDTOList,String mainId,String custId) {
+		for (DscSalesApplyBondsmanDTO dto : salesApplyBondsmanDTOList) {
+			DscSalesApplyBondsman dscSalesApplyBondsman = DscSalesApplyBondsmanAssembler.dto2Entity(dto);
+			dscSalesApplyBondsman.setMainId(mainId);
+			dscSalesApplyBondsman.setCustId(custId);
+			dscSalesApplyBondsman.create();
+		}
+	}
+
+	/**
+	 * 合同申请联系人信息表  表保存
+	 *
+	 * @param
+	 * @author YixinCapital -- wangxulong
+	 *	       2018年6月6日 下午2:48:36
+	 */
+	private void syncApplyContactLisData(List<DscSalesApplyContactDTO> salesApplyContactDTOList,String mainId,String custId) {
+		for (DscSalesApplyContactDTO dto : salesApplyContactDTOList) {
+			DscSalesApplyContact dscSalesApplyContact = DscSalesApplyContactAssembler.dto2Entity(dto);
+			dscSalesApplyContact.setMainId(mainId);
+			dscSalesApplyContact.setCustId(custId);
+			dscSalesApplyContact.create();
+		}
+	}
+
+
+	/**
+	 * 申请提报附件表  表保存
+	 *
+	 * @param
+	 * @author YixinCapital -- wangxulong
+	 *	       2018年6月6日 下午2:48:36
+	 */
+	private void syncFileAttachmentLisData(List<DscFileAttachmentDTO> fileAttachmentDTOList,String mainId) {
+		for (DscFileAttachmentDTO dto : fileAttachmentDTOList) {
+			DscFileAttachment dscFileAttachment = DscFileAttachmentAssembler.dto2Entity(dto);
+			dscFileAttachment.setFileUrl(dto.getFileId());
+			dscFileAttachment.setMainId(mainId);
+			dscFileAttachment.create();
+		}
+	}
+
+	/**
+	 *   风控部分银行准入信息表保存
+	 *
+	 * @param
+	 * @author YixinCapital -- gumanxue
+	 *	       2018年9月28日 下午2:48:36
+	 */
+	private void syncApplyRiskLisData(List<DscSalesApplyRiskDTO> salesApplyRiskDTOList,String mainId,String applyNo) {
+		for (DscSalesApplyRiskDTO dto : salesApplyRiskDTOList){
+			DscSalesApplyRisk risk = DscSalesApplyRiskAssembler.dto2Entity(dto);
+			risk.setMainId(mainId);
+			risk.setApplyNo(applyNo);
+			risk.create();
+		}
+	}
+	/**
+	 * 删除 所有该申请编号对应字段
+	 * @param applyNo
+	 * @return
+	 */
+	private Boolean removeAllData(String applyNo) {
+		DscSalesApplyMain applyMain = DscSalesApplyMain.getOneByApplyNo(applyNo);
+		if(applyMain!=null){
+			String mainId = applyMain.getId();
+
+			applyMain.remove();
+			DscSalesApplyCar.deleteBymainId(mainId);
+			DscSalesApplyCost.deleteBymainId(mainId);
+			DscSalesInsureInfo.deleteBymainId(mainId);
+			DscSalesInsureFinancing.deleteBymainId(mainId);
+			DscSalesApplyPayee.deleteBymainId(mainId);
+			DscSysReceivables.deleteBymainId(mainId);
+			DscSalesApplyFinancing.deleteBymainId(mainId);
+			DscSalesApplyCust.deleteBymainId(mainId);
+			DscSalesApplyBondsman.deleteBymainId(mainId);
+			DscSalesApplyContact.deleteBymainId(mainId);
+			DscFileAttachment.deleteBymainId(mainId);
+			DscSalesApplyRisk.deleteBymainId(mainId);
+		}
+
+
+		return true;
+	}
+
+
+
+	/**
+	 * 同步贷后资料接口
+	 * @param dscSyncDTO
+	 * @return
+	 * @author YixinCapital -- wangwenlong
+	 *	       2018年6月6日 下午3:53:22
+	 */
+	@Transactional
+	public Boolean syncLloanData(DscSyncDTO dscSyncDTO) {
+		AssetMainInfo mainInfo = AssetMainInfo.getByApplyNo(dscSyncDTO.getApplyNo());
+		if (mainInfo == null || !AssetStateEnum.SUCCESS.getState().equals(mainInfo.getPaymentState())) {
+			throw new BzException("该订单已取消或还未完成请款");
+		}
+
+		logger.info("同步贷后资料接口 开始：{}", JsonObjectUtils.objectToJson(dscSyncDTO));
+
+		this.syncCarInfo(dscSyncDTO);
+		
+		List<DscFileAttachmentDTO> fileAttachmentDTOList = dscSyncDTO.getFileAttachmentDTOList();
+		if(CollectionUtils.isEmpty(fileAttachmentDTOList)){
+			throw new BzException("同步贷后资料接口失败，资料为空");
+		}
+		for(DscFileAttachmentDTO fileDto:fileAttachmentDTOList){
+			if(fileDto == null || StringUtils.isBlank(fileDto.getFileId())){
+				throw new BzException(String.format("同步贷后资料接口失败，文件名[%s],文件ID为空", fileDto != null ? fileDto.getFileName() : null));
+			}
+		}
+		DscSalesApplyMain main = DscSalesApplyMain.getByApplyNo(dscSyncDTO.getApplyNo());
+		/*List<DscFileAttachment> attachmentList = DscFileAttachmentAssembler.attachmentDtoListTOEntity(fileAttachmentDTOList);
+		if(CollectionUtils.isNotEmpty(attachmentList)){
+			for(DscFileAttachment attachment:attachmentList){
+				attachment.setMainId(main.getId()); //设置主键ID
+				attachment.create();
+			}
+		}*/
+		/**
+		 * 申请提报附件表
+		 */
+		String mainId = main.getId();
+		if (fileAttachmentDTOList != null) {
+			for (DscFileAttachmentDTO dto : fileAttachmentDTOList) {
+				//查询并删除 同杨fileId和 主表ID的附件 信息
+				/*Map<String,Object> param = new HashMap<>();
+				param.put("mainId",mainId);
+				param.put("fileUrl",dto.getFileId());
+				param.put("attachSubClass", dto.getAttachSubClass());
+				List<DscFileAttachment> lis = DscFileAttachment.findByProperties(DscFileAttachment.class, param);
+				for(DscFileAttachment att : lis) {
+					att.remove();
+				}*/
+				
+				//add by wangwenlong on 2018-09-21
+				DscFileAttachment.logicDelete(mainId, dto.getAttachSubClass(), dto.getFileId(),dscSyncDTO.getApplyNo());
+				
+				//新保存附件list
+				DscFileAttachment entity = DscFileAttachmentAssembler.dto2Entity(dto);
+				entity.setMainId(mainId);
+				entity.setFileUrl(dto.getFileId());
+				entity.create();
+			}
+		}
+		
+		logger.info("贷后同步资料 贷后阶段校验开始,applyNo={}", dscSyncDTO.getApplyNo());
+		DscActionResultDTO checkResult = this.dscFlowService.phaseCheck(dscSyncDTO.getApplyNo(), BankPhaseEnum.AFTER_LOAN);
+		logger.info("贷后同步资料 贷后阶段校验结束,applyNo={}，result={}", dscSyncDTO.getApplyNo(),JSON.toJSONString(checkResult));
+        if(checkResult.getNeedSupply()){ //贷后阶段需要补充信息
+        	throw new BzException("同步贷后资料失败,原因:" + JSON.toJSONString(checkResult));
+        }
+        
+		logger.info("同步贷后资料接口 附件信息保存结束,订单编号:{}",dscSyncDTO.getApplyNo());
+		AssetFinanceInfo assetFinanceInfo = AssetFinanceInfo.get(AssetFinanceInfo.class, main.getCapitalId());
+		BaseMsgDTO preposeMsg = asyncTask.requestPrepose(dscSyncDTO.getApplyNo(), assetFinanceInfo.getCode(), RequestPreposeEnum.AFTER_LOAN);
+		if (DscContant.KeplerCode.FAILD.equals(preposeMsg.getCode())) {
+			throw new BzException("同步贷后资料失败,原因:" + preposeMsg.getMessage());
+		}
+		loanDomain.syncLoanInfo(dscSyncDTO.getApplyNo());
+		return true;
+	}
+	
+	/**
+	 * 同步车辆信息
+	 * @param dscSyncDTO 
+	 * @author YixinCapital -- wangwenlong
+	 *	       2018年7月11日 下午4:46:04
+	 */
+	private void syncCarInfo(DscSyncDTO dscSyncDTO){
+		DscSalesApplyMain applyMain = DscSalesApplyMain.getOneByApplyNo(dscSyncDTO.getApplyNo());
+		if(applyMain == null ) {
+			logger.info("同步贷后资料接口失败，订单编号错误，获取不到订单信息,申请编号：{}",dscSyncDTO.getApplyNo());
+			throw new BzException("同步贷后资料接口失败，订单编号错误，获取不到订单信息");
+		}
+		DscSaleApplyAttrDTO attrDto = dscSyncDTO.getAttrDto();
+		if(attrDto != null){
+			DscSalesApplyCar dscSalesApplyCar = DscSalesApplyCar.getBymainId(applyMain.getId());
+			if(dscSalesApplyCar != null){
+				if(attrDto.getRegistrateTime() != null){ //上牌日期
+					logger.info("同步贷后资料接口，订单编号：{},更新上牌日期",dscSyncDTO.getApplyNo());
+					dscSalesApplyCar.setRegistrateTime(attrDto.getRegistrateTime());
+				}
+				if(attrDto.getMortgageRegDate() != null){ //抵押登记日期
+					logger.info("同步贷后资料接口，订单编号：{},更新抵押登记日期",dscSyncDTO.getApplyNo());
+					dscSalesApplyCar.setMortgageRegDate(attrDto.getMortgageRegDate());
+				}
+				if(StringUtils.isNotBlank(attrDto.getMortgageCityCode())){ //抵押办理城市码值
+					logger.info("同步贷后资料接口，订单编号：{},更新抵押办理城市码值{}",dscSyncDTO.getApplyNo(),attrDto.getMortgageCityCode());
+					dscSalesApplyCar.setMortgageCityCode(attrDto.getMortgageCityCode());
+				}
+				if(StringUtils.isNotBlank(attrDto.getMortgageCityName())){ //抵押办理城市名称
+					logger.info("同步贷后资料接口，订单编号：{},更新抵押办理城市名称{}",dscSyncDTO.getApplyNo(),attrDto.getMortgageCityName());
+					dscSalesApplyCar.setMortgageCityName(attrDto.getMortgageCityName());
+				}
+				/**
+				 * add by wangwenlong on 2018-08-22 新车车牌号，只有再同步贷后资料时传
+				 */
+				if(StringUtils.isNotBlank(attrDto.getAcarnojc())){ //当前牌照
+					if(WBCarTypeEnum.NEW_CAR.getValue().equals(dscSalesApplyCar.getAcllx())){ //车辆类型是新车
+						logger.info("同步贷后资料接口，订单编号：{},更新当前牌照:{}",dscSyncDTO.getApplyNo(),attrDto.getAcarnojc());
+						dscSalesApplyCar.setAcarnojc(attrDto.getAcarnojc());
+					}
+				}
+				logger.info("同步贷后资料接口,更新车辆信息 ,申请编号：{}",dscSyncDTO.getApplyNo());
+				dscSalesApplyCar.update();
+			}
+		}
+	}
+
+	
+	/**
+	 * 同步请款附件信息
+	 * @param dscSyncDTO
+	 * @return
+	 */
+	@Override
+	@Transactional
+	public Boolean syncRequestFundsAndAttachmentData(DscSyncDTO dscSyncDTO) {
+		DscSalesApplyMain applyMain = DscSalesApplyMain.getOneByApplyNo(dscSyncDTO.getApplyNo());
+		if(applyMain == null) {
+			return false;
+		}
+		String mainId = applyMain.getId();
+		this.syncRequestFundsCarInfo(dscSyncDTO, mainId);
+		/**
+		 * 申请提报附件表
+		 */
+		List<DscFileAttachmentDTO> fileAttachmentDTOList = dscSyncDTO.getFileAttachmentDTOList();
+		if (fileAttachmentDTOList != null) {
+			for (DscFileAttachmentDTO dto : fileAttachmentDTOList) {
+				//查询并删除 同杨fileId和 主表ID的附件 信息
+				/*Map<String,Object> param = new HashMap<>();
+				param.put("mainId",mainId);
+				param.put("fileUrl",dto.getFileId());
+				param.put("attachSubClass", dto.getAttachSubClass());
+				List<DscFileAttachment> lis = DscFileAttachment.findByProperties(DscFileAttachment.class, param);
+				for(DscFileAttachment att : lis) {
+					att.remove();
+				}*/
+				//add by wangwenlong on 2018-09-21
+				DscFileAttachment.logicDelete(mainId, dto.getAttachSubClass(), dto.getFileId(),dscSyncDTO.getApplyNo());
+				
+				//新保存附件list
+				DscFileAttachment entity = DscFileAttachmentAssembler.dto2Entity(dto);
+				entity.setMainId(mainId);
+				entity.setFileUrl(dto.getFileId());
+				entity.create();
+			}
+		}
+		// applyAttachmentTar(dscSyncDTO.getApplyNo()); 同步请款材料时不上传附件
+		return true;
+	}
+	
+	
+	/**
+	 * 同步请款车辆信息
+	 * @param dscSyncDTO
+	 * @param mainId 
+	 * @author YixinCapital -- chen.lin
+	 *	       2018年10月15日 下午2:01:34
+	 */
+	private void syncRequestFundsCarInfo(DscSyncDTO dscSyncDTO, String mainId){
+		if(dscSyncDTO.getAttrDto() != null){
+			DscSaleApplyAttrDTO attrDto = dscSyncDTO.getAttrDto();
+			DscSalesApplyCarDTO applyCarDTO = dscSyncDTO.getSalesApplyCarDTO();
+			DscSalesApplyCar dscSalesApplyCar = DscSalesApplyCar.getBymainId(mainId);
+			if(dscSalesApplyCar != null){
+				/**
+				 * 	车辆开票金额（fclfpje）
+				 */
+				if(applyCarDTO.getFclfpje() != null){
+					dscSalesApplyCar.setFclfpje(applyCarDTO.getFclfpje());
+				}
+				/**
+				 * 	车辆开票日期（dclkprq）
+				 */
+				if(applyCarDTO.getDclkprq()!=null){
+					dscSalesApplyCar.setDclkprq(applyCarDTO.getDclkprq());
+				}
+				/**
+				 * 	购车年月（buyCarTime）
+				 */
+				if(applyCarDTO.getBuyCarTime()!=null){
+					dscSalesApplyCar.setBuyCarTime(applyCarDTO.getBuyCarTime());
+				}			
+				
+				if(attrDto.getCarPassDate() != null){  //车辆过户完成日期
+					dscSalesApplyCar.setCarPassDate(attrDto.getCarPassDate());
+				}
+				if(StringUtils.isNoneBlank(attrDto.getIsGpsActive())){  //GPS是否激活
+					dscSalesApplyCar.setIsGpsActive(attrDto.getIsGpsActive());
+				}
+				if(attrDto.getGpsActiveTime() != null){  //GPS激活时间
+					dscSalesApplyCar.setGpsActiveTime(attrDto.getGpsActiveTime());
+				}
+				if(StringUtils.isNoneBlank(attrDto.getGpsCode1())){  //GPS设备码1
+					dscSalesApplyCar.setGpsCode1(attrDto.getGpsCode1());
+				}
+				if(StringUtils.isNoneBlank(attrDto.getGpsCode2())){  //GPS设备码2
+					dscSalesApplyCar.setGpsCode2(attrDto.getGpsCode2());
+				}
+				if(StringUtils.isNoneBlank(attrDto.getGpsCode3())){  //GPS设备码3
+					dscSalesApplyCar.setGpsCode3(attrDto.getGpsCode3());
+				}
+				if(attrDto.getInsuranceExpireTime() != null){  //二手车保险到期日期
+					dscSalesApplyCar.setInsuranceMaturityDate(attrDto.getInsuranceExpireTime());
+				}
+				dscSalesApplyCar.update();
+			}
+		}
+	}
+	
+	
+	@Async
+	public void applyAttachmentTar(String applyNo){
+		logger.info("同步请款附件结束，异步打包开始。 订单编号:{}",applyNo);
+		OsbAttachmentDTO attachmentDTO = new OsbAttachmentDTO();
+		attachmentDTO.setBzId(applyNo);
+		attachmentDTO.setBzType(BankPhaseEnum.PAYMENT.getPhase());
+		asyncTask.uploadAttachment(attachmentDTO);
+		logger.info("同步请款附件结束，异步打包结束。 订单编号:{}",applyNo);
+	}
+
+
+	@Override
+	public InvokeResult<Object> dealContractFile(
+			DscContractSignFileDTO dscContractSignFileDTO) {
+
+		DscSalesApplyMain applyMain = DscSalesApplyMain.getOneByApplyNo(
+				dscContractSignFileDTO.getApplyNo());
+
+		if (applyMain != null && dscContractSignFileDTO != null
+				&& CollectionUtils.isNotEmpty(dscContractSignFileDTO.getFileAttachmentDTOList())){
+
+			dscContractSignFileDTO.getFileAttachmentDTOList().forEach(t -> {
+				DscFileAttachment.logicDelete(applyMain.getId(),
+						t.getAttachSubClass(), t.getFileId(),
+						dscContractSignFileDTO.getApplyNo());
+
+				//新保存附件list
+				DscFileAttachment entity = DscFileAttachmentAssembler.dto2Entity(t);
+				entity.setMainId(applyMain.getId());
+				entity.setFileUrl(t.getFileId());
+				entity.create();
+			}
+			);
+		}
+		return loanDomain.contractUploadFile(dscContractSignFileDTO);
+	}
+
+	/**
+	 * 同步易鑫放款信息
+	 * @param dscRepayScheduleDTO
+	 * @return 
+	 * @author YixinCapital -- wangwenlong
+	 *	       2018年9月26日 下午3:50:24
+	 */
+	@Override
+	public BaseMsgDTO syncYXLoanInfo(DscRepayScheduleDTO dscRepayScheduleDTO) {
+		BaseMsgDTO resultDto = new BaseMsgDTO();
+		String applyNo = dscRepayScheduleDTO.getApplyNo();
+		DscSalesApplyMain saleMain = DscSalesApplyMain.getByApplyNo(applyNo);
+		if(saleMain == null){
+			resultDto.setCode(CommonConstant.FAILURE);
+			resultDto.setMessage("订单业务数据为空");
+			logger.error("同步易鑫放款信息,订单业务数据为空,订单编号：{}",applyNo);
+			return resultDto;
+		}
+		if(StringUtils.isBlank(saleMain.getCapitalId())){
+			resultDto.setCode(CommonConstant.FAILURE);
+			resultDto.setMessage("订单业务数据匹配为无效资方");
+			logger.error("同步易鑫放款信息,订单业务数据匹配为无效资方,订单编号：{}",applyNo);
+			return resultDto;
+		}
+		AssetMainInfo assetMainInfo = AssetMainInfo.getByApplyNo(applyNo);
+		if(assetMainInfo == null || StringUtils.isBlank(assetMainInfo.getVenusApplyNo())){
+			resultDto.setCode(CommonConstant.FAILURE);
+			resultDto.setMessage("订单已取消或未通过信审");
+			logger.error("订单已取消或未通过信审,订单编号：{}",applyNo);
+			return resultDto;
+		}
+		if(AssetStateEnum.SUCCESS.getState().equals(assetMainInfo.getPaymentState())
+				||AssetStateEnum.DOING.getState().equals(assetMainInfo.getPaymentState())){
+			resultDto.setCode(CommonConstant.FAILURE);
+			resultDto.setMessage("订单已请款成功或正在请款当中，不可再次同步");
+			logger.error("订单已请款成功或正在请款当中，不可再次同步,订单编号：{}",applyNo);
+			return resultDto;
+		}
+		//============ 更新业务主表数据 ==================
+		if(dscRepayScheduleDTO.getActualLoanAmount() != null){
+			saleMain.setActualLoanAmount(dscRepayScheduleDTO.getActualLoanAmount()); //实际放款金额
+		}
+		if(CollectionUtils.isNotEmpty(dscRepayScheduleDTO.getLoanSerialList())){
+			saleMain.setLoanSerialList(JSON.toJSONString(dscRepayScheduleDTO.getLoanSerialList())); //放款流水集合
+		}
+		saleMain.update();
+		
+		try {
+			// 路由到具体的实现
+			BankRequestDataHandle bean = SpringContextUtil.getBean(
+					assetMainInfo.getFinancialCode().concat("RequestDataHandle"), BankRequestDataHandle.class);
+			//还款计划
+			bean.repayPlanHandle(dscRepayScheduleDTO.getRepaySchedules(),assetMainInfo,saleMain);
+		} catch (BzException e) {
+			resultDto.setCode(CommonConstant.FAILURE);
+			resultDto.setMessage(e.getMessage());
+			logger.error("同步易鑫放款信息,处理还款计划数据失败,订单编号：{}，错误信息：{}",applyNo,e.getMessage());
+			return resultDto;
+		} catch (Exception e) {
+			throw e;
+		}
+		
+		resultDto.setCode(CommonConstant.SUCCESS);
+		resultDto.setMessage("同步成功");
+		return resultDto;
+	}
+}

@@ -1,0 +1,208 @@
+package com.yixin.kepler.core.job;
+
+
+import java.util.List;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
+
+import javax.annotation.Resource;
+
+import org.apache.commons.collections.CollectionUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationContext;
+import org.springframework.stereotype.Component;
+
+import com.alibaba.fastjson.JSON;
+import com.yixin.common.exception.BzException;
+import com.yixin.common.system.job.JobExecutor;
+import com.yixin.common.utils.InvokeResult;
+import com.yixin.common.utils.JobParamDTO;
+import com.yixin.dsc.dto.DscFlowResultForAlixDto;
+import com.yixin.dsc.enumpackage.DscAlixLinkEnum;
+import com.yixin.dsc.util.MailMessageUtils;
+import com.yixin.kepler.common.enums.BankPhaseEnum;
+import com.yixin.kepler.component.RedisDistributedLock;
+import com.yixin.kepler.core.constant.CommonConstant;
+import com.yixin.kepler.core.domain.AsyncTask;
+import com.yixin.kepler.core.listener.ResultNotifyEvent;
+import com.yixin.kepler.core.listener.SettleOrderEvent;
+import com.yixin.kepler.dto.BaseMsgDTO;
+import com.yixin.kepler.enity.AssetPaymentTask;
+import com.yixin.web.service.monitor.NoticeService;
+
+/**
+ * @author sukang
+ */
+@Component
+public class PaymentReqJobScheduler implements JobExecutor {
+
+	private static final Logger logger = LoggerFactory.getLogger(PaymentReqJobScheduler.class);
+
+
+	@Autowired
+	private ApplicationContext ioc;
+
+	@Resource
+	private AsyncTask asyncTask;
+
+	@Resource
+	private RedisDistributedLock redisDistributedLock;
+	
+	@Resource
+	private NoticeService noticeService;
+
+
+
+	/**
+	 * 请款定时任务，重试次数达5次之后，则结束任务 modify by wangwenlong on 2018-10-12
+	 * 
+	 */
+	@Override
+	public JobParamDTO execute(JobParamDTO jobParamDTO) {
+		JobParamDTO result = new JobParamDTO();
+
+		logger.info("--------开始执行请款任务-----------");
+		String applyNo = "";
+
+		Boolean lock = redisDistributedLock.lock(getClass().getSimpleName(),
+				TimeUnit.MINUTES, 5);
+
+		if (lock){
+			try {
+				List<AssetPaymentTask> paymentTasks = AssetPaymentTask.getCurrentTask();
+
+				if (CollectionUtils.isNotEmpty(paymentTasks)) {
+					List<String> collect = paymentTasks.stream().map((t) ->
+							t.getApplyNo()).collect(Collectors.toList());
+					logger.info("开始执行请款任务{}", collect);
+
+					for (AssetPaymentTask assetPaymentTask : paymentTasks) {
+						applyNo = assetPaymentTask.getApplyNo();
+						
+						/**
+						 * modify by wangwenlong on 2018-10-22  此处不再判断民生影响是否上传
+						 * 已调整为影响上传成功后更新请款任务表 标记
+						 */
+						/*//先判断文件是否上传成功，否则银行当前时间拿不到文件，请款一直在进行中(民生银行、微众不需要)
+						AssetMainInfo mainInfo = AssetMainInfo.getByApplyNo(assetPaymentTask.getApplyNo());
+						if (mainInfo == null) {
+							//在请款任务执行期间销售取消了该订单，则将请款任务停止
+							logger.info("通过申请编号无法查询到该订单,该订单不存在或已被取消,applyNo={}", applyNo);
+							//更新任务结果为失败
+							assetPaymentTask.updateTaskEnd(false,CommonConstant.FAILURE,"通过申请编号无法查询到该订单,该订单不存在或已被取消");
+							continue;
+						}
+
+						if (CommonConstant.BankName.CMBC.equals(mainInfo.getFinancialCode())) {
+							OsbFileLog ok = OsbFileLog.getOk(assetPaymentTask.getApplyNo(),
+									BankPhaseEnum.PAYMENT.getPhase());
+							if (ok == null) {
+								continue;
+							}
+						}*/
+
+						BaseMsgDTO baseMsgDTO = null;
+						try {
+							InvokeResult<BaseMsgDTO> requestBank = asyncTask.requestBank(applyNo,BankPhaseEnum.PAYMENT);
+							logger.info("请款订单号{}获取的执行结果为{}", assetPaymentTask.getApplyNo(),JSON.toJSONString(requestBank));
+							baseMsgDTO = (BaseMsgDTO)requestBank.getData();
+						} catch (BzException e) {
+							logger.error("银行请款定时任务错误，订单编号:{},错误信息:{}",applyNo,e.getMessage());
+							//更新任务结果为失败
+							assetPaymentTask.updateTaskEnd(false,CommonConstant.FAILURE,e.getMessage());
+							continue;
+						} catch (Exception e) {
+							logger.error("银行请款定时任务异常，订单编号:{},错误信息:{}",applyNo,e.getMessage(),e);
+							assetPaymentTask.updateTaskEnd(false,CommonConstant.FAILURE,"银行请款定时任务异常");
+							continue;
+						}
+						
+						/**
+						 * 处理请款结果
+						 */
+						dealResult(baseMsgDTO,assetPaymentTask);
+
+					}
+				}
+			}catch (Exception e){
+				logger.error("请款任务发生异常，异常信息为",e);
+				result.setResultCode("400");
+				result.setResultContent("请款任务执行异常");
+				sendEmail(e,applyNo);
+			}finally {
+				redisDistributedLock.unLock(getClass().getSimpleName());
+			}
+		}else {
+			logger.info("{}未获取到锁",getClass().getSimpleName());
+		}
+		result.setResultCode("200");
+		result.setResultCode("请款任务执行结束");
+		return result;
+	}
+
+
+	/**
+	 * 请款任务异常发送维护邮件
+	 */
+	private void sendEmail(Exception e,String applyNo) {
+		MailMessageUtils.sendException(e,"订单号(" + applyNo+ ")请款任务执行异常，请关注");
+	}
+
+
+	private void dealResult(BaseMsgDTO baseMsgDTO,AssetPaymentTask assetPaymentTask) {
+
+		DscFlowResultForAlixDto forAlixDto = null;
+
+		if (baseMsgDTO.successed()){
+			//发送推送结算事件
+			ioc.publishEvent(new SettleOrderEvent(assetPaymentTask.getApplyNo()));
+			//更新任务结果为成功
+			assetPaymentTask.updateTaskEnd(true,baseMsgDTO.getCode(),baseMsgDTO.getMessage());
+			
+			
+			forAlixDto = createForAliDto(assetPaymentTask.getApplyNo(),
+					true, baseMsgDTO.getMessage());
+		} else if (CommonConstant.FAILURE.equals(baseMsgDTO.getCode())) {
+			
+			//更新任务结果为失败
+			assetPaymentTask.updateTaskEnd(false,baseMsgDTO.getCode(),baseMsgDTO.getMessage());
+
+			forAlixDto = createForAliDto(assetPaymentTask.getApplyNo(),
+					false, baseMsgDTO.getMessage());
+		} else if (CommonConstant.PROCESSING.equals(baseMsgDTO.getCode())) {
+			logger.info("请款定时任务，请款结果为进行中，订单编号:{}",assetPaymentTask.getApplyNo());
+			/**
+			 * 请款定时任务，重试次数达5次之后，则结束任务 modify by wangwenlong on 2018-10-12
+			 */
+			if(assetPaymentTask.getExecTimes() >=5 ){
+				//TODO 增加预警通报, 订单编号【资方】,请款任务重试已达5次以上，仍未成功，请核查
+				assetPaymentTask.updateTaskEnd(false,baseMsgDTO.getCode(),"重试已达5次，结束任务");
+				
+				this.notice(assetPaymentTask.getApplyNo(),assetPaymentTask.getAssetCode());
+			} else {
+				assetPaymentTask.addOneTimes();
+			}
+			
+		}
+
+		if (forAlixDto != null) {
+			ioc.publishEvent(new ResultNotifyEvent(forAlixDto));
+		}
+	}
+	
+	private void notice(String applyNo,String financialCode){
+		//============= 预警输出 =============================
+		noticeService.noticeBzError("PaymentReqJobScheduler/execute", applyNo, 
+				String.format("【%s】订单编号：%s,放款结果失败，需要人工介入",financialCode,applyNo), null);
+	}
+
+
+
+	private DscFlowResultForAlixDto createForAliDto(String applyNo, Boolean isSuccess, String msg) {
+		return DscFlowResultForAlixDto.createForAliDto(
+				applyNo, isSuccess, msg, DscAlixLinkEnum.REQUEST_FUNDS);
+	}
+
+}

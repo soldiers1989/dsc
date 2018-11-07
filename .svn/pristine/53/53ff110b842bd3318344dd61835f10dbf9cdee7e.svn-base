@@ -1,0 +1,67 @@
+package com.yixin.kepler.v1.job;
+
+import com.yixin.common.system.job.JobExecutor;
+import com.yixin.common.utils.JobParamDTO;
+import com.yixin.kepler.component.RedisDistributedLock;
+import com.yixin.kepler.enity.AssetContractTask;
+import com.yixin.kepler.v1.service.capital.yntrust.YnContractTaskService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import javax.annotation.Resource;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
+
+/**
+ * @author sukang
+ */
+public class YnContractJobScheduler implements JobExecutor{
+    private static final Logger logger = LoggerFactory.getLogger(BankRequestJobScheduler.class);
+
+    @Resource
+    private RedisDistributedLock redisDistributedLock;
+
+    @Resource
+    private YnContractTaskService ynContractTaskService;
+
+    @Override
+    public JobParamDTO execute(JobParamDTO jobParamDTO) {
+
+        JobParamDTO result = new JobParamDTO();
+
+        logger.info("--------开始执行处理合同文件任务-----------");
+        String applyNo = "";
+
+        Boolean lock = redisDistributedLock.lock(getClass().getSimpleName(),
+                TimeUnit.MINUTES, 7);
+
+        if(lock){
+            List<AssetContractTask> assetContractTasks = AssetContractTask.getCurrentTask(
+                    20);
+
+            try {
+
+
+                for (AssetContractTask task : assetContractTasks) {
+                    applyNo = task.getApplyNo();
+
+                    //调用上传成功的合同文件，获取签章后的合同文件
+                    if (task.getCompressFileState() == 1
+                            && task.getSignState() != 1){
+                        ynContractTaskService.getContractFile(task);
+                    }
+                    task.increment();
+                }
+            }catch (Exception e){
+                logger.error("{}贷后云信合同任务执行异常",applyNo,e);
+            }finally {
+                redisDistributedLock.unLock(getClass().getSimpleName());
+            }
+        }else {
+            logger.info("{}未获取到锁",getClass().getSimpleName());
+        }
+        result.setResultCode("200");
+        result.setResultCode("贷后任务执行结束");
+        return result;
+    }
+}

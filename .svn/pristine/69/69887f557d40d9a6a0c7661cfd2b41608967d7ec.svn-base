@@ -1,0 +1,76 @@
+package com.yixin.kepler.v1.common.constants;
+
+/**
+ * 存放定义的常量
+ *
+ * @author YixinCapital -- chenjiacheng
+ * 2018年05月04日 13:50
+ **/
+public interface IcbcErrorConstant {
+	interface IcbcErrorCode {
+		//实时返回错误码值
+		/** 文件内容异常 */
+		String ERROR_10000001 = "10000001";
+		/** 文件解压错误 */
+		String ERROR_10000002 = "10000002";
+		/** 其他错误 */
+		String ERROR_1000XXXX = "1000XXXX";
+
+		//处理结果代码码值
+		/** 系统判断自动退回 */
+		String ERROR_2000XXXX = "2000XXXX";
+		/** 人工判断退回 */
+		String ERROR_3000XXXX = "3000XXXX";
+
+		/** 提交的资料不全【人工退回】 */
+		String ERROR_30000001 = "30000001";
+		
+		/**内容填写错【人工退回】  */
+		String ERROR_30000003 = "30000003";
+		
+		/** 其他原因【人工退回】 */
+		String ERROR_30000099 = "30000099";
+
+		/** 系统判断退回上一审批阶段 */
+		String ERROR_4000XXXX = "4000XXXX";
+
+		/** 人工判断退回上一审批阶段 */
+		String ERROR_5000XXXX = "5000XXXX";
+
+		/** 提交的资料不全【人工退回，需重新审批】 */
+		String ERROR_50000001= "50000001";
+
+		/** 内容填写错【人工退回，需重新审批】 */
+		String ERROR_50000003= "50000003";
+
+		/** 其他原因【人工退回，需重新审批】*/
+		String ERROR_50000099 = "50000099";
+
+		/** 合同拒绝 */
+		String ERROR_00001001 = "00001001";
+
+		/** 征信不通过 */
+		String ERROR_90000001 = "90000001";
+		/** 电话核实不通过 */
+		String ERROR_90000002 = "90000002";
+		/** 面签非本人 */
+		String ERROR_90000003 = "90000003";
+		/** 客户所述内容与申请资料不符 */
+		String ERROR_90000004 = "90000004";
+		/** 重查人行客户资质劣变 */
+		String ERROR_90000005 = "90000005";
+
+		/** 命中黑名单 */
+		String ERROR_90000006 = "90000006";
+		/** 命中灰名单 */
+		String ERROR_90000007 = "90000007";
+		/** 反欺诈不通过 */
+		String ERROR_90000008 = "90000008";
+		/** 反洗钱不通过 */
+		String ERROR_90000009 = "90000009";
+		/** 其他原因 */
+		String ERROR_90000099 = "90000099";
+		
+	}
+
+}

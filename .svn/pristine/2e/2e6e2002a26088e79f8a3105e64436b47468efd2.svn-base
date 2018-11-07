@@ -1,0 +1,122 @@
+package com.yixin.dsc.service.flow;
+
+import com.yixin.common.utils.InvokeResult;
+import com.yixin.dsc.dto.DscActionResultDTO;
+import com.yixin.dsc.dto.DscComputerParamDto;
+import com.yixin.dsc.dto.DscComputerResultDto;
+import com.yixin.dsc.dto.DscContractCancelDto;
+import com.yixin.dsc.dto.DscFlowResultForAlixDto;
+import com.yixin.dsc.dto.DscModifyRepayDTO;
+import com.yixin.dsc.v1.datapackage.dto.notice.DscAsyncMessageDto;
+import com.yixin.kepler.common.enums.BankPhaseEnum;
+import com.yixin.kepler.dto.BaseMsgDTO;
+
+/**
+ * 流程相关接口
+ * Package : com.yixin.dsc.service.flow
+ * 
+ * @author YixinCapital -- wangwenlong
+ *		   2018年6月6日 下午5:27:17
+ *
+ */
+public interface DscFlowService {
+
+	
+	/**
+	 * 确认 授权书签署状态接口 是否 完成
+	 * @param applyNo 订单编号
+	 * @return 
+	 * @author YixinCapital -- wangwenlong
+	 *	       2018年6月6日 下午5:28:36
+	 */
+	Boolean isAuthorizationSucessByApplyNo(String applyNo);
+	
+	
+	/**
+	 * 获取银行合同签署状态接口
+	 * @param applyNo 订单编号
+	 * @return 
+	 * @author YixinCapital -- wangwenlong
+	 *	       2018年6月6日 下午5:29:22
+	 */
+	Boolean isSignContractByApplyNo(String applyNo);
+	
+	/**
+	 * 确认银行请款是否成功接口
+	 * @param applyNo 订单编号
+	 * @return 
+	 * @author YixinCapital -- wangwenlong
+	 *	       2018年6月6日 下午5:29:59
+	 */
+	Boolean isRequestFundsByApplyNo(String applyNo);
+	
+	/**
+	 * 确认订单信审是否成功
+	 * @param applyNo 订单编号
+	 * @return 
+	 * @author YixinCapital -- wangwenlong
+	 *	       2018年6月6日 下午5:29:59
+	 */
+	Boolean isCreditfrontSuccessByApplyNo(String applyNo);
+	
+	
+	/**
+	 * 资方审核 结果反推 alix 接口
+	 * 
+	 * @param dscFlowResultForAlixDto
+	 * @return 
+	 * @author YixinCapital -- wangxulong
+	 *	       2018年6月20日 下午3:17:02
+	 */
+	InvokeResult<DscFlowResultForAlixDto> flowResultNoticeForAlix(DscFlowResultForAlixDto dscFlowResultForAlixDto);
+
+	/**
+	 * 合同签章结果推送
+	 * @param dscAsyncMessageDto {@link DscAsyncMessageDto}
+	 * @return 结果
+	 * @author sukang
+	 */
+	InvokeResult<DscAsyncMessageDto> flowResultNoticeForAlix(DscAsyncMessageDto dscAsyncMessageDto);
+
+
+	/**
+	 * 借据试算
+	 * @param paramDto 申请编号
+	 * @return 试算结果
+	 * @author YixinCapital -- chenjiacheng
+	 *             2018/7/6 9:42
+	 */
+	DscComputerResultDto computerSchedules(DscComputerParamDto paramDto);
+
+	/**
+	 * 阶段性校验
+	 * @param applyNo 订单编号
+	 * @param phaseEnum 阶段
+	 * @return 
+	 * @author YixinCapital -- wangwenlong
+	 *	       2018年9月6日 上午10:54:32
+	 */
+	DscActionResultDTO phaseCheck(String applyNo,BankPhaseEnum phaseEnum);
+
+
+	/**
+	 * 合同取消
+	 * @param applyNo
+	 * @return 
+	 * @author YixinCapital -- wangwenlong
+	 *	       2018年9月10日 下午5:11:41
+	 */
+	DscContractCancelDto contractCancel(String applyNo);
+
+	/**
+	 * 贷后修改还款卡信息
+	 * @param dscModifyRepayDTO 还款卡信息
+	 * @return 修改结果
+	 * @author YixinCapital -- chenjiacheng
+	 *             2018/9/26 15:06
+	 */
+	BaseMsgDTO modifyRepay(DscModifyRepayDTO dscModifyRepayDTO);
+
+}
+
+

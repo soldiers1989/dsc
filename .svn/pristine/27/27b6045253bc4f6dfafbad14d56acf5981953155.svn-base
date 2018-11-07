@@ -1,0 +1,29 @@
+package com.yixin.web.service;
+
+
+import com.yixin.common.utils.Page;
+import com.yixin.web.dto.AttachmentConditionDto;
+
+import java.util.List;
+import java.util.Map;
+
+/**
+ * @author sukang
+ */
+public interface AttachmentService {
+
+    /**
+     *  根据入参获取文件上传的全部记录
+     * @param attachementConditionDto  条件参数
+     * @return  page列表
+     */
+    Page<List<Map<String, Object>>> getAll(AttachmentConditionDto attachementConditionDto);
+
+    /**
+     *  文件重新上传
+     * @param applyNo  申请编号
+     * @param phase    所属阶段
+     */
+    void attachmentUpload(String applyNo, String phase);
+
+}

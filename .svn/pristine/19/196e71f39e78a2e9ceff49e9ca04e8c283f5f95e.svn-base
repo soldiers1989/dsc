@@ -1,0 +1,46 @@
+package com.yixin.kepler.common.enums;
+
+/**
+ * Created by liushuai2 on 2018/6/7.
+ */
+public enum AssetPhaseEnum {
+    PRE_TRIAL("pre_trial"), //预审
+    TRIAL("trial"), //信审
+    PAYMENT_TRIAL("payment_trial"),//请款
+    AFTER_LOAN("after_loan");//贷后
+
+
+    private String phase;
+
+    private AssetPhaseEnum(String phase){
+        this.phase = phase;
+    }
+
+	public String getPhase() {
+		return phase;
+	}
+
+
+	/**
+	 * 获取当前阶段
+	 * @param phase 阶段
+	 * @return 阶段对应的中文名
+	 * @author YixinCapital -- chenjiacheng
+	 *             2018/7/19 17:16
+	 */
+	public static String getPhaseName(String phase) {
+    	if (phase==null) return null;
+    	String name = "";
+		if ("pre_trial".equals(phase)) {
+			name = "预审";
+		} else if ("trial".equals(phase)) {
+			name = "信审";
+		} else if ("payment_trial".equals(phase)) {
+			name = "请款";
+		} else if ("after_loan".equals(phase)) {
+			name = "贷后";
+		}
+		return name;
+	}
+
+}

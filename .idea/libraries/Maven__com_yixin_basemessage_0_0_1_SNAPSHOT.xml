@@ -1,0 +1,13 @@
+<component name="libraryTable">
+  <library name="Maven: com.yixin:basemessage:0.0.1-SNAPSHOT">
+    <CLASSES>
+      <root url="jar://$MAVEN_REPOSITORY$/com/yixin/basemessage/0.0.1-SNAPSHOT/basemessage-0.0.1-20171123.101121-41.jar!/" />
+    </CLASSES>
+    <JAVADOC>
+      <root url="jar://$MAVEN_REPOSITORY$/com/yixin/basemessage/0.0.1-SNAPSHOT/basemessage-0.0.1-20171123.101121-41-javadoc.jar!/" />
+    </JAVADOC>
+    <SOURCES>
+      <root url="jar://$MAVEN_REPOSITORY$/com/yixin/basemessage/0.0.1-SNAPSHOT/basemessage-0.0.1-20171123.101121-41-sources.jar!/" />
+    </SOURCES>
+  </library>
+</component>

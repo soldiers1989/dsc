@@ -1,0 +1,8 @@
+mysqldb.url=jdbc:mysql://192.168.145.44:5506/dsc
+mysqldb.username=root
+mysqldb.password=mysql
+
+mongodb.uri=mongodb://ssp:123456@192.168.145.164:27017,192.168.145.164:27018,192.168.145.164:27019/ssp
+
+redis.nodes=Centos6701:7001,Centos6701:7002,Centos6701:7003,Centos6701:7004,Centos6701:7005,Centos6701:7006
+

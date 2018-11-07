@@ -1,0 +1,112 @@
+package com.yixin.kepler.v1.service.capital.yntrust;
+
+import javax.annotation.Resource;
+
+import org.apache.commons.lang3.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
+
+import com.alibaba.fastjson.JSONObject;
+import com.yixin.common.exception.BzException;
+import com.yixin.common.utils.InvokeResult;
+import com.yixin.common.utils.JsonObjectUtils;
+import com.yixin.dsc.entity.order.DscSalesApplyMain;
+import com.yixin.dsc.util.PropertiesManager;
+import com.yixin.dsc.v1.service.capital.yntrust.YTCommonService;
+import com.yixin.kepler.common.RestTemplateUtil;
+import com.yixin.kepler.common.UrlConstant;
+import com.yixin.kepler.common.enums.AssetBankTransEnum;
+import com.yixin.kepler.core.base.AbstractBaseDealDomain;
+import com.yixin.kepler.core.constant.CommonConstant;
+import com.yixin.kepler.dto.BaseMsgDTO;
+import com.yixin.kepler.enity.AssetBankTran;
+import com.yixin.kepler.enity.AssetMainInfo;
+import com.yixin.kepler.v1.common.enumpackage.YNTrustUrlEnum;
+import com.yixin.kepler.v1.datapackage.dto.yntrust.YTCommonResponseDTO;
+import com.yixin.kepler.v1.datapackage.dto.yntrust.YTModifyRepayDTO;
+
+/**
+ * 云信修改还款卡信息
+ * @author YixinCapital -- chenjiacheng
+ *         2018年09月26日 15:16
+ **/
+@Service("YNTRUSTModifyRepayStrategy")
+public class ModifyRepayStrategy extends AbstractBaseDealDomain<Object, BaseMsgDTO>{
+
+	private static final Logger logger = LoggerFactory.getLogger(ModifyRepayStrategy.class);
+
+	@Resource
+	private YTCommonService commonService;
+
+	@Resource
+	private PropertiesManager propertiesManager;
+
+	private ThreadLocal<YTModifyRepayDTO> modifyRepayDTOThreadLocal = new ThreadLocal<>();
+
+	@Override
+	protected void getData() throws BzException {
+		String applyNo = (String) this.inputDto.get();
+		DscSalesApplyMain main = DscSalesApplyMain.getByApplyNo(applyNo);
+		AssetMainInfo mainInfo = AssetMainInfo.getByApplyNo(applyNo);
+		YTModifyRepayDTO modifyRepayDTO = new YTModifyRepayDTO();
+		modifyRepayDTO.setUrl(YNTrustUrlEnum.MODIFY_REPAY.getUrl());
+		modifyRepayDTO.setRequestId(commonService.getRequestId());
+		modifyRepayDTO.setUniqueId(mainInfo.getVenusApplyNo());
+		modifyRepayDTO.setBankCode(commonService.parseBankCode(main.getBankCode()).get("bankCode"));
+		modifyRepayDTO.setBankAccount(main.getAhkrjjkzh());
+		modifyRepayDTO.setBankName(commonService.parseBankCode(main.getBankCode()).get("bankName"));
+		modifyRepayDTO.setBankProvince("31");
+		modifyRepayDTO.setBankCity("310115");
+		modifyRepayDTOThreadLocal.set(modifyRepayDTO);
+	}
+
+	@Override
+	protected void assembler() throws BzException {
+
+	}
+
+	@Override
+	protected InvokeResult<BaseMsgDTO> message() throws BzException {
+		YTModifyRepayDTO modifyRepayDTO = modifyRepayDTOThreadLocal.get();
+		String applyNo = (String) inputDto.get();
+		inputDto.remove();
+		modifyRepayDTOThreadLocal.remove();
+
+		AssetMainInfo mainInfo = AssetMainInfo.getByApplyNo(applyNo);
+		AssetBankTran assetBankTran = new AssetBankTran();
+		assetBankTran.setReqBody(JsonObjectUtils.objectToJson(modifyRepayDTO));
+		assetBankTran.setApplyNo(applyNo);
+		assetBankTran.setAssetId(mainInfo.getId());
+		assetBankTran.setAssetNo(modifyRepayDTO.getUniqueId());
+		assetBankTran.setPhase(AssetBankTransEnum.YT_MODIFY_REPAY.getPhase());
+		assetBankTran.setReqUrl(YNTrustUrlEnum.MODIFY_REPAY.getUrl());
+		assetBankTran.setApiCode(modifyRepayDTO.getUrl());
+		assetBankTran.setSender(CommonConstant.SenderType.YIXIN);
+		assetBankTran.setTranNo(modifyRepayDTO.getRequestId());
+		assetBankTran.setBankOrderNo(mainInfo.getBankOrderNo());
+		assetBankTran.create();
+		
+		String osbUrl = this.propertiesManager.getOsbEnvironment() + UrlConstant.OsbSystemUrl.ynTrustInterface;
+		logger.info("调用云信修改还款卡信息接口开始,applyNo={},params={}", applyNo, assetBankTran.getReqBody());
+		String result = RestTemplateUtil.sendRequest(osbUrl, assetBankTran.getReqBody(), CommonConstant.BankName.YNTRUST_BANK);
+		logger.info("调用云信修改还款卡信息接口结束,applyNo={},result={}", applyNo, result);
+
+		if (StringUtils.isBlank(result)) {
+			return new InvokeResult<>(new BaseMsgDTO(CommonConstant.FAILURE,"修改还款信息失败"));
+		}
+
+		assetBankTran.setRepBody(result);
+		YTCommonResponseDTO responseDTO = JSONObject.parseObject(commonService.parseResponse(result), YTCommonResponseDTO.class);
+		if (responseDTO == null || responseDTO.getStatus() == null || Boolean.FALSE.equals(responseDTO.getStatus().getIsSuccess())) {
+			assetBankTran.setApprovalCode((responseDTO == null || responseDTO.getStatus() == null) ? "null" : responseDTO.getStatus().getResponseCode());
+			assetBankTran.setApprovalDesc((responseDTO == null || responseDTO.getStatus() == null) ? "null" : responseDTO.getStatus().getResponseMessage());
+			assetBankTran.update();
+			return new InvokeResult<>(new BaseMsgDTO(CommonConstant.FAILURE,"修改还款信息失败"));
+		}
+		assetBankTran.setApprovalCode(responseDTO.getStatus().getResponseCode());
+		assetBankTran.setApprovalDesc(responseDTO.getStatus().getResponseMessage());
+		assetBankTran.update();
+		return new InvokeResult<>(new BaseMsgDTO(CommonConstant.SUCCESS,"success"));
+	}
+}

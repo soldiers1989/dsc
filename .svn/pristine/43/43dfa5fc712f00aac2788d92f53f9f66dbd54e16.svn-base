@@ -1,0 +1,223 @@
+package com.yixin.web.controller;
+
+
+
+
+
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import com.yixin.kepler.enity.AssetFinanceInfo;
+import com.yixin.web.anocation.SysLog;
+import com.yixin.web.service.impl.AttachmentServiceImpl;
+import com.yixin.web.service.impl.BankTransLogServiceImpl;
+import com.yixin.web.service.impl.ProductServiceImpl;
+import org.apache.commons.lang.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.web.bind.annotation.*;
+
+import com.yixin.common.utils.InvokeResult;
+import com.yixin.common.utils.Page;
+import com.yixin.kepler.common.enums.BankPhaseEnum;
+import com.yixin.kepler.core.constant.CommonConstant;
+import com.yixin.kepler.dto.BaseMsgDTO;
+import com.yixin.kepler.enity.AssetProductFinancialRel;
+import com.yixin.web.dto.AttachmentConditionDto;
+import com.yixin.web.dto.ConditionBaseDto;
+
+import net.sf.json.JSONObject;
+
+import javax.annotation.Resource;
+import javax.servlet.http.HttpServletRequest;
+
+
+/**
+ * 
+ * @author sukang
+ * @date 2018-08-06 17:55:10
+ */
+@RestController
+@RequestMapping("sys/")
+public class AttachmentController {
+	
+	private final Logger logger = LoggerFactory.getLogger(getClass());
+
+	@Resource
+	private AttachmentServiceImpl attachmentServiceImpl;
+
+	@Resource
+	private BankTransLogServiceImpl bankTransLogServiceImpl;
+
+	@Resource
+	private ProductServiceImpl productServiceImpl;
+
+
+
+	@ExceptionHandler
+	@ResponseBody
+	public InvokeResult<Object> exception(Exception e, HttpServletRequest request){
+
+		logger.error("请求路径为{},程序异常",request.getRequestURL(),e);
+		InvokeResult<Object> objectInvokeResult = new InvokeResult<>();
+		objectInvokeResult.failure("程序异常");
+		return objectInvokeResult;
+	}
+
+
+
+
+	@PostMapping(value = "/bank-trans/list")
+	public InvokeResult<Page<Map<String, Object>>> getBankTransList(
+			@RequestBody AttachmentConditionDto aConditionDto){
+		InvokeResult<Page<Map<String, Object>>> invokeResult = new InvokeResult<>();
+
+		Page<Map<String, Object>> bankTransList = bankTransLogServiceImpl.getBankTransList(aConditionDto);
+		invokeResult.success().setData(bankTransList);
+		return invokeResult;
+	}
+	
+
+	/**
+	 * 获取所有订单的文件上传记录
+	 */
+	@RequestMapping(value = "/attachment/get-all",method = RequestMethod.POST)
+	public InvokeResult<Page<List<Map<String, Object>>>> getOsbLogs(
+			@RequestBody AttachmentConditionDto aConditionDto){
+
+		InvokeResult<Page<List<Map<String, Object>>>> invokeResult = new InvokeResult<>();
+		Page<List<Map<String, Object>>> all = attachmentServiceImpl.getAll(aConditionDto);
+		invokeResult.success().setData(all);
+		return invokeResult;
+	}
+
+
+	@SysLog(action = "文件重新上传")
+	@RequestMapping(value = "/attachment/file-upload/{applyNo}/{phase}",method = RequestMethod.POST)
+	public InvokeResult<BaseMsgDTO> attachmentUpload(
+			@PathVariable("applyNo") String applyNo,
+			@PathVariable("phase") String phase){
+		
+		InvokeResult<BaseMsgDTO> invokeResult = new InvokeResult<>();
+    	
+		BankPhaseEnum bankPhaseEnum = BankPhaseEnum.get(phase);
+		if (bankPhaseEnum == null) {
+			return invokeResult.failure("未知的参数类型");
+		}
+		attachmentServiceImpl.attachmentUpload(applyNo,bankPhaseEnum.getPhase());
+		return invokeResult.success();
+	}
+	
+	
+	/**
+	 * 获取推送结算失败的记录
+	 */
+	
+	@SuppressWarnings("unchecked")
+	@RequestMapping(value = "/settle-failure",method = RequestMethod.POST)
+	public InvokeResult<Page<Map<String, Object>>> getSettleFailure(
+			@RequestBody ConditionBaseDto conditionBaseDto){
+
+		InvokeResult<Page<Map<String, Object>>> invokeResult = new InvokeResult<>();
+		Page<Map<String, Object>> settleFailure = bankTransLogServiceImpl.getSettleFailure(conditionBaseDto);
+		invokeResult.success().setData(settleFailure);
+		return invokeResult;
+	}
+	
+	
+	/**
+	 * 重新发送结算数据
+	 */
+	@SysLog(action = "重发结算数据")
+	@RequestMapping(value = "/settle-push/{applyNo}",method = RequestMethod.POST)
+	public InvokeResult<Boolean> pushSettle(
+			@PathVariable("applyNo") String applyNo){
+
+		InvokeResult<Boolean> result = new InvokeResult<>();
+        if(StringUtils.isBlank(applyNo)){
+            return result.failure("申请编号参数不合法");
+        }
+        return bankTransLogServiceImpl.pushSettle(applyNo);
+	}
+
+
+	@SysLog(action = "产品信息修改")
+	@RequestMapping(value = "/product-update",method = RequestMethod.POST)
+	public InvokeResult<Boolean> updateFinancialProduct(
+			@RequestBody AssetProductFinancialRel aRel){
+		return productServiceImpl.updateFinancialProduct(aRel);
+	}
+	
+	@SysLog(action = "产品信息添加")
+	@RequestMapping(value = "/product-create",method = RequestMethod.POST)
+	public InvokeResult<Boolean> createFinancialProduct(
+			@RequestBody AssetProductFinancialRel aRel){
+		
+		InvokeResult<Boolean> invokeResult = new InvokeResult<>();
+
+		if (StringUtils.isBlank(aRel.getProductCode())) {
+			return invokeResult.failure("产品编号为空");
+		}
+		if (StringUtils.isBlank(aRel.getFinancialCode())) {
+			return invokeResult.failure("资方编号为空");
+		}
+		if (StringUtils.isBlank(aRel.getProductVersion())) {
+			return invokeResult.failure("产品版本号为空");
+		}
+		if (StringUtils.isBlank(aRel.getProductName())) {
+			return invokeResult.failure("产品名称为空");
+		}
+
+		AssetFinanceInfo financeInfo = AssetFinanceInfo.getByCode(aRel.getFinancialCode());
+		if (financeInfo == null){
+			return invokeResult.failure("未找到资方");
+		}
+		aRel.setFinancialId(financeInfo.getId());
+		productServiceImpl.createFinancialProduct(aRel);
+		return invokeResult.success();
+	}
+	
+	
+	@SuppressWarnings("unchecked")
+	@RequestMapping(value = "/product-all",method = RequestMethod.POST)
+	public InvokeResult<Page<List<Map<String, Object>>>> getFinancialProduct(
+			@RequestParam(value = "productCode",required = false) String productCode,
+			@RequestParam(value = "financialCode",required = false) String financialCode,
+			@RequestParam(value = "enable",required = false) String enable,
+			@RequestParam(value = "currentPage",defaultValue = "1",required = false) String currentPage){
+
+		InvokeResult<Page<List<Map<String, Object>>>> invokeResult = new InvokeResult<>();
+		Page<List<Map<String, Object>>> financialProduct = productServiceImpl.getFinancialProduct(productCode, financialCode, enable, currentPage);
+		invokeResult.setData(financialProduct);
+		return invokeResult;
+	}
+
+
+
+	@PostMapping(value = "/select-list")
+	public InvokeResult<Object> getSelectList(){
+		InvokeResult<Object> invokeResult = new InvokeResult<>();
+		Map<String, JSONObject> hashMap = new HashMap<>(2);
+		JSONObject phaseJson = new JSONObject();
+		phaseJson.put("初审",BankPhaseEnum.FIRST_TRIAL.getPhase());
+		phaseJson.put("终审",BankPhaseEnum.LAST_TRIAL.getPhase());
+		phaseJson.put("贷后",BankPhaseEnum.AFTER_LOAN.getPhase());
+		phaseJson.put("请款", BankPhaseEnum.PAYMENT.getPhase());
+		phaseJson.put("推送结算",BankPhaseEnum.PUSHFILE.getPhase());
+		hashMap.put("phase", phaseJson);
+
+		JSONObject osbStatus = new JSONObject();
+		osbStatus.put("已处理",CommonConstant.DEAL_STATUS_DEALED);
+		osbStatus.put("处理中",CommonConstant.DEAL_STATUS_DEALING);
+		osbStatus.put("无效流程",CommonConstant.DEAL_STATUS_INVALID);
+		osbStatus.put("失败",CommonConstant.DEAL_STATUS_OSB_FAILURE);
+		osbStatus.put("未处理",CommonConstant.DEAL_STATUS_UNDEAL);
+		hashMap.put("osbStatus", osbStatus);
+
+		invokeResult.success().setData(hashMap);
+		return invokeResult;
+	}
+	
+}

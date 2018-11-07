@@ -1,0 +1,110 @@
+package com.yixin.dsc.service.impl.async;
+
+import java.util.List;
+
+import javax.annotation.Resource;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.scheduling.annotation.Async;
+import org.springframework.stereotype.Service;
+
+import com.alibaba.fastjson.JSON;
+import com.yixin.common.exception.BzException;
+import com.yixin.dsc.dto.DscFlowResultForAlixDto;
+import com.yixin.dsc.dto.order.DscSyncDTO;
+import com.yixin.dsc.dto.rule.engine.BatchMatchResult;
+import com.yixin.dsc.entity.kepler.DscRuleMatchRecord;
+import com.yixin.dsc.service.async.AsyncTaskManagerService;
+import com.yixin.kepler.enity.AssetMainInfo;
+import com.yixin.kepler.enity.AssetOrderFlow;
+import com.yixin.kepler.v1.service.capital.yntrust.YTRequestDataHandle;
+
+/**
+ * 异步任务管理 -- spring 实现
+ * Package : com.yixin.dsc.service.impl.async
+ * 
+ * @author YixinCapital -- wangwenlong
+ *		   2018年8月28日 下午12:57:19
+ *
+ */
+@Service("asyncTaskManagerSpringImpl")
+public class AsyncTaskManagerSpringImpl implements AsyncTaskManagerService {
+
+	private static final Logger LOGGER = LoggerFactory.getLogger(AsyncTaskManagerSpringImpl.class);
+	
+	@Autowired
+	private MongoTemplate mongoTemplate;
+	
+	@Resource
+	private YTRequestDataHandle requestDataHandle;
+	
+	/**
+	 * 记录资方规则匹配结果
+	 * @param matchResult 匹配规则的结果包括规则通过和不通过的
+	 * @param matchTrackId 匹配痕迹ID即批次
+	 * @param applyNo 订单编号
+	 * @author YixinCapital -- wangwenlong
+	 *	       2018年8月28日 上午9:49:09
+	 */
+	@Async
+	public void recordMatchRuleList(List<BatchMatchResult> batchMatchResultList, String matchTrackId, String applyNo) {
+		LOGGER.info("异步任务【spring】-记录资方规则匹配结果开始,订单编号:{},匹配痕迹ID：{}",applyNo,matchTrackId);
+		DscRuleMatchRecord.recordMatchRuleList(batchMatchResultList, matchTrackId, applyNo);
+		LOGGER.info("异步任务【spring】-记录资方规则匹配结果结束,订单编号:{},匹配痕迹ID：{}",applyNo,matchTrackId);
+	}
+
+	/**
+	 * 记录发起信审/请款的结果通知
+	 * @param dscFlowResultForAlixDto 
+	 * @author YixinCapital -- wangwenlong
+	 *	       2018年9月4日 上午11:07:27
+	 */
+	@Async
+	public void recordflowResultNotice(DscFlowResultForAlixDto dscFlowResultForAlixDto) {
+		LOGGER.info("异步任务【spring】-记录发起信审/请款的结果通知开始,消息:{}",JSON.toJSONString(dscFlowResultForAlixDto));
+		try {
+			AssetOrderFlow.recordflowResultNotice(dscFlowResultForAlixDto);
+		} catch (Exception e) {
+			LOGGER.error("异步任务【spring】-记录发起信审/请款的结果通知异常",e);
+		}
+		LOGGER.info("异步任务【spring】-记录发起信审/请款的结果通知结束,消息:{}",JSON.toJSONString(dscFlowResultForAlixDto));
+	}
+
+	/**
+	 * 记录订单同步信息
+	 * @param dscSyncDTO 
+	 * @author YixinCapital -- wangwenlong
+	 *	       2018年9月8日 上午11:05:52
+	 */
+	@Async
+	public void recordOrderSyncInfo(DscSyncDTO dscSyncDTO,String dateStr) {
+		try {
+			dscSyncDTO.setSign(dateStr); //为了在mongo中，日志好查询 add by wangwenlong on 2018/07/24
+			//批量同步 保存 mongo
+			mongoTemplate.save(dscSyncDTO);
+		} catch (Exception e) {
+			LOGGER.error("订单同步记录mogo信息异常，订单编号:{}",dscSyncDTO.getApplyNo(),e);
+		}
+	}
+
+	/**
+	 * 云南信托签约导入
+	 * @param mainInfo 
+	 * @author YixinCapital -- wangwenlong
+	 *	       2018年9月27日 下午9:20:12
+	 */
+	@Async
+	public void YTImportProtocol(AssetMainInfo mainInfo) {
+		//================== 签约导入 ============================
+		try {
+			this.requestDataHandle.importProtocol(mainInfo);
+		} catch (BzException e) {
+			LOGGER.error("订单编号:{},请款前置-签约导入错误，错误信息：{}",mainInfo.getApplyNo(),e.getMessage());
+		} catch (Exception e) {
+			LOGGER.error("订单编号:{},请款前置-签约导入异常", mainInfo.getApplyNo(),e);
+		}
+	}
+}

@@ -1,0 +1,559 @@
+package com.yixin.kepler.core.attachment;
+
+
+import com.yixin.common.exception.BzException;
+import com.yixin.common.utils.DateUitls;
+import com.yixin.common.utils.InvokeResult;
+import com.yixin.dsc.dto.DscSupplyAttachmentsDto;
+import com.yixin.dsc.dto.DscSupplyDto;
+import com.yixin.dsc.entity.order.DscFileAttachment;
+import com.yixin.dsc.entity.order.DscSalesApplyCar;
+import com.yixin.dsc.entity.order.DscSalesApplyFinancing;
+import com.yixin.dsc.entity.order.DscSalesApplyMain;
+import com.yixin.kepler.common.JacksonUtil;
+import com.yixin.kepler.common.RestTemplateUtil;
+import com.yixin.kepler.common.ScriptEngineUtil;
+import com.yixin.kepler.common.SerialNumberUtil;
+import com.yixin.kepler.common.enums.BankPhaseEnum;
+import com.yixin.kepler.core.constant.CommonConstant;
+import com.yixin.kepler.dto.OsbAttachmentDTO;
+import com.yixin.kepler.enity.*;
+import net.sf.json.JSONArray;
+import net.sf.json.JSONObject;
+import org.apache.commons.collections.CollectionUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+import org.springframework.util.Assert;
+import org.springframework.util.StringUtils;
+
+import java.math.BigDecimal;
+import java.util.*;
+import java.util.Map.Entry;
+
+
+
+/**
+ * 微众上传文件处理流程
+ * @author sukang
+ * @date 2018-07-10 14:14:18
+ */
+@Service(value = "weBankUploadAttachment")
+public class WeBankUploadAttachment extends UploadAttachmentDomain<OsbAttachmentDTO>{
+	
+	private final Logger logger = LoggerFactory.getLogger(getClass());
+	
+	private static final String BANK_CODE = "WeBank";
+	
+	private static final String FILE_PATH = "/webank/%s/%s";
+	
+	private static final String PACKAGE_NAME = "MEDIA_MEDIAFILE_%s_%s_%s";
+	
+	private static final String CHANNAL_CODE = "TG";
+
+	private static Map<String,List<String>> attachCodeMap;
+
+
+	static {
+		if (attachCodeMap == null){
+			attachCodeMap = new HashMap<>();
+			attachCodeMap.put("applicantOrderIdPositive",Arrays.asList("applicantOrderIdPositive",
+						"applicantOrderIdReverse"));
+
+			attachCodeMap.put("tfileApplyIncome",Arrays.asList("actingWageStatement",
+						"personalTaxCertificate","statementOfIncome",
+						"proofOfEarnings","certificateOfPaymentOfProvidentFund",
+						"socialInsurancePaymentCertificate"));
+
+			attachCodeMap.put("compulsoryInsurance",Arrays.asList("compulsoryInsurance",
+						"commercialInsurance","firstYearCommercialInsurance",
+						"worryFreeTheft","noWorryFreeTheft"));
+
+			attachCodeMap.put("tfileApplyAsset",Arrays.asList(
+						"bankDepositReceipt","assetProof","alipayOrTenpayFlow"));
+
+			attachCodeMap.put("registrationCertificate",Arrays.asList("mortgageRegistrationCertificate"
+						,"mortgageRegistrationCertificateOtherPages"));
+
+			attachCodeMap.put("vehicleRegistration",Arrays.asList(
+						"vehicleRegistration","vehicleRegistrationOtherPages"));
+
+			attachCodeMap.put("leaseMainContract",Arrays.asList("contractReverse","leaseMainContract"));
+
+			attachCodeMap.put("guarantorIDPositive",Arrays.asList(
+						"guarantorIDPositive","guarantorIDReverse"));
+
+			}
+	}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	@Value("${spring.fileserver.http.upload.url}")
+    private String fileHttpUpload;
+	
+
+	@Override
+	protected String getFinancialId() {
+		AssetFinanceInfo assetFinanceInfo = AssetFinanceInfo.getByCode(BANK_CODE);
+		Assert.notNull(assetFinanceInfo,"根据资方code"+BANK_CODE+"未找到资方id");
+		return assetFinanceInfo.getId();
+	}
+	
+	
+	/**
+	 * 获取打包的名字
+	 * MEDIA_[业务标识]_[渠道标识]_[批次日期]_[3 位分包编号].zip
+	 * MEDIA_MEDIAFILE_xxx_20170622_001.zip
+	 */
+	@Override
+	public String getPackageName() {
+		String dateS = DateUitls.dateToStr(new Date(), "yyyyMMdd");
+		Integer num = OsbFileLog.getCurrentDayNum();
+		
+		String format = String.format("%03d", num == 0 ? 1 : ++num);
+	
+		return String.format(PACKAGE_NAME, CHANNAL_CODE,dateS,format);
+	}
+	
+	public static void main(String[] args) {
+		String dateS = DateUitls.dateToStr(new Date(), "yyyyMMdd");
+		Integer num = 1005;
+		
+		String format = String.format("%03d", num == 0 ? 1 : ++num);
+	
+		System.out.println(String.format(PACKAGE_NAME, CHANNAL_CODE,dateS,format));
+	}
+	
+	/**
+	 * 微众银行要求存放文件路径
+	 * /webank/{BUSINESS}/{yyyyMMdd}
+	 */
+	@Override
+	public String getServerFilePath() {
+		return String.format(FILE_PATH, "MEDIAFILE",
+				DateUitls.dateToStr(new Date(), "yyyyMMdd"));
+	}
+	
+	
+	/**
+	 * 微众部分文件不细分需要合并
+	 * @param attachmentMap
+	 */
+	private void dealNameFormat(Map<String, List<DscFileAttachment>>
+								attachmentMap) {
+		
+		//身份证集合
+		List<DscFileAttachment> var1 = getValues(Arrays.asList("applicantOrderIdPositive",
+				"applicantOrderIdReverse"),attachmentMap);
+		if (!var1.isEmpty()) {
+			attachmentMap.put("applicantOrderIdPositive", var1);
+		}
+		
+		//收入类文件
+		List<DscFileAttachment> var2 = getValues(Arrays.asList("actingWageStatement",
+				"personalTaxCertificate","statementOfIncome",
+				"proofOfEarnings","certificateOfPaymentOfProvidentFund",
+				"socialInsurancePaymentCertificate"), attachmentMap);
+
+		attachmentMap.put("tfileApplyIncome", var2);
+		
+		//担保人身份证
+		List<DscFileAttachment> var3 = getValues(Arrays.asList(
+				"guarantorIDPositive","guarantorIDReverse"),attachmentMap);
+
+		attachmentMap.put("guarantorIDPositive", var3);
+
+		//车辆评估报告/评估结果截图/其他证明材料
+		/*List<DscFileAttachment> var4 = getValues(Arrays.asList("applicantAssessment",
+				"applicantAssessmentXT"), attachmentMap);
+
+		attachmentMap.put("applicantAssessmentXT", var4);*/
+
+		//交强险保单或者发票、商业险保单或者发票
+		List<DscFileAttachment> var5= getValues(Arrays.asList("compulsoryInsurance",
+				"commercialInsurance","firstYearCommercialInsurance",
+				"worryFreeTheft","noWorryFreeTheft"), attachmentMap);
+		attachmentMap.put("compulsoryInsurance", var5);
+		
+		//资格类证明材料
+		List<DscFileAttachment> var6= getValues(Arrays.asList(
+				"bankDepositReceipt","assetProof","alipayOrTenpayFlow"),
+				attachmentMap);
+		attachmentMap.put("tfileApplyAsset", var6);
+		
+		//车辆登记证抵押页
+		List<DscFileAttachment> var7 = getValues(Arrays.asList("mortgageRegistrationCertificate"
+				,"mortgageRegistrationCertificateOtherPages"), attachmentMap);
+		attachmentMap.put("registrationCertificate", var7);
+		
+		//机动车登记证书
+		List<DscFileAttachment> var8 = getValues(Arrays.asList(
+				"vehicleRegistration"
+				,"vehicleRegistrationOtherPages"), attachmentMap);
+		attachmentMap.put("vehicleRegistration", var8);
+		
+		
+		//融资租赁合同contractReverse,leaseMainContract
+		List<DscFileAttachment> var9 = getValues(Arrays.asList("contractReverse","leaseMainContract"),
+				attachmentMap);
+		attachmentMap.put("leaseMainContract", var9);
+	}
+	
+	
+	/**
+	 * 验证文件js规则
+	 */
+	@Override
+	public InvokeResult<DscSupplyDto> checkAttachmentFile(OsbAttachmentDTO osbAttachmentDTO){
+		InvokeResult<DscSupplyDto> invokeResult = new InvokeResult<>();
+
+		DscSalesApplyMain applyNo = DscSalesApplyMain.getByApplyNo(osbAttachmentDTO.getBzId());
+		Map<String, List<DscFileAttachment>> attachmentMap = DscFileAttachment.get(applyNo.getId());
+		dealNameFormat(attachmentMap);
+
+		Map<String, AssetAttachmentRule> rules = AssetAttachmentRule.getRule(applyNo.getCapitalId())
+				.get(BankPhaseEnum.get(osbAttachmentDTO.getBzType()));
+		DscSalesApplyCar salesApplyCar = DscSalesApplyCar.getBymainId(applyNo.getId());
+
+
+		DscSupplyDto dscSupplyDto = null;
+		List<DscSupplyAttachmentsDto> results = null;
+
+		for (Entry<String, AssetAttachmentRule> rule: rules.entrySet()) {
+			List<DscFileAttachment> list = attachmentMap.get(rule.getKey());
+			//js规则入参
+			boolean isNew = "1".equals(salesApplyCar.getAcllx());
+			int size = list == null ? 0 : list.size();
+			boolean checkRs = (boolean)ScriptEngineUtil.eval(rule.getValue().getRule(),
+					"toDo", size,isNew);
+			if (!checkRs) {
+				//组装errorInfo;
+				if (dscSupplyDto == null) {
+					dscSupplyDto = new DscSupplyDto();
+					results = new ArrayList<>();
+				}
+				DscSupplyAttachmentsDto attachmentsDto = new DscSupplyAttachmentsDto(1,-1);
+				attachmentsDto.setAttName(rule.getValue().getAttachName());
+
+				String subType = rule.getValue().getAttachMainType();
+
+				List<String> strings = attachCodeMap.get(subType);
+				attachmentsDto.setAttType(strings == null ? subType:strings.toString());
+				results.add(attachmentsDto);
+
+			}
+
+		}
+
+		if (dscSupplyDto != null){
+			dscSupplyDto.setAttList(results);
+			invokeResult.failure("缺少必要附件类型").setData(dscSupplyDto);
+			return invokeResult;
+		}
+		return invokeResult.success();
+	}
+	
+	
+	/**
+	 * 获取文件的名字
+	 * 
+	 * [业务主键( app_no 或者 nbs_order_no)]_[文件类型编号]_[3 位分页编号].jpg
+	 */
+	@Override
+	public String rename(AttachmentRuleParamMap paramMap,
+			Map<String, AssetAttachmentRule> rules,
+			List<Map<String, String>> renamedList) {
+		
+		//获取订单对应的附件信息
+        DscSalesApplyMain main = DscSalesApplyMain.getByApplyNo(
+        		this.inputDto.get().getBzId());
+        
+        Map<String, List<DscFileAttachment>> attachmentMap = DscFileAttachment.get(
+        		main.getId());
+        
+        dealNameFormat(attachmentMap);
+        
+        for (Entry<String, AssetAttachmentRule> rule: rules.entrySet()) {
+			List<DscFileAttachment> list = attachmentMap.get(rule.getKey());
+			
+			//js规则入参
+			DscSalesApplyCar salesApplyCar = DscSalesApplyCar.getBymainId(main.getId());
+			boolean isNew = "1".equals(salesApplyCar.getAcllx());
+			int size = list == null ? 0 : list.size();
+	        boolean isF050 = isExistFinanceItem(main.getApplyNo(), CommonConstant.FinanceType.F050); //购置税发票
+
+			
+			boolean checkRs = (boolean)ScriptEngineUtil.eval(rule.getValue().getRule(),
+					"toDo", size,isNew, isF050);
+			
+			if (!checkRs) {
+				throw new BzException("订单号("+main.getApplyNo()+")"+rule.getValue().getAttachMainType()+"缺少必要文件,规则为"+rule.getValue().getRule()+"入参为("
+						+size+","+isNew+")");
+			}else {
+				int index = 1;
+				
+				if (CollectionUtils.isNotEmpty(list)) {
+					for (DscFileAttachment dscFileAttachment : list) {
+						Map<String, String> renameMap = new HashMap<>(4);
+						renameMap.put(FILEID, dscFileAttachment.getFileId());
+						//获取命名format
+						String nameFormat = rule.getValue().getNameFormat();
+						//二手车  vehicleRegistration替换为111
+						if ("vehicleRegistration".equals(dscFileAttachment.getAttachSubClass())) {
+							nameFormat = isNew ? nameFormat : nameFormat.replaceAll("112", "111");
+						}
+						
+						renameMap.put(FILENAME, getRename(nameFormat,index,main));
+						renamedList.add(renameMap);
+						++index;
+					}
+				}
+			}
+		}
+		return renamedList.toString();
+	}
+	
+	
+	private String getAppNbsNo(){
+		String applyNo = this.inputDto.get().getBzId();
+		String bzType = this.inputDto.get().getBzType();
+		
+		AssetMainInfo assetMainInfo = AssetMainInfo.getByApplyNo(applyNo);
+		
+		String appNbsNo = BankPhaseEnum.LAST_TRIAL.getPhase().equals(
+				bzType) ? assetMainInfo.getAssetNo()
+						: assetMainInfo.getBankOrderNo();
+		return appNbsNo;
+	}
+
+	/**
+	 * 查询一个订单是否有某个融资项
+	 * @param applyNo 申请编号
+	 * @param item 融资项码值
+	 * @return true：存在
+	 * @author YixinCapital -- chenjiacheng
+	 *             2018/9/11 13:40
+	 */
+	private boolean isExistFinanceItem(String applyNo, String item) {
+		DscSalesApplyMain main = DscSalesApplyMain.getByApplyNo(applyNo);
+		List<DscSalesApplyFinancing> financingList = DscSalesApplyFinancing.getByMainId(main.getId());
+		if (CollectionUtils.isEmpty(financingList)) return false;
+		for (DscSalesApplyFinancing financing : financingList) {
+			if (item.equals(financing.getArzxmid())) {
+				return BigDecimal.ZERO.compareTo(financing.getFkhrzje()) < 0;
+			}
+		}
+		return false;
+	}
+	
+
+
+	/**
+	 * 
+	 * @param nameFormat  /[业务主键]_[文件类型编号]_[3 位分页编号].jpg
+	 * @param index
+	 * @param main 
+	 * @return
+	 */
+	private String getRename(String nameFormat, int index,
+			DscSalesApplyMain main) {
+
+		String appNbsNo = getAppNbsNo();
+		String format = String.format("%03d", index);
+		return String.format(nameFormat, appNbsNo,format);
+	}
+
+
+	@Override
+	public String getBankCode() {
+		return BANK_CODE;
+	}
+	
+	
+	@Override
+	protected void getData() throws BzException {
+		super.getData();
+		//先通过url上传
+		uploadFileByUrl(getAttachments(this.inputDto.get().getBzId()));
+		//getCumstomer(this.inputDto.get().getBzId());
+	}
+	
+	
+	private List<DscFileAttachment> getAttachments(String bzId) {
+		// 获取对应的附件信息
+		DscSalesApplyMain main = DscSalesApplyMain.getByApplyNo(this.inputDto.get().getBzId());
+        return DscFileAttachment.lists(main.getId());
+	}
+
+	@Override
+	public void upLoadTask(String bzId, String bzType,
+			List<Map<String, String>> renamedList) {
+		
+		try {
+			
+			AssetMainInfo assetMainInfo = AssetMainInfo.getByApplyNo(bzId);
+			OsbFileLog osbFileLog = osbFileDomain.createOsbFileLog(bzId,bzType,"webank",
+	                true,CommonConstant.ZIP_COMPRESS_FORMAT,getPackageName(),true,
+	                JacksonUtil.fromObjectToJson(renamedList),getServerFilePath());
+			
+			//根据组装txt描述文件
+			//在上传文件前先上传txt描述文件,以osbFileLog的id命名
+			String fileId = uploadTxtFile(createDesFile(osbFileLog,assetMainInfo),
+					osbFileLog.getId(),bzId,bzType);
+			Assert.notNull(fileId, "上传txt文件失败");
+			
+			
+			//添加txt文件描述
+			JSONObject jsonObject = new JSONObject();
+			jsonObject.put("fileName", "MEDIA_RELATION.txt");
+			jsonObject.put("fileId", fileId);
+			JSONArray fromObject = JSONArray.fromObject(osbFileLog.getFileJson());
+			fromObject.add(jsonObject);
+			osbFileLog.setFileJson(fromObject.toString());
+			osbFileLog.update();
+			
+			//获取url
+			String url = sftpConfig.getSftp().get(OsbFileDomain.OSB_UPLOAD_HOST)
+					+ OsbFileUrl.WEBANK_OSB_UPLOAD_URI;
+			
+			osbFileDomain.uploadOsbData(osbFileLog, getUploadData(osbFileLog),url);
+		} catch (Exception e) {
+			logger.error("文件上传异常，异常信息为",e);
+		}
+		
+	}
+	
+	
+	private String uploadTxtFile(String createDesFile,String fileName,
+			String bzId, String bzType) {
+		Map<String, Object> reqData = new HashMap<String,Object>(4){{
+			put("fileSource", Base64.getEncoder().encodeToString(createDesFile.getBytes()));
+			put("sourceFileName", fileName.concat(".txt"));
+		}};
+		
+		OsbFile osbFile = new OsbFile();
+		osbFile.setBzId(bzId);
+		osbFile.setFileName(reqData.get("sourceFileName").toString());
+		osbFile.setFileSize(reqData.get("fileSource").toString().length());
+		osbFile.setTranNo(SerialNumberUtil.generate());
+		osbFile.create();
+		
+		logger.info("微众银行上传txt请求路径为{}参数为{}",fileHttpUpload,reqData.toString());
+		String result = RestTemplateUtil.sendRequestV2(fileHttpUpload,reqData);
+		logger.info("微众银行上传txt文件返回参数为{}",result);
+		
+		JSONObject fromObject = JSONObject.fromObject(result);
+		String fileId = "";
+		if (fromObject.containsKey("data") 
+				&& (fileId = fromObject.getJSONObject("data").getString("fileId")) != null) {
+			osbFile.setFileId(fileId);
+			osbFile.update();
+			return fileId;
+		}
+		return null;
+	}
+
+
+	/**
+	 * [业务主键]_[文件类型编号]_[3 位分页编号].jpg
+	 * 
+	 * 	MEDIA_RELATION.txt 为文件描述文件，必须要有。
+		里面的 MEDIA_RELATION.txt 结构如下:
+		第 1 列：业务主键 - 使用身份证
+		第 2 列：1:合作机构主键 0：WEBANK 业务主键 - 0 （使用 1）
+		第 3 列：文件名称 - 格式为[合作平台定单号]_[文件类型编号]_[分页编号].[后缀]，例如
+		000000000000001_002_001.jpg
+		第 4 列：业务标识 - MEDIAFILE
+		第 5 列：渠道标识 - xxx
+		第 6 列：文件类型编号 - 002 （在接口文档中有具体的字典表,主要用于区分文件类型）
+		第 7 列：3 位文件分页编号 - 001 （比例有一个合同共 5 页，将有 5 个 jpg 文件，文件名前面相同，分页
+		编号_001,_002 等来区分不同页）
+		第 8 列：备注 - NULL（暂未使用此字段，可留空）
+	 * @param assetMainInfo 
+	 */
+	@SuppressWarnings("unchecked")
+	private String createDesFile(OsbFileLog osbFileLog,
+			AssetMainInfo assetMainInfo) {
+		
+		StringBuffer stringBuffer = new StringBuffer();
+		JSONArray fileJson = JSONArray.fromObject(osbFileLog.getFileJson());
+		
+		String appNbsNo = getAppNbsNo();
+		
+		fileJson.forEach((t) -> {
+			JSONObject json = (JSONObject)t;
+			
+			//500240196908181428_001_002.jpg
+			String oldName = json.getString("fileName");
+			String newName = oldName.substring(0, oldName.lastIndexOf("."));
+			int index1 = newName.indexOf("_");
+			int index2 = newName.lastIndexOf("_");
+			
+			String idNo = newName.substring(0,index1);
+			String fileType = newName.substring(index1+1,index2);
+			String page = newName.substring(index2+1);
+			
+			stringBuffer.append(appNbsNo).append("\001")
+						.append("0").append("\001")
+						.append(oldName.replace(idNo, appNbsNo))
+						.append("\001")
+						.append("MEDIAFILE").append("\001")
+						.append(CHANNAL_CODE).append("\001")
+						.append(fileType).append("\001")
+						.append(page).append("\001")
+						.append("\n");
+		});
+		String result = "";
+		logger.info("申请编号为{},获取的描述文件信息为\n{}",
+				osbFileLog.getBzId(),result = stringBuffer.toString());
+		return result;
+	}
+
+	/**
+     * 获取上传请求数据
+     * @param osbFileLog
+     * @return
+     */
+    private String getUploadData(OsbFileLog osbFileLog){
+    	
+        logger.info("[osb文件处理]需要处理的osbFileLog：{}", JacksonUtil.fromObjectToJson(osbFileLog));
+        JSONObject data = new JSONObject();
+        data.put("archives", osbFileLog.isArchives());
+        data.put("compress", osbFileLog.isCompress());
+        data.put("compressPackageName", osbFileLog.getCompressName());
+        data.put("filePath", osbFileLog.getServerFilePath());
+        data.put("password", osbFileLog.getCompressPwd());
+        data.put("serialNumber", osbFileLog.getTranNo());
+        data.put("server", osbFileLog.getServerType());
+        data.put("createDir", true);
+        data.put("folderName", osbFileLog.getCompressName());
+        data.put("serverIP", osbFileLog.getServerIp());
+        data.put("serverPassword", osbFileLog.getServerPwd());
+        data.put("serverPort", osbFileLog.getServerPort());
+        data.put("serverUserName", osbFileLog.getServerUname());
+        data.put("systemId", osbFileLog.getRoutingKey());
+        // 如果是压缩文件 向osb推送compressFileJsonText 否则向osb推送fileJson
+        if (!StringUtils.isEmpty(osbFileLog.getCompressFileJson())) {
+            data.put("files", osbFileLog.getCompressFileJson());
+        } else {
+            data.put("files", osbFileLog.getFileJson());
+        }
+        data.put("compressFormat", osbFileLog.getCompressFormat());
+        logger.info("[osb文件处理]即将传递给osb的参数信息JSON：{}", data.toString());
+        return data.toString();
+    }
+}

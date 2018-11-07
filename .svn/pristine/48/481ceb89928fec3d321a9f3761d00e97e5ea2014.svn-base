@@ -1,0 +1,467 @@
+package com.yixin.dsc.api;
+
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+import javax.annotation.Resource;
+
+import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationContext;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.alibaba.fastjson.JSON;
+import com.google.common.collect.Maps;
+import com.yixin.common.utils.InvokeResult;
+import com.yixin.dsc.common.DscContant;
+import com.yixin.dsc.common.exception.BzException;
+import com.yixin.dsc.dto.DscAdmittanceDto;
+import com.yixin.dsc.dto.DscFlowResultForAlixDto;
+import com.yixin.dsc.dto.own.DscRuleVerifyResultDto;
+import com.yixin.dsc.dto.rule.DscMatchResultDto;
+import com.yixin.dsc.enumpackage.DscAlixLinkEnum;
+import com.yixin.dsc.service.shunt.DscShuntService;
+import com.yixin.kepler.common.enums.AssetPhaseEnum;
+import com.yixin.kepler.common.enums.AssetStateEnum;
+import com.yixin.kepler.common.enums.BankPhaseEnum;
+import com.yixin.kepler.common.enums.CreditfrontResultEnum;
+import com.yixin.kepler.core.constant.CommonConstant;
+import com.yixin.kepler.core.domain.AsyncTask;
+import com.yixin.kepler.core.domain.webank.LastTrialRequestStrategy;
+import com.yixin.kepler.core.listener.ResultNotifyEvent;
+import com.yixin.kepler.core.listener.SettleOrderEvent;
+import com.yixin.kepler.dto.BaseMsgDTO;
+import com.yixin.kepler.dto.BaseReqDTO;
+import com.yixin.kepler.enity.AssetBankTran;
+import com.yixin.kepler.enity.AssetMainInfo;
+import com.yixin.kepler.enity.AssetPaymentFail;
+import com.yixin.kepler.enity.AssetPaymentTask;
+import com.yixin.kepler.v1.job.BankRequestJobScheduler;
+
+import net.sf.json.JSONObject;
+
+/**
+ * Package : com.yixin.dsc.api
+ *
+ * @author YixinCapital -- wanghonglin
+ * 2018/7/6 9:07
+ */
+@RestController
+@RequestMapping(value="/api/dscOwnApi/")
+public class DscOwnApi {
+
+    private final Logger logger = LoggerFactory.getLogger(this.getClass());
+    @Autowired
+    private ApplicationContext ioc;
+    @Resource
+    AsyncTask asyncTask;
+    @Autowired
+    private  MongoTemplate mongoTemplate;
+
+    @Autowired
+    private DscShuntService shuntService;
+    
+    @Resource
+    private LastTrialRequestStrategy lastTrialRequestStrategy;
+    
+    @Resource
+    private BankRequestJobScheduler jobScheduler;
+
+    /**
+     * @Description:根据订单编号查询 不匹配的 规则匹配结果
+     * @Author:  weihua
+     * @param dscSalesApplyMainDTO
+     * @return
+     * @exception
+     * @date        2018/7/6 10:00
+     */
+    @RequestMapping(value = "/findNoMachRuleDataByApplyNo")
+    public InvokeResult<List<DscMatchResultDto>>   findNoMachRuleDataByApplyNo(@RequestBody String applyNo){
+        InvokeResult<List<DscMatchResultDto>> result = new InvokeResult<>();
+        if(StringUtils.isBlank(applyNo)){
+            result.failure("入参applyNo为空");
+        }
+        Query query = new Query();
+        Criteria criteria = Criteria.where("applyNo").is(applyNo);
+        query.addCriteria(criteria);
+        query.with(Sort.by(new Sort.Order(Sort.Direction.DESC,"createTime")));
+        try{
+            List<DscMatchResultDto> dscMatchResultDtos = mongoTemplate.find(query,DscMatchResultDto.class);
+            result.setData(dscMatchResultDtos);
+        }catch (BzException e){
+            logger.error("根据订单编号查询 不匹配的 规则匹配结果{}",e.getMessage());
+            result.failure(e.getMessage());
+        }catch (Exception e){
+            logger.error("根据订单编号查询 不匹配的 规则匹配结果接口异常.",e);
+            result.failure("根据订单编号查询 不匹配的 规则匹配结果接口异常");
+        }
+        return result;
+    }
+
+
+    /**
+     * 批量重推结算数据
+     * @return 推送结果
+     * @author YixinCapital -- chenjiacheng
+     *             2018/8/20 15:48
+     */
+    @RequestMapping(value = "/pushListener",method = RequestMethod.POST)
+    public InvokeResult<Boolean> pushListener(@RequestBody String paramApplyNo){
+        InvokeResult<Boolean> result = new InvokeResult<>();
+        if(StringUtils.isBlank(paramApplyNo) || paramApplyNo.equalsIgnoreCase("all")){
+        	List<String> list = AssetBankTran.getPushFileIsFailedData();
+        	if(CollectionUtils.isEmpty(list)){
+        		return result.failure("未查询到需要推送结算的数据");
+        	}
+        	logger.info("查询出需要给结算推数的数据有:{}", JSON.toJSONString(list));
+        	for (String applyNo : list) {
+        		//调用监听推送数据
+        		ioc.publishEvent(new SettleOrderEvent(applyNo));
+        	}
+        }else{
+        	ioc.publishEvent(new SettleOrderEvent(paramApplyNo));
+        }
+
+        return result.success();
+    }
+
+
+    /**
+     * 重发银行请款任务
+     * @param reqDTO
+     * @return
+     */
+    @RequestMapping(value = "/paymentReq",method = RequestMethod.POST)
+    public InvokeResult<BaseMsgDTO> paymentReq(@RequestBody BaseReqDTO reqDTO){
+        InvokeResult<BaseMsgDTO> result = new InvokeResult<BaseMsgDTO>();
+        logger.info("重新发起请款,params={}", JSON.toJSONString(reqDTO));
+        try{
+            BaseMsgDTO msgDTO = new BaseMsgDTO();
+            AssetPaymentFail paymentFail = AssetPaymentFail.getByApplyNo(reqDTO.getApplyNo());
+            if(paymentFail == null){
+                msgDTO.setMessage("不存在银行请求异常记录或已执行成功");
+                msgDTO.setCode(DscContant.KeplerCode.FAILD);
+                result.setData(msgDTO);
+                return result;
+            }
+            if(StringUtils.equals(paymentFail.getPhase(),reqDTO.getPhase())){
+                InvokeResult<BaseMsgDTO> requestBank = asyncTask.requestBank(reqDTO.getApplyNo(),BankPhaseEnum.PAYMENT);
+                logger.info("请款订单号{}获取的执行结果为{}",reqDTO.getApplyNo(),JSONObject.fromObject(requestBank).toString());
+                BaseMsgDTO baseMsgDTO = (com.yixin.kepler.dto.BaseMsgDTO) requestBank.getData();
+                DscFlowResultForAlixDto  forAlixDto = null;
+                if (CommonConstant.SUCCESS.equals(baseMsgDTO.getCode())) {
+                    ioc.publishEvent(new SettleOrderEvent(reqDTO.getApplyNo()));//推送结算数据
+                    paymentFail.setIsSuccess(true);
+                    msgDTO.setMessage("重新发起银行请款已执行成功");
+                    msgDTO.setCode(DscContant.KeplerCode.SUCCESS);
+                    //更新银行记录表
+                    AssetPaymentTask assetPaymentTask = AssetPaymentTask.getByApplyNo(reqDTO.getApplyNo());
+                    if(assetPaymentTask != null){
+                        assetPaymentTask.setIsSuccess(true);
+                        assetPaymentTask.setIsEnd(true);
+                        assetPaymentTask.update();
+                    }
+                    forAlixDto = createForAliDto(reqDTO.getApplyNo(),
+                            true,baseMsgDTO.getMessage());
+
+                }else if (CommonConstant.FAILURE.equals(baseMsgDTO.getCode())) {
+                    paymentFail.setIsSuccess(false);
+                    paymentFail.setBankCode(baseMsgDTO.getCode());
+                    paymentFail.setBankMessage(baseMsgDTO.getMessage());
+                    msgDTO.setMessage(baseMsgDTO.getMessage());
+                    msgDTO.setCode(DscContant.KeplerCode.FAILD);
+
+                    forAlixDto = createForAliDto(reqDTO.getApplyNo(),
+                            false,baseMsgDTO.getMessage());
+                }
+                paymentFail.update();
+                if (forAlixDto != null) {
+                    ioc.publishEvent(new ResultNotifyEvent(forAlixDto));
+                }
+            }
+        }catch (Exception e){
+            logger.error("重发银行请款任务异常，异常信息为:",e);
+        }
+
+        return result;
+
+    }
+
+    /**
+     * 查询当前订单的执行状态
+     * @param applyNo 申请编号
+     * @return result
+     * @author YixinCapital -- chenjiacheng
+     *             2018/7/19 17:25
+     */
+    @RequestMapping(value = "/queryStateOfApplyNo")
+    public InvokeResult<Object> queryStateOfApplyNo(@RequestBody String applyNo) {
+        InvokeResult<Object> invokeResult = new InvokeResult<>();
+        if (StringUtils.isBlank(applyNo)) {
+            return invokeResult.failure("申请编号为空");
+        }
+        AssetMainInfo mainInfo = AssetMainInfo.getByApplyNo(applyNo);
+        if (mainInfo == null) {
+            return invokeResult.failure("该订单还未与银行交互，请确认订单");
+        }
+        Map<String,Object> map = new HashMap<>();
+        map.put("applyNo", applyNo);
+        map.put("phase", AssetPhaseEnum.getPhaseName(mainInfo.getAssetPhase())); //阶段
+        map.put("firstTrial", AssetStateEnum.getNameByState(mainInfo.getFirstState())); //初审
+        map.put("secTrial", AssetStateEnum.getNameByState(mainInfo.getLastState())); //二审
+        map.put("payment", AssetStateEnum.getNameByState(mainInfo.getPaymentState())); //请款
+        map.put("afterLoan", AssetStateEnum.getNameByState(mainInfo.getAfterLoanState())); //贷后
+        map.put("financialCode", mainInfo.getFinancialCode()); //资方code
+        invokeResult.setData(map);
+        return invokeResult;
+    }
+
+    /**
+     * 查询该订单与银行交互的信息
+     * @param applyNo 申请编号
+     * @return 交互信息
+     * @author YixinCapital -- chenjiacheng
+     *             2018/7/20 16:33
+     */
+    @RequestMapping(value = "/queryBankInfoOfApplyNo")
+    public InvokeResult<Object> queryBankInfoOfApplyNo(@RequestBody String applyNo) {
+        InvokeResult<Object> invokeResult = new InvokeResult<>();
+        if (StringUtils.isBlank(applyNo)) {
+            return invokeResult.failure("申请编号为空");
+        }
+        AssetMainInfo mainInfo = AssetMainInfo.findFirstByProperty(AssetMainInfo.class, "applyNo", applyNo);
+        if (mainInfo == null) {
+            return invokeResult.failure("该订单还未与银行交互，请确认订单");
+        }
+        Map<String, Object> map = new HashMap<>();
+        map.put("applyNo", applyNo);
+        map.put("phase", AssetPhaseEnum.getPhaseName(mainInfo.getAssetPhase())); //阶段
+        map.put("isDeleted", mainInfo.isDeleted());
+
+        String hql = "select tran from AssetBankTran tran where tran.deleted=false and tran.applyNo=?1 order by tran.createTime asc";
+        List<AssetBankTran> bankTranList = AssetBankTran.getRepository().createJpqlQuery(hql).setParameters(new Object[]{applyNo}).list();
+        if (CollectionUtils.isNotEmpty(bankTranList)) {
+            Map<String, Object> body = new LinkedHashMap<>();
+            for (AssetBankTran bankTran : bankTranList) {
+                Map<String, Object> contentMap = new HashMap<>();
+                contentMap.put("applyNo", bankTran.getApplyNo());
+                contentMap.put("phase", bankTran.getPhase());
+                contentMap.put("apiCode", bankTran.getApiCode());
+                contentMap.put("approvalCode", bankTran.getApprovalCode());
+                contentMap.put("approvalDesc", bankTran.getApprovalDesc());
+                contentMap.put("repBody", bankTran.getRepBody());
+
+                body.put(bankTran.getId(), contentMap);
+            }
+            map.put("body", body);
+        }
+        invokeResult.setData(map);
+        return invokeResult;
+    }
+
+
+
+
+    /**
+     * 临时提供的方法   一审
+     * @param applyNo
+     * @return
+     */
+
+    @Deprecated
+    @RequestMapping(value = "/lastTrailReq")
+    public InvokeResult<BaseMsgDTO> lastTrailReq(@RequestBody String applyNo) {
+        logger.info("微众一审回调接口,通过调用复审/二审 ,{}",applyNo);
+        InvokeResult<BaseMsgDTO> iResult = lastTrialRequestStrategy.doIt(applyNo);
+        logger.info("微众一审回调接口,通过调用复审/二审 ,{},返回结果：{}",applyNo, JSON.toJSONString(iResult));
+        if(iResult !=null && iResult.isSuccess()){
+            BaseMsgDTO msgDTO = (BaseMsgDTO) iResult.getData();
+            if(StringUtils.equals(msgDTO.getCode(),CommonConstant.SUCCESS)){
+                logger.info("微众一审回调接口,通过调用复审/二审 ,{},返回成功",applyNo);
+                ioc.publishEvent(new ResultNotifyEvent(this.createForAliDto(applyNo, CreditfrontResultEnum.SUCCESS)));
+            } else {
+                logger.info("微众一审回调接口,通过调用复审/二审 ,{},返回失败",applyNo);
+                ioc.publishEvent(new ResultNotifyEvent(this.createForAliDto(applyNo, CreditfrontResultEnum.REFUSE)));
+            }
+        } else {
+            ioc.publishEvent(new ResultNotifyEvent(this.createForAliDto(applyNo, CreditfrontResultEnum.REFUSE)));
+        }
+
+        return iResult;
+    }
+    
+    /**
+     * 规则验证接口
+     * @param dscAdmittanceDto
+     * @return 
+     * @author YixinCapital -- wangwenlong
+     *	       2018年8月2日 下午5:10:30
+     */
+    @RequestMapping(value = "/ruleVerify")
+    public InvokeResult<DscRuleVerifyResultDto> ruleVerify(@RequestBody DscAdmittanceDto dscAdmittanceDto){
+    	InvokeResult<DscRuleVerifyResultDto> iResult = new InvokeResult<>();
+    	if(dscAdmittanceDto == null){
+			return iResult.failure("规则验证入参为空");
+		}
+		if(StringUtils.isBlank(dscAdmittanceDto.getApplyNo())){
+			return iResult.failure("规则验证订单编号为空");
+		}
+		String applyNo = dscAdmittanceDto.getApplyNo(); //订单编号
+		String capitalCode = dscAdmittanceDto.getCapitalCode(); //资方Code
+		try {
+			iResult.setData(this.shuntService.ruleVerify(applyNo,capitalCode));
+		} catch (BzException e) {
+			logger.error("DscOwnApi规则验证接口失败,订单编号:{},错误信息:{}",applyNo, e.getMessage());
+			return iResult.failure(e.getMessage());
+		} catch (Exception e) {
+			logger.error("DscOwnApi规则验证接口失败,订单编号:{},",applyNo, e);
+			return iResult.failure("规则验证接口失败");
+		}
+    	return iResult;
+    }
+
+
+    @RequestMapping(value = "/relaunchAfterLoan")
+    @ResponseBody
+    public InvokeResult<Object> relaunchAfterLoan(@RequestBody String applyNo) {
+        InvokeResult<Object> invokeResult = new InvokeResult<>();
+        if (StringUtils.isBlank(applyNo)) {
+            return invokeResult.failure("申请编号为空");
+        }
+        String[] array  = applyNo.split(",");
+        Map<String, Object> dataMap = new HashMap<>();
+        for (String str : array) {
+            try {
+                InvokeResult<BaseMsgDTO> requestBank = asyncTask.requestBank(str, BankPhaseEnum.AFTER_LOAN);
+                if (requestBank != null && requestBank.getData() != null) {
+                    BaseMsgDTO baseMsgDTO = (BaseMsgDTO) requestBank.getData();
+                    if (CommonConstant.SUCCESS.equals(baseMsgDTO.getCode())) {
+                        dataMap.put(str, "成功");
+                        break;
+                    }
+                }
+                dataMap.put(str, "失败");
+            } catch (Exception e) {
+                logger.error("重新发起贷后请求失败", e);
+                dataMap.put(str, "失败");
+            }
+        }
+        invokeResult.setData(dataMap);
+        return invokeResult;
+    }
+
+
+
+
+
+
+
+    private DscFlowResultForAlixDto createForAliDto(String applyNo, CreditfrontResultEnum resultEnum) {
+
+        DscFlowResultForAlixDto alixDto = new DscFlowResultForAlixDto();
+        alixDto.setApplyNo(applyNo);
+        alixDto.setCode(resultEnum.getCode());
+        alixDto.setLink(DscAlixLinkEnum.CREDITFRONT.getCode());
+        alixDto.setMessage(resultEnum.getMsg());
+        return alixDto;
+    }
+
+    private DscFlowResultForAlixDto createForAliDto(String applyNo,Boolean isSuccess,String msg) {
+        return DscFlowResultForAlixDto.createForAliDto(
+                applyNo, isSuccess, msg, DscAlixLinkEnum.REQUEST_FUNDS);
+    }
+
+    
+    
+    /**
+     * 通用跑批任务挡板
+     * @param 任务类名
+     * @return 跑批结果
+     * @author YixinCapital -- chen.lin
+     *	       2018年9月19日 下午4:41:10
+     */
+    @RequestMapping(value = "/taskBaffle")
+    @ResponseBody
+    public InvokeResult<String> taskBaffle(@RequestBody String taskName) {
+        InvokeResult<String> invokeResult = new InvokeResult<>();
+        if (StringUtils.isBlank(taskName)) {
+            return invokeResult.failure("任务名称为空");
+        }
+        if("BankRequestJobScheduler".equals(taskName)){
+        	jobScheduler.execute(null);
+			logger.info("BankRequestJobScheduler任务跑批完成");
+			return new InvokeResult("BankRequestJobScheduler任务跑批完成").success();
+        }
+		return new InvokeResult("未发现任务需要跑批").success();
+    }
+    
+    
+    
+    /**
+     * 批量重推微众贷后接口
+     * @return 
+     * @author YixinCapital -- wangwenlong
+     *	       2018年9月28日 下午4:37:56
+     */
+    @RequestMapping(value = "/pushWBAfterloan",method = RequestMethod.POST)
+    public InvokeResult<Map<String,Object>> pushWBAfterloan(@RequestBody String applyNoList){
+        InvokeResult<Map<String,Object>> result = new InvokeResult<>();
+        logger.info("批量重推微众贷后接口开始 -------------------");
+        applyNoList = applyNoList == null?"":applyNoList;
+        List<String> list = AssetBankTran.getWBAfterloanFailed();
+        if(CollectionUtils.isEmpty(list)){
+            return result.failure("未查询到需要推送的数据");
+        }
+        Map<String,Object> resultMap = Maps.newHashMap();
+        logger.info("查询出需要重推微众贷后接口的数据有:{}", JSON.toJSONString(list));
+        for (String applyNo : list) {
+        	if(applyNoList.equals(applyNo)){
+        		logger.info("批量重推微众贷后接口,订单编号:{}，排除不请求银行", applyNo);
+        		continue;
+        	}
+        	InvokeResult<BaseMsgDTO> invokeResult = asyncTask.requestBank(applyNo, BankPhaseEnum.AFTER_LOAN);
+        	resultMap.put(applyNo, invokeResult);
+        }
+        logger.info("批量重推微众贷后接口结束 -------------------");
+        result.setData(resultMap);
+        return result;
+    }
+    
+    /**
+     * 指定单号重推微众贷后接口
+     * @return 
+     * @author YixinCapital -- wangwenlong
+     *	       2018年9月28日 下午4:37:56
+     */
+    @RequestMapping(value = "/pushWBAfterloanByParam",method = RequestMethod.POST)
+    public InvokeResult<Map<String,Object>> pushWBAfterloanByParam(@RequestBody String applyNoList){
+        InvokeResult<Map<String,Object>> result = new InvokeResult<>();
+        logger.info("指定单号重推微众贷后接口开始 -------------------");
+        applyNoList = applyNoList == null?"":applyNoList;
+        
+        String[] applyNoArray = applyNoList.split(",");
+        Map<String,Object> resultMap = Maps.newHashMap();
+        logger.info("查询出需要重推微众贷后接口的数据有:{}", JSON.toJSONString(applyNoArray));
+        for (String applyNo : applyNoArray) {
+        	applyNo = applyNo.trim();
+        	InvokeResult<BaseMsgDTO> invokeResult = asyncTask.requestBank(applyNo, BankPhaseEnum.AFTER_LOAN);
+        	resultMap.put(applyNo, invokeResult);
+        }
+        logger.info("批量重推微众贷后接口结束 -------------------");
+        result.setData(resultMap);
+        return result;
+    }
+}

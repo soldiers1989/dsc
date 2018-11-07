@@ -1,0 +1,368 @@
+package com.yixin.dsc.entity.order;
+
+import java.io.Serializable;
+import java.math.BigDecimal;
+import java.util.Date;
+import java.util.List;
+import java.util.Map;
+
+import javax.persistence.Column;
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.Id;
+import javax.persistence.Table;
+
+import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.hibernate.annotations.GenericGenerator;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
+import com.yixin.common.system.domain.BaseEntity;
+import com.yixin.dsc.dto.DscLoanRepayDTO;
+import com.yixin.kepler.core.constant.CommonConstant;
+
+/**
+ * 还款计划表
+ * Package : com.yixin.dsc.entity.order
+ * 
+ * @author YixinCapital -- wangwenlong
+ *		   2018年9月26日 上午11:52:17
+ *
+ */
+@Entity
+@Table(name = "dsc_repay_plan")
+public class DscRepayPlan extends BaseEntity{
+
+	private static final long serialVersionUID = 4063055933356787304L;
+	
+	private static Logger LOGGER = LoggerFactory.getLogger(DscRepayPlan.class);
+
+	@Id
+    @Column(name = "ID", length = 50)
+    @GeneratedValue(generator = "system-uuid")
+    @GenericGenerator(name = "system-uuid", strategy = "uuid")
+    private String id;
+	
+	/***
+     * 是否删除状态，true为已删除，false为未删除
+     */
+    @Column(name = "IS_DELETED")
+    private Boolean deleted = false;
+	
+	/***
+     * 创建时间
+     */
+    @Column(name = "create_time")
+    private Date createTime;
+    
+    /**
+	 * 订单主表ID
+	 */
+	@Column(name = "main_id", nullable = false,columnDefinition = "varchar(50) comment '订单主表ID'")
+	private String mainId;
+    
+	/**
+	 * 申请编号
+	 */
+	@Column(name = "apply_no", nullable = false , columnDefinition = "varchar(50) comment '申请编号'")
+	private String applyNo;
+	
+	/**
+	 * 期数
+	 */
+	@Column(name = "term", nullable = false , columnDefinition = "int(11) comment '期数'")
+	private Integer term;
+    
+	/**
+	 * 还款日期
+	 */
+	@Column(name = "repay_date", nullable = false , columnDefinition = "datetime comment '还款日期'")
+	private Date repayDate;
+	
+	/**
+	 * 还款本金
+	 */
+	@Column(name = "repay_principal", nullable = false , columnDefinition = "decimal(19,2) comment '还款本金'")
+	private BigDecimal repayPrincipal;
+	
+	/**
+	 * 还款利息
+	 */
+	@Column(name = "repay_profit", nullable = false , columnDefinition = "decimal(19,2) comment '还款利息'")
+	private BigDecimal repayProfit;
+	
+	/**
+	 * 还款金额
+	 */
+	@Column(name = "repay_amount", nullable = false , columnDefinition = "decimal(19,2) comment '还款金额'")
+	private BigDecimal repayAmount;
+	
+	/**
+     * 贷款服务费
+     */
+	@Column(name = "loan_service_fee",  columnDefinition = "decimal(19,2) comment '贷款服务费'")
+    private BigDecimal loanServiceFee;
+
+    /**
+     * 其他费用
+     */
+	@Column(name = "other_fee",  columnDefinition = "decimal(19,2) comment '其他费用'")
+    private BigDecimal otherFee;
+    
+    /**
+     * 技术服务费
+     */
+	@Column(name = "tech_maintenancefee",  columnDefinition = "decimal(19,2) comment '技术服务费'")
+    private BigDecimal techMaintenanceFee;
+	
+	/**
+	 * 每期还款计划的唯一标识
+	 */
+	@Column(name = "schedule_no", columnDefinition = "varchar(50) comment '还款金额'")
+	private String scheduleNo;
+	
+	/**
+	 * 资方编码 参考 CommonConstant.BankName
+	 */
+	@Column(name = "capital_code", nullable = false , columnDefinition = "varchar(50) comment '资方编码'")
+	private String capitalCode;
+	
+	/**
+	 * 资方编码 参考 CommonConstant.BankName
+	 */
+	@Column(name = "belong_capital_code", nullable = false , columnDefinition = "varchar(50) comment '该还款计划所属资方编码'")
+	private String belongCapitalCode;
+
+
+
+    @Override
+	public Serializable getId() {
+		return id;
+	}
+	
+	/**
+     * 创建方法
+     * 
+     * @return
+     */
+    public String create() {
+        this.setCreateTime(new Date());
+        this.save();
+        return this.id;
+    }
+
+    public Boolean getDeleted() {
+		return deleted;
+	}
+
+	public void setDeleted(Boolean deleted) {
+		this.deleted = deleted;
+	}
+
+	/**
+     * 物理删除方法
+     */
+    public void remove() {
+        super.remove();
+    }
+    
+	public Date getCreateTime() {
+		return createTime;
+	}
+
+	public void setCreateTime(Date createTime) {
+		this.createTime = createTime;
+	}
+
+	public void setId(String id) {
+		this.id = id;
+	}
+
+	public String getMainId() {
+		return mainId;
+	}
+
+	public void setMainId(String mainId) {
+		this.mainId = mainId;
+	}
+
+	public String getApplyNo() {
+		return applyNo;
+	}
+
+	public void setApplyNo(String applyNo) {
+		this.applyNo = applyNo;
+	}
+
+	public Integer getTerm() {
+		return term;
+	}
+
+	public void setTerm(Integer term) {
+		this.term = term;
+	}
+
+	public Date getRepayDate() {
+		return repayDate;
+	}
+
+	public void setRepayDate(Date repayDate) {
+		this.repayDate = repayDate;
+	}
+
+	public BigDecimal getRepayPrincipal() {
+		return repayPrincipal;
+	}
+
+	public void setRepayPrincipal(BigDecimal repayPrincipal) {
+		this.repayPrincipal = repayPrincipal;
+	}
+
+	public BigDecimal getRepayProfit() {
+		return repayProfit;
+	}
+
+	public void setRepayProfit(BigDecimal repayProfit) {
+		this.repayProfit = repayProfit;
+	}
+
+	public BigDecimal getRepayAmount() {
+		return repayAmount;
+	}
+
+	public void setRepayAmount(BigDecimal repayAmount) {
+		this.repayAmount = repayAmount;
+	}
+
+	public String getScheduleNo() {
+		return scheduleNo;
+	}
+
+	public void setScheduleNo(String scheduleNo) {
+		this.scheduleNo = scheduleNo;
+	}
+
+	public String getCapitalCode() {
+		return capitalCode;
+	}
+
+	public void setCapitalCode(String capitalCode) {
+		this.capitalCode = capitalCode;
+	}
+	
+	
+	public String getBelongCapitalCode() {
+		return belongCapitalCode;
+	}
+
+	public void setBelongCapitalCode(String belongCapitalCode) {
+		this.belongCapitalCode = belongCapitalCode;
+	}
+
+	public BigDecimal getLoanServiceFee() {
+		return loanServiceFee;
+	}
+
+	public void setLoanServiceFee(BigDecimal loanServiceFee) {
+		this.loanServiceFee = loanServiceFee;
+	}
+
+	public BigDecimal getOtherFee() {
+		return otherFee;
+	}
+
+	public void setOtherFee(BigDecimal otherFee) {
+		this.otherFee = otherFee;
+	}
+
+	public BigDecimal getTechMaintenanceFee() {
+		return techMaintenanceFee;
+	}
+
+	public void setTechMaintenanceFee(BigDecimal techMaintenanceFee) {
+		this.techMaintenanceFee = techMaintenanceFee;
+	}
+	
+	/**
+	 * 获取易鑫还款计划
+	 * @param applyNo
+	 * @author YixinCapital -- wangwenlong
+	 *	       2018年9月26日 下午5:51:29
+	 */
+	public static List<DscRepayPlan> getYXRepayPlan(String applyNo){
+		if(StringUtils.isBlank(applyNo)){
+			return null;
+		}
+		Map<String, Object> propValues = Maps.newHashMap();
+		propValues.put("applyNo", applyNo); //订单编号
+		propValues.put("belongCapitalCode", CommonConstant.BankName.YX); //所属资方为易鑫
+		propValues.put("deleted",false);
+		return DscRepayPlan.findByProperties(DscRepayPlan.class, propValues);
+	}
+
+
+	public static List<DscRepayPlan> getYXRepayPlanByMainId(String mainId) {
+		Map<String, Object> propValues = Maps.newHashMap();
+		propValues.put("mainId",mainId);
+		propValues.put("deleted",false);
+		return DscRepayPlan.findByProperties(DscRepayPlan.class,propValues);
+	}
+
+	/**
+	 * 保存还款计划
+	 * @param repaySchedules
+	 * @param mainId
+	 * @param applyNo
+	 * @param capitalCode
+	 * @param belongCapitalCode 
+	 * @author YixinCapital -- wangwenlong
+	 *	       2018年9月26日 下午5:20:38
+	 */
+	public static void saveRepayPlan(List<DscLoanRepayDTO> repaySchedules,String mainId,String applyNo,
+			String capitalCode,String belongCapitalCode){
+		if(CollectionUtils.isEmpty(repaySchedules)){
+			return ;
+		}
+		DscRepayPlan repayPlan = null;
+		for(DscLoanRepayDTO repayDto:repaySchedules){
+			repayPlan = new DscRepayPlan();
+			repayPlan.setApplyNo(applyNo);//订单编号
+			repayPlan.setMainId(mainId); //业务主表ID
+			repayPlan.setCapitalCode(capitalCode); //资方CODE
+			repayPlan.setBelongCapitalCode(belongCapitalCode); //所属资方code
+			repayPlan.setCreateTime(new Date()); //创建时间
+			repayPlan.setTerm(repayDto.getTerm()); //期数
+			repayPlan.setRepayAmount(repayDto.getRepayAmount()); //还款金额
+			repayPlan.setRepayDate(repayDto.getRepayDate()); //还款日期
+			repayPlan.setRepayPrincipal(repayDto.getRepayPrincipal()); //还款本金
+			repayPlan.setRepayProfit(repayDto.getRepayProfit()); //还款利息
+			repayPlan.setLoanServiceFee(repayDto.getLoanServiceFee()); //贷款服务费
+			repayPlan.setTechMaintenanceFee(repayDto.getTechMaintenanceFee()); //技术服务费
+			repayPlan.setOtherFee(repayDto.getOtherFee()); //其他费用
+			repayPlan.setDeleted(false);
+			
+			repayPlan.create();
+		}
+	}
+	
+	/**
+	 * 逻辑删除还款计划
+	 * @param applyNo 订单编号
+	 * @author YixinCapital -- wangwenlong
+	 *	       2018年10月11日 下午8:49:43
+	 */
+	public static Boolean logicRemove(String applyNo){
+		String sql = "UPDATE dsc_repay_plan SET is_deleted = TRUE WHERE apply_no = ?1 ";
+    	List<Object> params = Lists.newArrayList(applyNo); //订单编号
+    	int result = -1;
+		try {
+			result = getRepository().createSqlQuery(sql).setParameters(params).executeUpdate();
+		} catch (Exception e) {
+			LOGGER.error("通过订单编号逻辑删除还款计划异常，订单编号:{}",applyNo,e);
+		}
+    	return result >=0;
+	}
+}

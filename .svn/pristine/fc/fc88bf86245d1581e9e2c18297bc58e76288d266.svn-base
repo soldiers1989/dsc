@@ -1,0 +1,92 @@
+package com.yixin.dsc.v1.datapackage.dto;
+
+/**
+ * 还款卡信息DTO
+ * Package : com.yixin.dsc.v1.datapackage.dto
+ * 
+ * @author YixinCapital -- chen.lin
+ *		   2018年10月30日 上午11:21:53
+ *
+ */
+public class RepayCardInfoDTO {
+
+
+	/**
+	 * 申请编号
+	 */
+	private String applyNo;
+	
+	/**
+	 * 申请人姓名(持卡人姓名)
+	 */
+	private String custName;
+	
+	/**
+	 * 申请人身份证号(持卡人身份证号码)
+	 */
+	private String custNum;
+	
+	/**
+	 * 申请人手机号
+	 */
+	private String custPhone;
+	
+	/**
+	 * 还款卡号
+	 */
+	private String repayCard;
+	
+	/**
+	 * 绑卡手机号
+	 */
+	private String cardPhone;
+
+	
+	public String getApplyNo() {
+		return applyNo;
+	}
+
+	public void setApplyNo(String applyNo) {
+		this.applyNo = applyNo;
+	}
+
+	public String getCustName() {
+		return custName;
+	}
+
+	public void setCustName(String custName) {
+		this.custName = custName;
+	}
+
+	public String getCustNum() {
+		return custNum;
+	}
+
+	public void setCustNum(String custNum) {
+		this.custNum = custNum;
+	}
+
+	public String getCustPhone() {
+		return custPhone;
+	}
+
+	public void setCustPhone(String custPhone) {
+		this.custPhone = custPhone;
+	}
+
+	public String getRepayCard() {
+		return repayCard;
+	}
+
+	public void setRepayCard(String repayCard) {
+		this.repayCard = repayCard;
+	}
+
+	public String getCardPhone() {
+		return cardPhone;
+	}
+
+	public void setCardPhone(String cardPhone) {
+		this.cardPhone = cardPhone;
+	}
+}

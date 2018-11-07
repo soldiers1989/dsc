@@ -1,0 +1,54 @@
+package com.yixin.kepler.v1.job;
+
+import java.util.concurrent.TimeUnit;
+
+import javax.annotation.Resource;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
+
+import com.yixin.common.system.job.JobExecutor;
+import com.yixin.common.utils.JobParamDTO;
+import com.yixin.dsc.service.async.AsyncTaskManagerService;
+import com.yixin.kepler.component.RedisDistributedLock;
+import com.yixin.kepler.core.constant.CommonConstant;
+
+/**
+ * Venus 定时补救任务
+ * Package : com.yixin.kepler.v1.job
+ * 
+ * @author YixinCapital -- wangwenlong
+ *		   2018年10月22日 下午3:25:53
+ *
+ */
+@Component
+public class VenusRescueJobScheduler implements JobExecutor{
+
+	private static final Logger LOGGER = LoggerFactory.getLogger(BankRequestJobScheduler.class);
+	
+	@Resource
+	private RedisDistributedLock redisDistributedLock;
+	
+	@Resource(name = "asyncTaskManagerSpringImpl")
+	private AsyncTaskManagerService asyncTaskManagerService;
+	
+	@Override
+	public JobParamDTO execute(JobParamDTO jobParamDTO) {
+		JobParamDTO result = new JobParamDTO();
+		LOGGER.info("----------开始执行Venus定时补救任务-----------");
+		Boolean lock = redisDistributedLock.lock("Job-"+getClass().getSimpleName(), TimeUnit.MINUTES, 1);
+		if (lock){
+			//=============== 定时清理附件 ===========================================
+			this.asyncTaskManagerService.venusRescueJob(CommonConstant.ZERO);
+			
+		} else {
+			LOGGER.info("{}未获取到锁", "Job-"+getClass().getSimpleName());
+		}
+		LOGGER.info("----------Venus定时补救任务执行结束-----------");
+		result.setResultCode("200");
+		result.setResultContent("执行Venus定时补救任务结束");
+		return result;
+	}
+
+}

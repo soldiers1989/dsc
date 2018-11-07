@@ -1,0 +1,97 @@
+package com.yixin.dsc.dto.own;
+
+public class RuleDetailOperateDTO extends RuleMaintainQueryDto {
+	
+	private static final long serialVersionUID = 1L;
+	/**
+	 * 资方id
+	 */
+	private String capitalId;
+	/**
+	 * 资方名称
+	 */
+	private String capitalName;
+	/**
+	 * 添加字段
+	 */
+	private String fields;
+	/**
+	 * 添加字段
+	 */
+	private String fieldCode;
+	
+	/**
+	 * 关系id
+	 */
+	private String relationId;
+	/**
+	 * 未匹配提示
+	 */
+	private String message;
+	/**
+	 * 规则公式定义
+	 */
+	private String ruleFormula;
+	/**
+	 * 详情是否启用
+	 */
+	private String detailEnable;
+	
+	public String getFieldCode() {
+		return fieldCode;
+	}
+	public void setFieldCode(String fieldCode) {
+		this.fieldCode = fieldCode;
+	}
+	public String getCapitalName() {
+		return capitalName;
+	}
+	public void setCapitalName(String capitalName) {
+		this.capitalName = capitalName;
+	}
+	public String getCapitalId() {
+		return capitalId;
+	}
+	public void setCapitalId(String capitalId) {
+		this.capitalId = capitalId;
+	}
+	public String getFields() {
+		return fields;
+	}
+	public void setFields(String fields) {
+		this.fields = fields;
+	}
+	public String getRelationId() {
+		return relationId;
+	}
+	public void setRelationId(String relationId) {
+		this.relationId = relationId;
+	}
+	public String getMessage() {
+		return message;
+	}
+	public void setMessage(String message) {
+		this.message = message;
+	}
+	public String getRuleFormula() {
+		return ruleFormula;
+	}
+	public void setRuleFormula(String ruleFormula) {
+		this.ruleFormula = ruleFormula;
+	}
+	public String getDetailEnable() {
+		return detailEnable;
+	}
+	public void setDetailEnable(String detailEnable) {
+		this.detailEnable = detailEnable;
+	}
+	
+	
+	
+	
+	
+	
+	
+	
+
+}

@@ -1,0 +1,57 @@
+package com.yixin.kepler.v1.service.capital.icbc;
+
+import com.yixin.kepler.v1.common.constants.IcbcConstant;
+import com.yixin.kepler.v1.datapackage.dto.icbc.IcbcApplyDTO;
+import org.apache.poi.ss.formula.functions.T;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
+
+import com.yixin.dsc.dto.DscComputerParamDto;
+import com.yixin.dsc.dto.DscComputerResultDto;
+import com.yixin.dsc.v1.service.common.CommonService;
+import com.yixin.kepler.common.enums.ConstantKeyEnum;
+import com.yixin.kepler.enity.ConstantConfig;
+
+/**
+ * @author YixinCapital -- chenjiacheng
+ *         2018年09月26日 14:27
+ **/
+@Service("ICBCCommonService")
+public class IcbcCommonServiceImpl implements CommonService {
+	private static final Logger LOGGER = LoggerFactory.getLogger(IcbcCommonServiceImpl.class);
+
+	@Override
+	public DscComputerResultDto keplerComputer(DscComputerParamDto paramDto) {
+		return null;
+	}
+
+	@Override
+	public String baffleCheckCommon(Object parameter, String financialCode) {
+		IcbcApplyDTO<T> icbcReqDTO;
+		try {
+			icbcReqDTO =  (IcbcApplyDTO<T>)parameter;
+		}catch (Exception Exception){
+			LOGGER.info("银行请求类型解析错误（不是银行的请求，直接返回）");
+			return "";
+		}
+		String txnId = icbcReqDTO.getComm().getTrxcode(); //交易服务码, 通过这个字段标识调用工行哪个接口，每个接口对应一个编码
+		//开关  0/请求银行  1不校验       为1时 返回直接通过
+		String flag = ConstantConfig.getStringValeByKey(ConstantKeyEnum.ICBC_INTERFACE_FLAG.getKey());
+		if("0".equals(flag)){
+			return "";
+		}
+		String jsonStr = "";
+		if(IcbcConstant.TRXCODE_10101.equals(txnId)||IcbcConstant.TRXCODE_10181.equals(txnId)){ //终审
+			jsonStr = ConstantConfig.getStringValeByKey(ConstantKeyEnum.ICBC_LAST_TRIAL_RESPONSE_JSON.getKey());
+
+		} else if(IcbcConstant.TRXCODE_40101.equals(txnId)||IcbcConstant.TRXCODE_40181.equals(txnId)){ //请款
+			jsonStr = ConstantConfig.getStringValeByKey(ConstantKeyEnum.ICBC_PAYMENT_RESPONSE_JSON.getKey());
+
+		} else if(IcbcConstant.TRXCODE_20101.equals(txnId)){//订单终止
+			jsonStr = ConstantConfig.getStringValeByKey(ConstantKeyEnum.ICBC_ORDER_CANCEL_RESPONSE_JSON.getKey());
+
+		}
+		return "0".equals(jsonStr)?"":jsonStr;
+	}
+}

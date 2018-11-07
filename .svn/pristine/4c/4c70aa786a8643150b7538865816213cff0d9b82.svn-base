@@ -1,0 +1,239 @@
+package com.yixin.kepler.core.domain.cmbc;
+
+import com.yixin.common.exception.BzException;
+import com.yixin.common.utils.DateUitls;
+import com.yixin.common.utils.InvokeResult;
+import com.yixin.kepler.common.RestTemplateUtil;
+import com.yixin.kepler.common.enums.AssetPhaseEnum;
+import com.yixin.kepler.common.enums.BankPhaseEnum;
+import com.yixin.kepler.common.enums.CMBCTransCodeEnum;
+import com.yixin.kepler.core.base.AbstractBaseDealDomain;
+import com.yixin.kepler.core.config.CMBCConfig;
+import com.yixin.kepler.core.constant.CommonConstant;
+import com.yixin.kepler.core.domain.cmbc.util.CMBCUtil;
+import com.yixin.kepler.dto.BaseMsgDTO;
+import com.yixin.kepler.dto.PretrialDTO;
+import com.yixin.kepler.dto.cmbc.CMBCPreTrialBodyDTO;
+import com.yixin.kepler.dto.cmbc.CMBCReceiveMsgDTO;
+import com.yixin.kepler.dto.cmbc.CMBCRequestDTO;
+import com.yixin.kepler.dto.cmbc.CMBCReserve1DTO;
+import com.yixin.kepler.enity.AssetBankTran;
+import com.yixin.kepler.enity.AssetFinanceInfo;
+import com.yixin.kepler.enity.AssetMainInfo;
+
+import net.sf.json.JSONObject;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import java.util.Date;
+
+import static com.yixin.kepler.core.constant.CommonConstant.SUCCESS;
+
+/**
+ * 请求银行预审策略实现类
+ *
+ * @author sukang
+ * @date 2018-06-09 15:48:21
+ */
+@Service("CMBCPreTrialRequestStrategy")
+public class PreTrialRequestStrategy extends AbstractBaseDealDomain<PretrialDTO, BaseMsgDTO> {
+    private static final Logger logger = LoggerFactory.getLogger(PreTrialRequestStrategy.class);
+ 
+    @Autowired
+    private CMBCConfig cmbcConfig;
+    
+
+    private ThreadLocal<CMBCRequestDTO> preTrialDTOThreadLocal = 
+    		new ThreadLocal<>();
+
+    private ThreadLocal<CMBCReceiveMsgDTO> receiveMsgDTOThreadLocal = 
+    		new ThreadLocal<>();
+
+    
+    @Override
+    protected void getData() throws BzException {
+        logger.info("[民生银行]预审数据组装开始");
+        
+        PretrialDTO pretrialDTO = this.inputDto.get();
+        CMBCRequestDTO cmbcRequestDTO = CMBCRequestDTO.getCMBCInstance(
+                CMBCTransCodeEnum.LAST_TRIAL);
+        // 1.设置请求头数据基
+        cmbcRequestDTO.setReqSeq(CMBCUtil.createReqSeq());
+        cmbcRequestDTO.setTransType("000010");
+        cmbcRequestDTO.setMerchantNum(cmbcConfig.getMerchantNum());
+        cmbcRequestDTO.setSystemCode(cmbcConfig.getSystemCode());
+        cmbcRequestDTO.setBody(getCMBCPreTrialDTO(pretrialDTO));
+        
+        this.preTrialDTOThreadLocal.set(cmbcRequestDTO);
+    }
+    
+  
+    @Override
+    protected void assembler() throws BzException {}
+    
+
+    @Override
+    protected InvokeResult<BaseMsgDTO> message() throws BzException {
+
+        PretrialDTO pretrialDTO = this.inputDto.get();
+
+        CMBCRequestDTO cmbcReqBaseDTO = this.preTrialDTOThreadLocal.get();
+
+        // 初始化资产信息主表
+        String tradeNo = this.receiveMsgDTOThreadLocal.get().getChnlTxNo();
+        
+        AssetMainInfo mainInfo = createAssertMainInfo(pretrialDTO,tradeNo);
+
+        //存储银行交易信息
+        AssetBankTran assetBankTran = new AssetBankTran();
+        assetBankTran.setAssetId(mainInfo.getId());
+        assetBankTran.setApplyNo(pretrialDTO.getApplyNo());
+        assetBankTran.setReqBody(JSONObject.fromObject(cmbcReqBaseDTO).toString());
+        assetBankTran.setAssetNo(tradeNo);
+        assetBankTran.setPhase(BankPhaseEnum.PRE_TRIAL.getPhase());
+        assetBankTran.setReqUrl(cmbcConfig.getOsbReqUrl());
+        assetBankTran.setTranNo(cmbcReqBaseDTO.getReqSeq());
+        assetBankTran.setSender(1);
+        assetBankTran.create();
+        
+        logger.info("\n发起预审请求报文为{}",assetBankTran.getReqBody());
+        String jsonResult = RestTemplateUtil.sendRequestV2(cmbcConfig.getOsbReqUrl(), 
+        		cmbcReqBaseDTO);
+        logger.info("\n预审返回报文为:{}",jsonResult);
+        
+        //更新银行交易信息
+        assetBankTran.setRepBody(jsonResult);
+        JSONObject bankResult = JSONObject.fromObject(jsonResult);
+   
+        if (bankResult != null && bankResult.containsKey("body")) {
+            JSONObject body = JSONObject.fromObject(bankResult.getString("body"));
+            JSONObject returnMsg = body.containsKey("returnMg") 
+            		? body.getJSONObject("returnMg") : null;
+            
+            if (returnMsg == null){
+            	assetBankTran.setApprovalCode(body.getString("respCode"));
+				assetBankTran.setApprovalDesc(body.getString("respStatus"));
+            	mainInfo.setPreState(2);
+	            mainInfo.setFirstState(2);
+				mainInfo.setDeleted(true);
+				mainInfo.update();
+            }else if ("E".equals(returnMsg.getString("rtnSts"))) {
+            	assetBankTran.setApprovalCode(returnMsg.getString("rtnSts"));
+				assetBankTran.setApprovalDesc(returnMsg.getString("rtnMsg"));
+				
+				mainInfo.setPreState(2);
+	            mainInfo.setFirstState(2);
+				mainInfo.setDeleted(true);
+				mainInfo.update();
+
+				//如果预审   返回四要素 不通过时候。
+                String rtnCode = returnMsg.getString("rtnCode");
+                if(CommonConstant.RCSC542.equals(rtnCode)){
+                    return new InvokeResult<>(new BaseMsgDTO(CommonConstant.NO_THROUGH,returnMsg.getString("rtnMsg")));
+                }
+
+
+			}else if ("S".equals(returnMsg.getString("rtnSts"))
+					&& "12".equals(body.getString("applySts"))) {
+				assetBankTran.setApprovalCode(returnMsg.getString("rtnCode"));
+				assetBankTran.setApprovalDesc(returnMsg.getString("rtnSts"));
+				assetBankTran.update();
+		      	   // 更新资产信息主表
+                mainInfo.setPreState(1);
+                mainInfo.setFirstState(1);
+                mainInfo.setUpdateTime(new Date());
+                mainInfo.setCmbcApplyNo(body.getString("applyNo"));
+                mainInfo.update();
+                return new InvokeResult<>(new BaseMsgDTO(SUCCESS, "预审申请成功")).success();
+			}
+        }else {
+        	mainInfo.setPreState(2);
+            mainInfo.setFirstState(2);
+			mainInfo.setDeleted(true);
+			mainInfo.update();
+		}
+        assetBankTran.update();
+		return new InvokeResult<>(new BaseMsgDTO(CommonConstant.FAILURE,
+				assetBankTran.getApprovalDesc()));
+    }
+
+
+	@Override
+    public InvokeResult<BaseMsgDTO> doIt(PretrialDTO pretrialDTO) {
+        return super.doIt(pretrialDTO);
+    }
+	
+	
+	
+	
+	private AssetMainInfo createAssertMainInfo(PretrialDTO pretrialDTO,
+			String tradeNo) {
+		
+		AssetFinanceInfo assetFinanceInfo = AssetFinanceInfo.get(AssetFinanceInfo.class, pretrialDTO.getCapitalId());
+		
+		AssetMainInfo mainInfo = new AssetMainInfo();
+        mainInfo.setApplyNo(pretrialDTO.getApplyNo()); // 申请编号
+        mainInfo.setAssetPhase(AssetPhaseEnum.PRE_TRIAL.getPhase());
+        mainInfo.setContractSignState(0);
+        mainInfo.setContractSignState(0);
+        mainInfo.setFirstState(0);
+        mainInfo.setLastState(0);
+        mainInfo.setPreState(0);
+        mainInfo.setPaymentState(0);
+        mainInfo.setAssetNo(tradeNo); // 生成唯一订单标识
+        mainInfo.setChannelCode(pretrialDTO.getChannelCode()); // 渠道编号
+        mainInfo.setChannelName(pretrialDTO.getChannelName()); // 渠道名称
+        mainInfo.setCompanyCode(pretrialDTO.getCompanyCode()); // 发起融资公司编号
+        mainInfo.setFinancialCode(assetFinanceInfo.getCode());
+        mainInfo.setFinancialId(assetFinanceInfo.getId());
+        mainInfo.create();
+        
+        return mainInfo;
+	}
+	
+	
+	
+	
+	
+	private Object getCMBCPreTrialDTO(PretrialDTO pretrialDTO) {
+	    	
+		//receiveMsg
+		CMBCReceiveMsgDTO cmbcReceiveMsgDTO = new CMBCReceiveMsgDTO();
+	    cmbcReceiveMsgDTO.setChnlTxNo(CMBCUtil.getTradeNo()); // 渠道流水号
+	    cmbcReceiveMsgDTO.setTxDt(DateUitls.dateToStr(new Date(), "yyyyMMdd")); // 交易日期
+	    cmbcReceiveMsgDTO.setTxTm(DateUitls.dateToStr(new Date(), "HHmmss")); // 交易时间
+	    this.receiveMsgDTOThreadLocal.set(cmbcReceiveMsgDTO);
+	    
+	    CMBCPreTrialBodyDTO cmbcPreTrialDTO = new CMBCPreTrialBodyDTO();
+	    cmbcPreTrialDTO.setReceiveMg(cmbcReceiveMsgDTO);
+	    cmbcPreTrialDTO.setReserve1(getPreTrialReserve(pretrialDTO));
+	
+	    // (3)设置基础字段
+	    cmbcPreTrialDTO.setCustName(pretrialDTO.getCustName()); // 客户姓名
+	    cmbcPreTrialDTO.setIdNo(pretrialDTO.getIdNo()); // 证件号码
+	    cmbcPreTrialDTO.setIdType("ZR01"); // 证件类型
+	    cmbcPreTrialDTO.setPhoneNo(pretrialDTO.getPhoneNo()); // 手机号
+	    cmbcPreTrialDTO.setTacNo(pretrialDTO.getTacNo()); // 卡号
+
+		return cmbcPreTrialDTO;
+	}
+
+
+
+	private String getPreTrialReserve(PretrialDTO pretrialDTO){
+		CMBCReserve1DTO reserve1DTO = new CMBCReserve1DTO();
+		// 流程标识
+		reserve1DTO.setMktProdType("A202008-PRE");
+		// 订单号
+		reserve1DTO.setAsqbh(pretrialDTO.getApplyNo());
+		reserve1DTO.setRentCompNo(pretrialDTO.getCompanyCode());
+		reserve1DTO.setTransTime(DateUitls.dateToStr(new Date(), "HHmmssSSS")); 
+		reserve1DTO.setAtbddm(pretrialDTO.getChannelCode());
+		reserve1DTO.setAsqdmmc(pretrialDTO.getChannelName());
+		reserve1DTO.setSpChannelName(pretrialDTO.getChannelName());
+		reserve1DTO.setSpChannelNo(pretrialDTO.getChannelCode());
+		return com.alibaba.fastjson.JSONObject.toJSONString((reserve1DTO));
+	}
+}

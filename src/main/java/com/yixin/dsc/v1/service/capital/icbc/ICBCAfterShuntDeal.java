@@ -1,0 +1,195 @@
+package com.yixin.dsc.v1.service.capital.icbc;
+
+import com.alibaba.fastjson.JSON;
+import com.alibaba.fastjson.JSONObject;
+import com.google.common.collect.Maps;
+import com.yixin.dsc.common.exception.BzException;
+import com.yixin.dsc.dto.DscCapitalDto;
+import com.yixin.dsc.entity.order.DscSalesApplyFinancing;
+import com.yixin.dsc.enumpackage.BankCostRateEnum;
+import com.yixin.dsc.util.PropertiesManager;
+import com.yixin.dsc.v1.service.capital.AfterShuntDeal;
+import com.yixin.kepler.common.RestTemplateUtil;
+import com.yixin.kepler.common.UrlConstant;
+import com.yixin.kepler.core.constant.CommonConstant;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
+
+import javax.annotation.Resource;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.util.HashMap;
+import java.util.Map;
+
+/**
+ * 工行预审处理实现类
+ * @author YixinCapital -- xjt
+ *		   2018年9月28日 下午2:53:40
+ */
+@Component("iCBCAfterShuntDeal")
+public class ICBCAfterShuntDeal extends AfterShuntDeal {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(ICBCAfterShuntDeal.class);
+
+    @Resource
+    private PropertiesManager propertiesManager;
+
+    @Override
+    public DscCapitalDto deal(DscCapitalDto dscCapitalDto) {
+        LOGGER.info("ICBC准入后处理开始:{}-{}", threadLocalApplyMain.get().getApplyNo(), dscCapitalDto.getCapitalCode());
+        try{
+            // 判断是否贴息，如果不贴息，则不校验贴息规则，预审通过
+            if (!StringUtils.hasText(threadLocalApplyCost.get().getAtxfs())){
+                return convertResult(dscCapitalDto, false, "缺失必须字段:贴息标识");
+            } else {
+                if (threadLocalApplyCost.get().getAtxfs().equals(CommonConstant.DiscountType.DISCOUNT_NO)){
+                    return convertResult(dscCapitalDto, true, "预审通过");
+                }
+            }
+            // 校验计算银行贴息所需属性是否齐全(期数、客户融资金额、担保费率、是否有担保费、结算利率)
+            if (!StringUtils.hasText(threadLocalApplyMain.get().getArzqx())) {
+                return convertResult(dscCapitalDto, false, "缺失必须字段:期数");
+            }
+            if (null == threadLocalApplyCost.get().getFrze() || BigDecimal.ZERO.equals(threadLocalApplyCost.get().getFrze())) {
+                return convertResult(dscCapitalDto, false, "缺失必须字段:客户融资额");
+            }
+            if (null == threadLocalApplyCost.get().getFjsll() || BigDecimal.ZERO.equals(threadLocalApplyCost.get().getFjsll())) {
+                return convertResult(dscCapitalDto, false, "缺失必须字段:结算利率");
+            }
+            if (null == threadLocalApplyCost.get().getFcstxze() || BigDecimal.ZERO.equals(threadLocalApplyCost.get().getFcstxze())) {
+                return convertResult(dscCapitalDto, false, "缺失必须字段:厂家贴息金额");
+            }
+            if (null == threadLocalApplyCost.get().getFdlstxze() || BigDecimal.ZERO.equals(threadLocalApplyCost.get().getFdlstxze())) {
+                return convertResult(dscCapitalDto, false, "缺失必须字段:经销商贴息金额");
+            }
+
+            // 获取配置的银行成本费率
+            BankCostRateEnum bankCostRateEnum = BankCostRateEnum.getByParams(CommonConstant.BankName.ICBC_BANK, threadLocalApplyCar.get().getAcllx(), threadLocalApplyMain.get().getArzqx());
+            LOGGER.info("获取到银行成本费率:{}", bankCostRateEnum);
+            if (null == bankCostRateEnum || !StringUtils.hasText(bankCostRateEnum.getBankCostRate())) {
+                return convertResult(dscCapitalDto, false, "无法获取银行成本费率");
+            }
+            // 校验是否存在费率
+            if ((null != threadLocalApplyCost.get().getFkhfl() && threadLocalApplyCost.get().getFkhfl().compareTo(BigDecimal.ZERO)>0)
+                    && (null != threadLocalApplyCost.get().getFjsfl() && threadLocalApplyCost.get().getFjsfl().compareTo(BigDecimal.ZERO)>0)) {
+                LOGGER.info("存在费率字段，内部计算贴息");
+                // 计算补息金额：贴息金额、客户费率、银行资金成本费率、客户融资额
+                calculateInterestRate(threadLocalApplyCost.get().getFcstxze().add(threadLocalApplyCost.get().getFdlstxze()), threadLocalApplyCost.get().getFkhfl(), new BigDecimal(bankCostRateEnum.getBankCostRate()), threadLocalApplyCost.get().getFrze());
+                // 1. 帖0息，可准入。（贴息金额 = 银行成本费+易鑫服务费）
+                // 2. 没有帖到银行的成本费，可准入。 （贴息金额<=易鑫服务费）
+                // 计算返回不抛异常即为可以准入
+                return convertResult(dscCapitalDto, true, "预审通过");
+            } else {
+                if (BigDecimal.ZERO.compareTo(threadLocalApplyCost.get().getFkhll()) == 0){
+                    LOGGER.info("客户利率为0，贴0息准入");
+                    return convertResult(dscCapitalDto, true, "预审通过");
+                }
+                // 调用结算接口进行费用计算
+                String url = propertiesManager.getSettleWebEnvironment() + UrlConstant.SettleSystemUrl.calculationICBCInterestAmt;
+                Map<String, Object> params = Maps.newHashMap();
+                // 期数
+                params.put("totalPeriod", threadLocalApplyMain.get().getArzqx());
+                // 客户融资额
+                params.put("custFinaceAmount", threadLocalApplyCost.get().getFrze());
+                // 银行成本费率
+                params.put("bankCostRate", new BigDecimal(bankCostRateEnum.getBankCostRate()).divide(new BigDecimal(100), 4, BigDecimal.ROUND_HALF_UP));
+                // 结算利率
+                params.put("settleInterestRate", threadLocalApplyCost.get().getFjsll().divide(new BigDecimal(100), 4, BigDecimal.ROUND_HALF_UP));
+                // 易鑫担保费(此处从融资项中获取)
+                Map<String, Object> financingParams = new HashMap<>();
+                financingParams.put("mainId", threadLocalApplyMain.get().getId());
+                financingParams.put("arzxmid", CommonConstant.FinanceType.F117);
+                DscSalesApplyFinancing financing = DscSalesApplyFinancing.findFirstByProperties(DscSalesApplyFinancing.class, financingParams);
+                if (null != financing && financing.getFkhrzje().compareTo(BigDecimal.ZERO) > 0){
+//                if (null != threadLocalApplyCost.get().getFyxdbf() && threadLocalApplyCost.get().getFyxdbf().compareTo(BigDecimal.ZERO) > 0){
+                    LOGGER.info("存在担保费，送入担保费率[{}]", threadLocalApplyCost.get().getFyxdbfl());
+                    // 是否有担保费
+                    params.put("isHavingGuarantee", "1");
+                    // 此处需要的是费率，从cost表获取
+                    params.put("guaranteeRate", threadLocalApplyCost.get().getFyxdbfl());
+                }
+                String respData = "";
+                try {
+                    LOGGER.info("请求结算系统ICBC利转费计算贴息金额接口,url={},params={}", url, JSON.toJSONString(params));
+                    respData = RestTemplateUtil.sendRequest(url, params, null);
+                    LOGGER.info("请求结算系统ICBC利转费计算贴息金额接口,url={},params={},返回报文:{}", url, JSON.toJSONString(params), respData);
+                } catch (Exception e) {
+                    LOGGER.error("请求结算系统ICBC利转费计算贴息金额接口异常，订单编号:{}", threadLocalApplyMain.get().getApplyNo(), e);
+                    return convertResult(dscCapitalDto, false, "试算贴息失败!");
+                }
+                if (org.apache.commons.lang3.StringUtils.isBlank(respData)) {
+                    LOGGER.error("请求结算系统ICBC利转费计算贴息金额接口，订单编号：{}，获返回值为空", threadLocalApplyMain.get().getApplyNo());
+                    return convertResult(dscCapitalDto, false, "试算贴息失败!");
+                }
+                JSONObject synJson = JSONObject.parseObject(respData);
+                if (!"true".equals(synJson.getString("success"))) {
+                    LOGGER.error("请求结算系统ICBC利转费计算贴息金额接口，申请编号：{},synJson.optString('success')为false", threadLocalApplyMain.get().getApplyNo());
+                    return convertResult(dscCapitalDto, false, "试算贴息失败!");
+                }
+                if (org.apache.commons.lang3.StringUtils.isBlank(synJson.getString("data")) || synJson.getJSONObject("data").isEmpty()) {
+                    LOGGER.error("请求结算系统ICBC利转费计算贴息金额接口，申请编号：{}，返回值synJson.optString('data')为null或者为空", threadLocalApplyMain.get().getApplyNo());
+                    return convertResult(dscCapitalDto, false, "试算贴息失败!");
+                }
+                JSONObject data = synJson.getJSONObject("data");
+                // 易鑫服务费
+                BigDecimal yxServiceAmt = new BigDecimal(data.getString("yxServiceAmount"));
+                // 银行手续费
+                BigDecimal bankServiceAmt = new BigDecimal(data.getString("bankServiceAmount"));
+                // 1. 帖0息，可准入。（贴息金额 = 银行成本费+易鑫服务费）
+                if (threadLocalApplyCost.get().getFcstxze().add(threadLocalApplyCost.get().getFdlstxze()).compareTo(yxServiceAmt.add(bankServiceAmt).setScale(2, RoundingMode.HALF_UP)) == 0) {
+                    return convertResult(dscCapitalDto, true, "预审通过");
+                }
+                // 2. 没有帖到银行的成本费，可准入。 （贴息金额<=易鑫服务费）
+                if (threadLocalApplyCost.get().getFcstxze().add(threadLocalApplyCost.get().getFdlstxze()).compareTo(yxServiceAmt.setScale(2, RoundingMode.HALF_UP)) <= 0) {
+                    return convertResult(dscCapitalDto, true, "预审通过");
+                }
+                LOGGER.info("贴息金额超过易鑫服务费,贴息规则不满足,不允许准入");
+                return convertResult(dscCapitalDto, false, "预审失败!");
+            }
+        } catch (BzException e) {
+            LOGGER.error("资方预审异常,{},{}", threadLocalApplyMain.get().getApplyNo(), e.getMessage());
+            dscCapitalDto.setPretrialResult(false); //发起预审失败
+            dscCapitalDto.setPretrialMsg("资方预审异常");
+            return dscCapitalDto;
+        } catch (Exception e) {
+            LOGGER.error("资方预审异常,{}", threadLocalApplyMain.get().getApplyNo(), e);
+            dscCapitalDto.setPretrialResult(false); //发起预审失败
+            dscCapitalDto.setPretrialMsg("资方预审异常");
+            return dscCapitalDto;
+        }
+    }
+
+    private DscCapitalDto convertResult(DscCapitalDto dscCapitalDto, boolean result, String msg){
+        dscCapitalDto.setPretrialResult(result); //发起预审失败
+        dscCapitalDto.setPretrialMsg(msg);
+        return dscCapitalDto;
+    }
+
+    /**
+     * 1、如贴息后客户费率（结算费率-厂商和经销商贴息费率）高于银行资金成本费率，则对银行不属于补息产品，返回。（适应准入2）
+     * 2、如贴息后客户费率（结算费率-厂商和经销商贴息费率）低于银行资金成本费率，且客户利率不为0(为0可能为贴0息产品，放在第三条校验)，不允许准入，抛异常
+     * 3、贴息金额>0,同时客户费率=0准入，银行补息金额为：客户融资额X银行成本费率。（贴0息）
+     *
+     * @param interestAmt               贴息金额
+     * @param customerFeeRate           客户费率
+     * @param bankCostRate              银行资金成本费率
+     * @param customerFinancingAmt      客户融资额
+     * @throws BzException              如果不允许准入工行的资产，则抛出异常
+     */
+    public static BigDecimal calculateInterestRate(BigDecimal interestAmt, BigDecimal customerFeeRate, BigDecimal bankCostRate, BigDecimal customerFinancingAmt) throws BzException{
+        if (customerFeeRate.compareTo(bankCostRate) >= 0){
+            LOGGER.info("非补息");
+            return BigDecimal.ZERO;
+        }
+        if (customerFeeRate.compareTo(BigDecimal.ZERO) > 0 && customerFeeRate.compareTo(bankCostRate) < 0){
+            throw new BzException("客户费率不为0且低于银行资金成本费率，不允许准入");
+        }
+        if (BigDecimal.ZERO.compareTo(interestAmt) < 0 && BigDecimal.ZERO.compareTo(customerFeeRate) == 0) {
+            return customerFinancingAmt.multiply(bankCostRate);
+        }
+        throw new BzException("异常情况，不允许准入");
+    }
+
+}

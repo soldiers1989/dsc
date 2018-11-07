@@ -1,0 +1,61 @@
+package com.yixin.kepler.v1.service.capital.icbc;
+
+import java.util.Arrays;
+import java.util.HashSet;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationContext;
+import org.springframework.scheduling.annotation.Async;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.Assert;
+
+import com.yixin.common.exception.BzException;
+import com.yixin.common.utils.JsonObjectUtils;
+import com.yixin.dsc.dto.DscFlowResultForAlixDto;
+import com.yixin.dsc.enumpackage.DscAlixLinkEnum;
+import com.yixin.dsc.util.MailMessageUtils;
+import com.yixin.kepler.common.enums.AssetStateEnum;
+import com.yixin.kepler.common.enums.CreditfrontResultEnum;
+import com.yixin.kepler.core.constant.CommonConstant;
+import com.yixin.kepler.core.listener.ResultNotifyEvent;
+import com.yixin.kepler.dto.BaseMsgDTO;
+import com.yixin.kepler.enity.AssetBankTran;
+import com.yixin.kepler.enity.AssetMainInfo;
+import com.yixin.kepler.enity.OsbFile;
+import com.yixin.kepler.enity.OsbFileLog;
+import com.yixin.kepler.v1.common.constants.BankRequestConstant;
+import com.yixin.kepler.v1.common.constants.IcbcConstant;
+import com.yixin.kepler.v1.common.core.compress.CompressHandle;
+import com.yixin.kepler.v1.datapackage.dto.BankRespResultHandleDTO;
+import com.yixin.kepler.v1.datapackage.dto.CompressHandleDTO;
+import com.yixin.kepler.v1.datapackage.dto.icbc.ICBCFirstTrialDataDTO;
+import com.yixin.kepler.v1.datapackage.dto.icbc.ICBCRequestFundsDTO;
+import com.yixin.kepler.v1.datapackage.dto.icbc.IcbcAckDataDTO;
+import com.yixin.kepler.v1.datapackage.dto.icbc.IcbcApplyDTO;
+import com.yixin.kepler.v1.datapackage.entity.AssetBankRequest;
+import com.yixin.kepler.v1.job.BankRequestJobScheduler;
+import com.yixin.kepler.v1.utils.JacksonUtils;
+
+/**
+ * 银行响应结果处理任务
+ * Package : com.yixin.kepler.v1.job
+ * 
+ * @author YixinCapital -- chen.lin
+ *		   2018年9月17日 下午5:31:21
+ *
+ */
+@Service("ICBCCompressHandle")
+public class ICBCCompressHandle implements CompressHandle {
+
+	
+	private static final Logger logger = LoggerFactory.getLogger(ICBCCompressHandle.class);
+
+	@Override
+	public BaseMsgDTO handle(CompressHandleDTO handleDTO) {
+		// TODO Auto-generated method stub
+		return null;
+	}
+}

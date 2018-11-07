@@ -1,0 +1,13 @@
+<component name="libraryTable">
+  <library name="Maven: com.yixin:nusc-rpc:1.0.1-SNAPSHOT">
+    <CLASSES>
+      <root url="jar://$MAVEN_REPOSITORY$/com/yixin/nusc-rpc/1.0.1-SNAPSHOT/nusc-rpc-1.0.1-20181022.080451-83.jar!/" />
+    </CLASSES>
+    <JAVADOC>
+      <root url="jar://$MAVEN_REPOSITORY$/com/yixin/nusc-rpc/1.0.1-SNAPSHOT/nusc-rpc-1.0.1-20181022.080451-83-javadoc.jar!/" />
+    </JAVADOC>
+    <SOURCES>
+      <root url="jar://$MAVEN_REPOSITORY$/com/yixin/nusc-rpc/1.0.1-SNAPSHOT/nusc-rpc-1.0.1-20181022.080451-83-sources.jar!/" />
+    </SOURCES>
+  </library>
+</component>

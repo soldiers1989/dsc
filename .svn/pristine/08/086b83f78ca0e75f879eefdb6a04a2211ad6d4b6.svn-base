@@ -1,0 +1,63 @@
+package com.yixin.dsc.enumpackage;
+
+
+import org.apache.commons.lang3.StringUtils;
+/**
+ * 日志操作使用枚举类
+ * @author Thinkpad
+ *
+ */
+public enum DscOperateEnum {
+
+	ADD("新增操作","add"),//
+	UPDATE("更新属性","update"),//规则名称
+	IS_ENABLE("更新为,启用/禁用","enable"), // 规则类型   准入规则、补充资料规则
+	DELETE("删除操作","delete"); //规则详情是否启用
+	
+	
+	private String name;
+
+	private String value;
+
+	DscOperateEnum(String name,String value) {
+		this.name = name;
+		this.value = value;
+	}
+
+	/**
+	 * 根据type获取对应的name
+	 * @param type 类型
+	 * @return 名称
+	 * @author YixinCapital --zongzhiping
+	 *             2018年10月30日11:39:34
+	 */
+	public static String getNameByType(String value) {
+		if (StringUtils.isBlank(value)) {
+			return null;
+		}
+		for (DscOperateEnum obj : DscOperateEnum.values()) {
+			if (value.equals(obj.getValue())) {
+				return obj.getName();
+			}
+		}
+		return null;
+	}
+
+	public String getName() {
+		return name;
+	}
+
+	public void setName(String name) {
+		this.name = name;
+	}
+
+	public String getValue() {
+		return value;
+	}
+
+	public void setValue(String value) {
+		this.value = value;
+	}
+
+	
+}

@@ -1,0 +1,95 @@
+package com.yixin.web.service.impl;
+
+import com.yixin.common.utils.InvokeResult;
+import com.yixin.common.utils.Page;
+import com.yixin.kepler.enity.AssetFinanceInfo;
+import com.yixin.kepler.enity.AssetProductFinancialRel;
+import com.yixin.web.service.ProductService;
+import com.yixin.web.service.base.BaseService;
+import net.sf.json.JSONObject;
+import org.apache.commons.lang.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * @author sukang
+ */
+@Service
+public class ProductServiceImpl extends BaseService implements ProductService{
+
+    private final Logger logger = LoggerFactory.getLogger(getClass());
+
+    @Override
+    public Boolean createFinancialProduct(AssetProductFinancialRel assetProductFinancialRel) {
+        assetProductFinancialRel.setDeleted(false);
+        assetProductFinancialRel.create();
+        String json = JSONObject.fromObject(assetProductFinancialRel).toString();
+        logger.info("创建产品成功{}", json);
+        return true;
+    }
+
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public Page<List<Map<String, Object>>> getFinancialProduct(String productCode, String financialCode, String enable, String currentPage) {
+
+        ArrayList<Object> parameters = new ArrayList<>(3);
+
+        StringBuilder hql = new StringBuilder(
+                "SELECT new map(apf.financialCode as financialCode,apf.id as id,"
+                        + " DATE_FORMAT(apf.createTime,'%Y-%m-%d %H:%i:%s') as createTime,"
+                        + " case apf.deleted when 'true' then 1 else 0 end as enable,"
+                        + " apf.productName as productName,apf.productCode as productCode, "
+                        + " apf.productVersion as productVersion )"
+                        + " FROM AssetProductFinancialRel apf WHERE 1=1");
+        int index = 0;
+        if (StringUtils.isNotBlank(productCode)) {
+            hql.append(" AND apf.productCode = ?".concat(String.valueOf(++index)));
+            parameters.add(productCode);
+        }
+        if (StringUtils.isNotBlank(financialCode)) {
+            hql.append(" AND apf.financialCode = ?".concat(String.valueOf(++index)));
+            parameters.add(financialCode);
+        }
+        if (StringUtils.isNotBlank(enable)) {
+            hql.append(" AND apf.deleted = ".concat("1".equals(enable) ? "false":"true"));
+        }
+        hql.append(" ORDER BY apf.createTime DESC");
+        String sql = hql.toString();
+        logger.debug("查询产品的sql为{}",sql);
+
+        return queryChannel.createJpqlQuery(sql)
+                .setParameters(parameters)
+                .setPage(dealPageIndex(currentPage),10)
+                .pagedList();
+    }
+
+
+    @Override
+    public InvokeResult<Boolean> updateFinancialProduct(AssetProductFinancialRel aRel) {
+        InvokeResult<Boolean> invokeResult = new InvokeResult<>();
+
+        AssetProductFinancialRel financialRel = AssetProductFinancialRel.get(AssetProductFinancialRel.class, aRel.getId());
+
+        if (financialRel == null) {
+            return invokeResult.failure("产品不存在");
+        }
+
+        if (StringUtils.isNotBlank(aRel.getProductCode())){
+            financialRel.setProductCode(aRel.getProductCode());
+        }
+
+        if (StringUtils.isNotBlank(aRel.getProductName())){
+            financialRel.setProductName(aRel.getProductName());
+        }
+
+        financialRel.setDeleted(aRel.isDeleted());
+        financialRel.update();
+        return invokeResult.success();
+    }
+}

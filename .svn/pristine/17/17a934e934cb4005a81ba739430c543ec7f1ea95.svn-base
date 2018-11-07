@@ -1,0 +1,321 @@
+package com.yixin.kepler.core.domain.webank;
+
+import java.math.BigDecimal;
+import java.util.Date;
+import java.util.List;
+
+import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationContext;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.scheduling.annotation.Async;
+import org.springframework.stereotype.Service;
+
+import com.alibaba.fastjson.JSON;
+import com.alibaba.fastjson.JSONObject;
+import com.yixin.common.utils.DateUitls;
+import com.yixin.common.utils.InvokeResult;
+import com.yixin.common.utils.JsonObjectUtils;
+import com.yixin.dsc.dto.DscFlowResultForAlixDto;
+import com.yixin.dsc.entity.order.DscSalesApplyCost;
+import com.yixin.dsc.entity.order.DscSalesApplyMain;
+import com.yixin.dsc.enumpackage.DscAlixLinkEnum;
+import com.yixin.kepler.common.enums.AssetStateEnum;
+import com.yixin.kepler.common.enums.BankPhaseEnum;
+import com.yixin.kepler.common.enums.CreditfrontResultEnum;
+import com.yixin.kepler.common.enums.WBCallbackEnum;
+import com.yixin.kepler.common.enums.WBTransCodeEnum;
+import com.yixin.kepler.core.constant.CommonConstant;
+import com.yixin.kepler.core.domain.AsyncTask;
+import com.yixin.kepler.core.listener.ResultNotifyEvent;
+import com.yixin.kepler.dto.BaseMsgDTO;
+import com.yixin.kepler.dto.OsbAttachmentDTO;
+import com.yixin.kepler.dto.webank.WBCallbackRepDTO;
+import com.yixin.kepler.dto.webank.WBFirstCallbackDTO;
+import com.yixin.kepler.dto.webank.WBMongoDTO;
+import com.yixin.kepler.enity.AssetBankTran;
+import com.yixin.kepler.enity.AssetMainInfo;
+
+/**
+ * 一审请求回调
+ * Package : com.yixin.kepler.core.domain.webank
+ * 
+ * @author YixinCapital -- wangwenlong
+ *		   2018年7月10日 下午2:19:17
+ *
+ */
+@Service
+public class FirstTrialCallback{
+
+	public static final Logger LOGGER = LoggerFactory.getLogger(FirstTrialCallback.class);
+	
+	@Autowired
+	private WBOrderCancelRequest orderCancelRequest;
+	
+	@Autowired
+	private LastTrialRequestStrategy lastTrialRequestStrategy;
+	
+	@Autowired
+	private ApplicationContext ioc;
+	
+	@Autowired
+	private MongoTemplate mongoTemplate;
+	
+	@Autowired
+	private AsyncTask asyncTask;
+	
+	public String execute(String weBankjson) {
+		LOGGER.info("微众一审回调接口入参：{}",weBankjson);
+		JSONObject returnJson = new  JSONObject();
+		returnJson.put("Signature", ""); //签名，OSB处理
+		returnJson.put("SeqNo", ""); //字段标示请求的唯一流水编号。 回传给银行
+		returnJson.put("transName", WBTransCodeEnum.FIRST_TRIAL_CALLBACK.getTransCode()); //接口标识
+		returnJson.put("Timestamp", String.valueOf(new Date().getTime())); //时间戳
+		if(StringUtils.isBlank(weBankjson)){
+			returnJson.put("Plain", JSON.toJSONString(new WBCallbackRepDTO(WBCallbackEnum.CODE_0103))); //报文解析失败
+			return returnJson.toJSONString();
+		}
+		JSONObject synJson = null;
+		JSONObject oriJson = null;
+		try {
+			oriJson = JSONObject.parseObject(weBankjson);
+			synJson = oriJson.getJSONObject("Plain");
+		} catch (Exception e) {
+			LOGGER.error("微众回调接口 keplerWeBank,回调报文错误，解报文异常",e);
+			returnJson.put("Plain", JSON.toJSONString(new WBCallbackRepDTO(WBCallbackEnum.CODE_0103))); //报文解析失败
+			return returnJson.toJSONString();
+		}
+		returnJson.put("SeqNo", oriJson.getString("SeqNo")); //字段标示请求的唯一流水编号。 回传给银行
+		
+		if(StringUtils.isBlank(synJson.getString("TXN_ID"))){
+			LOGGER.error("微众回调接口 keplerWeBank,TXN_ID为空,入参：{}",weBankjson);
+			returnJson.put("Plain", JSON.toJSONString(new WBCallbackRepDTO(WBCallbackEnum.CODE_0002))); //未满足接口输入要求
+			return returnJson.toJSONString();
+		}
+		if(StringUtils.isBlank(synJson.getString("MERCHANT_ID"))){
+			LOGGER.error("微众回调接口 keplerWeBank,MERCHANT_ID为空,入参：{}",weBankjson);
+			returnJson.put("Plain", JSON.toJSONString(new WBCallbackRepDTO(WBCallbackEnum.CODE_0002))); //未满足接口输入要求
+			return returnJson.toJSONString();
+		}
+		
+		WBFirstCallbackDTO calbackDto = (WBFirstCallbackDTO) JsonObjectUtils.jsonToObject(synJson.toString(), new WBFirstCallbackDTO());
+		String bizSeqNo = calbackDto.getBizSeqNo(); //业务流水号
+		String applyNo = calbackDto.getMerBizNo(); //平台流水   对应90031初审合作方上送的MER_BIZ_NO 即申请编号
+		LOGGER.info("微众一审回调接口 BizSeqNo:{}  预组装出参：{}",bizSeqNo,returnJson.toJSONString());
+		//获取初审请求的交互信息
+		/*AssetBankTran firstRequest = AssetBankTran.getByTranNo(bizSeqNo,CommonConstant.SenderType.YIXIN);
+		if(firstRequest == null){
+			LOGGER.info("微众一审回调接口,获取初审请求的交互信息为空,bizSeqNo:{}",bizSeqNo);
+			returnJson.put("Plain", JSON.toJSONString(new WBCallbackRepDTO(WBCallbackEnum.CODE_0002))); //未满足接口输入要求
+			return returnJson.toJSONString();
+		}*/
+		//获取初审请求的交互信息获取申请编号
+		//String applyNo = firstRequest.getApplyNo(); //申请编号
+		
+		LOGGER.info("微众一审回调接口 BizSeqNo:{}, applyNo:{}, 预组装出参：{}",bizSeqNo,applyNo,returnJson.toJSONString());
+		AssetMainInfo assetMainInfo = AssetMainInfo.getByApplyNo(applyNo);
+		if(AssetStateEnum.SUCCESS.getState().equals(assetMainInfo.getLastState())){ //二审请求成功
+			LOGGER.info("微众一审回调接口,AssetMainInfo 二审请求状态是成功，不在接受回调报文,bizSeqNo:{},applyNo:{}",bizSeqNo,applyNo);
+			returnJson.put("Plain", JSON.toJSONString(new WBCallbackRepDTO(WBCallbackEnum.CODE_0002))); //未满足接口输入要求
+			return returnJson.toJSONString();
+		}
+		if(assetMainInfo != null){
+			assetMainInfo.setAssetNo(calbackDto.getAppNo()); // 申请成功时有值，微众生成的申请编号
+			if(APS_STATUS.SUCC.equals(calbackDto.getApsStatus())){
+				assetMainInfo.setFirstState(AssetStateEnum.SUCCESS.getState()); //成功
+			} else {
+				assetMainInfo.setFirstState(AssetStateEnum.FAILD.getState()); //失败
+			}
+			assetMainInfo.update();
+			
+			this.updateMongoInfo(assetMainInfo);
+		}
+		//============= 保存 回调报文 =============================
+		this.saveAssetBankTran(calbackDto, weBankjson);
+		
+		if(APS_STATUS.SUCC.equals(calbackDto.getApsStatus())){ //审批准入
+			LOGGER.info("微众一审回调接口,审批准入-成功,订单编号:{},PsbParams:{}",applyNo,calbackDto.getPsbParams());
+			if(StringUtils.isNotBlank(calbackDto.getApsCode()) && calbackDto.getApsCode().contains(CommonConstant.WB_RESP_CODE)){
+				LOGGER.info("微众一审回调接口,审批准入-成功,{},{}",applyNo,calbackDto.getPsbParams());
+				successHandle(applyNo, calbackDto, assetMainInfo.getId());
+			} else if(StringUtils.isNotBlank(calbackDto.getApsCode()) && calbackDto.getApsCode().contains(APS_CODE.FORE_REFUSE)) {
+				LOGGER.info("微众一审回调接口,审批准入-申请人验四失败,{}",applyNo);
+				ioc.publishEvent(new ResultNotifyEvent(this.createForAliDto(applyNo, CreditfrontResultEnum.CHANGE)));
+				
+			} else if(StringUtils.isNotBlank(calbackDto.getApsCode()) && calbackDto.getApsCode().contains(APS_CODE.REPEAT)) {
+				LOGGER.info("微众一审回调接口,审批准入-受理失败-审批通过有效期内重复提交,{}",applyNo);
+				ioc.publishEvent(new ResultNotifyEvent(this.createForAliDto(applyNo, CreditfrontResultEnum.REFUSE)));
+			} else {
+				LOGGER.info("微众一审回调接口,审批准入-审批拒绝,{}",applyNo);
+				ioc.publishEvent(new ResultNotifyEvent(this.createForAliDto(applyNo, CreditfrontResultEnum.REFUSE)));
+			}
+			
+			this.applyAttachmentTar(applyNo);
+			
+		} else if (APS_STATUS.FAIL.equals(calbackDto.getApsStatus())){ //审批拒绝
+			LOGGER.info("微众一审回调接口,审批拒绝,{}",applyNo);
+			ioc.publishEvent(new ResultNotifyEvent(this.createForAliDto(applyNo, CreditfrontResultEnum.REFUSE)));
+		} else if (APS_STATUS.UNCHK.equals(calbackDto.getApsStatus())){ //申请人验四失败
+			LOGGER.info("微众一审回调接口,申请人验四失败,{}",applyNo);
+			//DscFlowResultForAlixDto alidto = DscFlowResultForAlixDto.createCreditfrontResult(applyNo, CreditfrontResultEnum.CHANGE, CreditfrontResultEnum.REJECT_BANK_UNCHK);
+			ioc.publishEvent(new ResultNotifyEvent(this.createForAliDto(applyNo, CreditfrontResultEnum.CHANGE)));
+		}
+		
+		returnJson.put("Plain", JSON.toJSONString(new WBCallbackRepDTO(WBCallbackEnum.CODE_0000))); //未满足接口输入要求
+		return returnJson.toJSONString();
+	}
+	
+	private void successHandle(String applyNo,WBFirstCallbackDTO calbackDto,String assetMainInfoId){
+		//============= 判断校验是否降额 ===========================
+		LOGGER.info("微众一审回调接口,比满足贷款需求 首付比例比最低首付比例还低/客户融资额比 ,calbackDto:{}",JSON.toJSONString(calbackDto));
+		String minPayRatio = calbackDto.getExtraInfo().getMinPayRatio(); //最低首付比例
+		String maxCreditLimit = calbackDto.getExtraInfo().getMaxCreditLimit(); //最高额度上限
+		LOGGER.info("微众一审回调接口,比满足贷款需求 首付比例比最低首付比例还低/客户融资额比 ,申请编号:{},minPayRatio:{},maxCreditLimit:{}",applyNo,minPayRatio,maxCreditLimit);
+		
+		DscSalesApplyMain mainInfo = DscSalesApplyMain.getByApplyNo(applyNo);
+		DscSalesApplyCost applyCost = DscSalesApplyCost.getByMainId(mainInfo.getId());
+		boolean isFaild = false; //
+		if(StringUtils.isNotBlank(minPayRatio)){  //最低首付比例不为空
+			BigDecimal minPayRatioDecimal = new BigDecimal(minPayRatio); //最低首付比例 -- 银行传来的是个小数
+			if(applyCost.getFsfbl().compareTo(minPayRatioDecimal.multiply(new BigDecimal("100"))) < 0){
+				LOGGER.info("微众一审回调接口,比较是否满足贷款需求 首付比例比最低首付比例还低 ,申请编号:{},客户首付比例Fsfbl:{},minPayRatioDecimal:{}",applyNo,applyCost.getFsfbl(),minPayRatioDecimal);
+				isFaild = true;
+			}
+		}
+		if(StringUtils.isNotBlank(maxCreditLimit)){  //最高额度上限
+			BigDecimal maxCreditLimitDecimal = new BigDecimal(maxCreditLimit); //最高额度上限
+			if(applyCost.getFrze().compareTo(maxCreditLimitDecimal) >0){  //客户融资额 比 最高额度上限 还高
+				LOGGER.info("微众一审回调接口,比较是否满足贷款需求 客户融资额 比 最高额度上限 还高 ,申请编号:{},客户融资额Frze:{},maxCreditLimitDecimal:{}",applyNo,applyCost.getFrze(),maxCreditLimitDecimal);	
+				isFaild = true;
+			}
+		}
+		if(isFaild){ //不满足贷款需求
+			LOGGER.info("微众一审回调接口,不满足贷款需求 申请编号:{}",applyNo);
+			BaseMsgDTO baseMsgDto = orderCancelRequest.lastRequestCancle(assetMainInfoId, mainInfo.getId(), calbackDto.getAppNo());
+			if(CommonConstant.SUCCESS.equals(baseMsgDto.getCode())){
+				LOGGER.info("微众一审回调接口,调用银行 90032 复审平台审批结果回传(4) 返回成功,订单编号:{},微众申请编号:{}",applyNo,calbackDto.getAppNo());
+				
+			} else {
+				LOGGER.error("微众一审回调接口,调用银行 90032 复审平台审批结果回传(4) 返回失败,订单编号:{},微众申请编号:{}",applyNo,calbackDto.getAppNo());
+			}
+			ioc.publishEvent(new ResultNotifyEvent(this.createForAliDto(applyNo, CreditfrontResultEnum.REFUSE)));
+		} else {
+			LOGGER.info("微众一审回调接口,通过调用复审/二审 ,{}",applyNo);
+			InvokeResult<BaseMsgDTO> iResult = lastTrialRequestStrategy.doIt(applyNo);
+			LOGGER.info("微众一审回调接口,通过调用复审/二审 ,{},返回结果：{}",applyNo,JSON.toJSONString(iResult));
+			if(iResult !=null && iResult.isSuccess()){
+				BaseMsgDTO msgDTO = (BaseMsgDTO) iResult.getData();
+				if(StringUtils.equals(msgDTO.getCode(),CommonConstant.SUCCESS)){
+					LOGGER.info("微众一审回调接口,通过调用复审/二审 ,{},返回成功",applyNo);
+					ioc.publishEvent(new ResultNotifyEvent(this.createForAliDto(applyNo, CreditfrontResultEnum.SUCCESS)));
+				} else if(StringUtils.equals(msgDTO.getCode(),CommonConstant.WeBankErrorCode.VIN)){ //复审驳回 返回码1034，VIN码格式错误
+					DscFlowResultForAlixDto alidto = DscFlowResultForAlixDto.createCreditfrontResult(applyNo, CreditfrontResultEnum.REJECT, CreditfrontResultEnum.REJECT_BANK_VIN);
+					LOGGER.info("微众一审回调接口,通过调用复审/二审,申请编号:{},发送 {}",applyNo,JSON.toJSONString(alidto));
+					ioc.publishEvent(new ResultNotifyEvent(alidto));
+				} else if(StringUtils.equals(msgDTO.getCode(),CommonConstant.WeBankErrorCode.MONEY)){ //复审驳回  返回码1036，开户拒绝-负债收入比不准入
+					DscFlowResultForAlixDto alidto = DscFlowResultForAlixDto.createCreditfrontResult(applyNo, CreditfrontResultEnum.REJECT, CreditfrontResultEnum.REJECT_BANK_MONEY);
+					LOGGER.info("微众一审回调接口,通过调用复审/二审,申请编号:{},发送 {}",applyNo,JSON.toJSONString(alidto));
+					ioc.publishEvent(new ResultNotifyEvent(alidto));
+				} else {
+					LOGGER.info("微众一审回调接口,通过调用复审/二审 ,{},返回失败",applyNo);
+					ioc.publishEvent(new ResultNotifyEvent(this.createForAliDto(applyNo, CreditfrontResultEnum.REFUSE)));
+				}
+			} else {
+				ioc.publishEvent(new ResultNotifyEvent(this.createForAliDto(applyNo, CreditfrontResultEnum.REFUSE)));
+			}
+		}
+	}
+	
+	@Async
+	public void applyAttachmentTar(String applyNo){
+		LOGGER.info("微众一审回调接口准入，异步打包开始。 订单编号:{}",applyNo);
+		OsbAttachmentDTO attachmentDTO = new OsbAttachmentDTO();
+		attachmentDTO.setBzId(applyNo);
+		attachmentDTO.setBzType(BankPhaseEnum.LAST_TRIAL.getPhase());
+		asyncTask.uploadAttachment(attachmentDTO);
+		LOGGER.info("微众一审回调接口准入，异步打包结束。 订单编号:{}",applyNo);
+	}
+	
+	private void saveAssetBankTran(WBFirstCallbackDTO calbackDto,String json){
+		LOGGER.info("微众一审回调，申请编号：{},保存 回调报文 ",calbackDto.getMerBizNo());
+		AssetBankTran callbackTran = new AssetBankTran();
+		callbackTran.setTranNo(calbackDto.getBizSeqNo()); //业务流水号  微众端流水号，可用于匹配申请结果异步回调通知
+		callbackTran.setReqBody(json);
+		callbackTran.setApplyNo(calbackDto.getMerBizNo());
+		callbackTran.setAssetId(calbackDto.getBizSeqNo());
+
+		callbackTran.setPhase(BankPhaseEnum.FIRST_TRIAL.getPhase());
+		callbackTran.setReqUrl(null);
+		callbackTran.setApiCode(WBTransCodeEnum.FIRST_TRIAL_CALLBACK.getTransCode()); //一审回调
+		callbackTran.setSender(CommonConstant.SenderType.BANK); 
+		callbackTran.setRepBody(null); //相应
+		callbackTran.setApprovalCode(calbackDto.getApsCode()); //错误码
+		callbackTran.setApprovalDesc(calbackDto.getApsDesc()); //错误描述
+		callbackTran.create();
+	}
+	
+	/**
+	 * 更新mongo中信息
+	 * @param assetMainInfo 
+	 * @author YixinCapital -- wangwenlong
+	 *	       2018年7月27日 下午12:04:06
+	 */
+	private void updateMongoInfo(AssetMainInfo assetMainInfo){
+		 try {
+			 Query query = new Query();
+			 query.addCriteria(Criteria.where("applyNo").is(assetMainInfo.getApplyNo()));
+			 List<WBMongoDTO> mongoDTOList = mongoTemplate.findAllAndRemove(query, WBMongoDTO.class);
+			 WBMongoDTO mongoDto = null;
+			 if(CollectionUtils.isEmpty(mongoDTOList)){
+				 mongoDto = new WBMongoDTO();
+			 } else {
+				 mongoDto = mongoDTOList.get(0);
+			 }
+			 mongoDto.setFirstState(assetMainInfo.getFirstState()); //一审结果
+			 mongoDto.setFirstSuccessTime(DateUitls.dateToStr(new Date(), "yyyy-MM-dd_HH:mm:SS")); //一审成功时间
+			 mongoDto.setSign(DateUitls.dateToStr(new Date(), "yyyy-MM-dd_HH:mm:SS")); //时间标识
+			 mongoDto.setApplyNo(assetMainInfo.getApplyNo()); //申请编号
+			 if(AssetStateEnum.SUCCESS.getState().equals(assetMainInfo.getFirstState())){ //成功
+				 mongoDto.setAppNo(assetMainInfo.getAssetNo()); //微众申请编号
+			 }
+			 
+			 LOGGER.info("微众一审回调更新mongo成功，向mongo中存放信息，申请编号：{},{}",assetMainInfo.getApplyNo(),JSON.toJSONString(mongoDto));
+			 //往mogo里存放一审的请求信息保存到MongoDB中，用户再次信审时，校验四要素信息
+			 this.mongoTemplate.save(mongoDto);
+		} catch (Exception e) {
+			LOGGER.error("微众一审成功，保存MongoDB信息异常，订单编号:{}",assetMainInfo.getApplyNo(), e);
+		}
+	}
+	
+	private DscFlowResultForAlixDto createForAliDto(String applyNo,CreditfrontResultEnum resultEnum) {
+		
+		DscFlowResultForAlixDto alixDto = new DscFlowResultForAlixDto();
+		alixDto.setApplyNo(applyNo);
+		alixDto.setCode(resultEnum.getCode());
+		alixDto.setLink(DscAlixLinkEnum.CREDITFRONT.getCode());
+		alixDto.setMessage(resultEnum.getMsg());
+		return alixDto;
+	}
+	
+	class APS_STATUS {
+		/** 审批准入 */
+		public static final String SUCC = "SUCC";
+		/** 审批拒绝 */
+		public static final String FAIL = "FAIL";
+		/** 申请人验四失败 */
+		public static final String UNCHK = "UNCHK";
+	}
+	
+	class APS_CODE {
+		/** 验四拒绝 */
+		public static final String FORE_REFUSE = "1021";
+		
+		/** 受理失败-审批通过有效期内重复提交 */
+		public static final String REPEAT = "1026";
+	}
+}

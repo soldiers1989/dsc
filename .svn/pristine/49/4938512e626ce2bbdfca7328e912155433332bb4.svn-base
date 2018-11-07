@@ -1,0 +1,371 @@
+package com.yixin.dsc.service.impl.flow;
+
+import java.math.BigDecimal;
+import java.util.Map;
+
+import javax.annotation.Resource;
+
+import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections.MapUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.time.DateUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.stereotype.Service;
+
+import com.alibaba.fastjson.JSON;
+import com.yixin.common.system.ioc.SpringContextUtil;
+import com.yixin.common.utils.InvokeResult;
+import com.yixin.dsc.common.DscContant;
+import com.yixin.dsc.common.exception.BzException;
+import com.yixin.dsc.dto.DscActionResultDTO;
+import com.yixin.dsc.dto.DscComputerParamDto;
+import com.yixin.dsc.dto.DscComputerResultDto;
+import com.yixin.dsc.dto.DscContractCancelDto;
+import com.yixin.dsc.dto.DscFlowResultForAlixDto;
+import com.yixin.dsc.dto.DscModifyRepayDTO;
+import com.yixin.dsc.dto.DscReverseFlowForAlixDto;
+import com.yixin.dsc.dto.DscSupplyDto;
+import com.yixin.dsc.entity.order.DscSalesApplyMain;
+import com.yixin.dsc.enumpackage.CancelResultEnum;
+import com.yixin.dsc.mq.QueuesSender;
+import com.yixin.dsc.service.async.AsyncTaskManagerService;
+import com.yixin.dsc.service.common.DscKeplerCommonService;
+import com.yixin.dsc.service.common.DscSettleCommonService;
+import com.yixin.dsc.service.flow.DscFlowService;
+import com.yixin.dsc.service.rule.engine.RuleService;
+import com.yixin.dsc.service.shunt.DscShuntService;
+import com.yixin.dsc.v1.datapackage.dto.notice.DscAsyncMessageDto;
+import com.yixin.dsc.v1.service.capital.yntrust.YTCommonService;
+import com.yixin.dsc.v1.service.common.CommonService;
+import com.yixin.kepler.common.enums.BankPhaseEnum;
+import com.yixin.kepler.core.constant.CommonConstant;
+import com.yixin.kepler.core.domain.CommonDomainUtil;
+import com.yixin.kepler.dto.BaseMsgDTO;
+import com.yixin.kepler.enity.AssetFinanceInfo;
+import com.yixin.kepler.enity.AssetMainInfo;
+import com.yixin.kepler.v1.common.core.bankReq.BankRequestDataHandle;
+import com.yixin.kepler.v1.service.capital.yntrust.PaymentRequestPrepose;
+
+/**
+ * 流程相关接口实现
+ * Package : com.yixin.dsc.service.impl.flow
+ * 
+ * @author YixinCapital -- wangwenlong
+ *		   2018年6月6日 下午5:27:36
+ *
+ */
+@Service("dscFlowService")
+public class DscFlowImpl implements DscFlowService {
+
+	private static final Logger LOGGER = LoggerFactory.getLogger(DscFlowImpl.class);
+	
+	@Autowired
+	private DscKeplerCommonService dscKeplerCommonService;
+	
+	@Resource(name = "asyncTaskManagerSpringImpl")
+	private AsyncTaskManagerService asyncTaskManagerService;
+	
+	@Autowired
+	private QueuesSender queuesSender;
+	
+	@Resource
+	private RuleService ruleService;
+	
+	@Resource
+	private DscShuntService dscShuntService;
+	
+	@Resource
+	private DscSettleCommonService dscSettleCommonService;
+
+	@Resource
+	private MongoTemplate mongoTemplate;
+
+	@Resource
+	private PaymentRequestPrepose ytPaymentRequestPrepose;
+	
+	@Resource
+    private YTCommonService commonService;
+
+	private final String SUFFIX = "CommonService";
+	
+	/**
+	 * 确认授权书签署状态接口 是否 完成
+	 * @param applyNo 订单编号
+	 * @return 
+	 * @author YixinCapital -- wangwenlong
+	 *	       2018年6月6日 下午5:28:36
+	 */
+	@Override
+	public Boolean isAuthorizationSucessByApplyNo(String applyNo) {
+		LOGGER.info("确认授权书签署状态 订单编号：{},type:{}",applyNo, DscContant.ApplyNoStatusType.AUTHORIZATION_SIGN);
+		return dscKeplerCommonService.confirmApplyNoStatus(applyNo, DscContant.ApplyNoStatusType.AUTHORIZATION_SIGN);
+	}
+
+	/**
+	 * 获取银行合同签署状态接口
+	 * @param applyNo 订单编号
+	 * @return 
+	 * @author YixinCapital -- wangwenlong
+	 *	       2018年6月6日 下午5:29:22
+	 */
+	@Override
+	public Boolean isSignContractByApplyNo(String applyNo) {
+		LOGGER.info("确认合同签署状态 订单编号：{},type:{}",applyNo, DscContant.ApplyNoStatusType.CONTRACT_SIGN);
+		return dscKeplerCommonService.confirmApplyNoStatus(applyNo, DscContant.ApplyNoStatusType.CONTRACT_SIGN);
+	}
+
+	
+	/**
+	 * 确认银行请款是否成功接口
+	 * @param applyNo 订单编号
+	 * @return 
+	 * @author YixinCapital -- wangwenlong
+	 *	       2018年6月6日 下午5:29:59
+	 */
+	@Override
+	public Boolean isRequestFundsByApplyNo(String applyNo) {
+		LOGGER.info("确认银行请款状态 订单编号：{},type:{}",applyNo, DscContant.ApplyNoStatusType.REQUEST_FUNDS);
+		return dscKeplerCommonService.confirmApplyNoStatus(applyNo, DscContant.ApplyNoStatusType.REQUEST_FUNDS);
+	}
+
+	/**
+	 * 确认订单信审是否成功
+	 * @param applyNo 订单编号
+	 * @return 
+	 * @author YixinCapital -- wangwenlong
+	 *	       2018年6月6日 下午5:29:59
+	 */
+	@Override
+	public Boolean isCreditfrontSuccessByApplyNo(String applyNo) {
+		LOGGER.info("确认订单信审请款状态 订单编号：{},type:{}",applyNo, DscContant.ApplyNoStatusType.CREDITFRONT);
+		return dscKeplerCommonService.confirmApplyNoStatus(applyNo, DscContant.ApplyNoStatusType.CREDITFRONT);
+	}
+
+	@Override
+	public InvokeResult<DscFlowResultForAlixDto> flowResultNoticeForAlix(DscFlowResultForAlixDto dscFlowResultForAlixDto) {
+		InvokeResult<DscFlowResultForAlixDto> result = new InvokeResult<>();
+		try {
+			dscFlowResultForAlixDto.setNeedSupply(true);
+			queuesSender.send(dscFlowResultForAlixDto);
+			//add by wangwenlong on 2018-09-04 记录信审/请款结果通知
+			asyncTaskManagerService.recordflowResultNotice(dscFlowResultForAlixDto);
+		}catch (BzException e){
+			LOGGER.error("资方审核结果反推异常{}",e.getMessage());
+			return result.failure("资方审核结果反推异常");
+		}
+		return result;
+	}
+
+	@Override
+	public InvokeResult<DscAsyncMessageDto> flowResultNoticeForAlix(DscAsyncMessageDto dscAsyncMessageDto) {
+		InvokeResult<DscAsyncMessageDto> result = new InvokeResult<>();
+		try {
+			queuesSender.send(dscAsyncMessageDto);
+		}catch (BzException e){
+			LOGGER.error("资方合同签署反推异常{}",e.getMessage());
+			return result.failure("资方合同签署反推异常");
+		}
+		return result;
+	}
+
+	/**
+	 * 借据试算
+	 *
+	 * @param paramDto 申请编号
+	 * @return 试算结果
+	 * @author YixinCapital -- chenjiacheng
+	 *              2018/7/6 9:42
+	 */
+	@Override
+	public DscComputerResultDto computerSchedules(DscComputerParamDto paramDto) {
+		//获取资方code路由到具体处理类
+		String financialCode = AssetMainInfo.getByApplyNo(paramDto.getApplyNo())
+				.getFinancialCode();
+		CommonService bean = SpringContextUtil.getBean(
+				financialCode.concat(SUFFIX), CommonService.class);
+		return bean.keplerComputer(paramDto);
+	}
+
+	/**
+	 * 阶段性校验
+	 * @param applyNo 订单编号
+	 * @param phaseEnum 阶段
+	 * @return 
+	 * @author YixinCapital -- wangwenlong
+	 *	       2018年9月6日 上午10:54:32
+	 */
+	@Override
+	public DscActionResultDTO phaseCheck(String applyNo, BankPhaseEnum phaseEnum) {
+		DscActionResultDTO result = new DscActionResultDTO();
+		DscSupplyDto dscSupply = null; //需要补充的信息
+		if(StringUtils.isBlank(applyNo) || phaseEnum == null){
+			return result;
+		}
+		AssetMainInfo mainInfo = AssetMainInfo.getByApplyNo(applyNo);
+		if(mainInfo == null){
+			return result;
+		}
+		Map<String, Object> sourceMap = dscShuntService.getOrderDataSource(applyNo);
+		//================== 字段项校验 ===================================
+		LOGGER.info("{}阶段字段项校验开始,applyNo{}", phaseEnum.getName(),applyNo);
+		dscSupply = this.ruleService.phaseCheck(mainInfo.getFinancialId(), phaseEnum,sourceMap);
+		LOGGER.info("{}阶段字段项校验结束,applyNo{}", phaseEnum.getName(),applyNo);
+		if(dscSupply == null){
+			dscSupply = new DscSupplyDto();
+		}
+		//==================== 附件校验 ==================================
+		LOGGER.info("{}阶段附件校验开始,applyNo{}", phaseEnum.getName(),applyNo);
+		InvokeResult<DscSupplyDto> checkAttachmentFile = CommonDomainUtil.checkAttachmentFile(applyNo, phaseEnum);
+		LOGGER.info("{}阶段附件校验结束,applyNo{},result={}", 
+				phaseEnum.getName(), applyNo, JSON.toJSONString(checkAttachmentFile));
+		
+		if (checkAttachmentFile.isHasErrors() == true && checkAttachmentFile.isSuccess() == false) {
+			DscSupplyDto fileSupplyDto = (DscSupplyDto)checkAttachmentFile.getData();
+			if(fileSupplyDto != null && CollectionUtils.isNotEmpty(fileSupplyDto.getAttList())){
+				dscSupply.setAttList(fileSupplyDto.getAttList()); //附件校验
+			}
+		}
+		
+		return result.initRejectCode(dscSupply);
+	}
+
+	/**
+	 * 合同取消
+	 * @param applyNo 订单编号
+	 * @return 
+	 * @author YixinCapital -- wangwenlong
+	 *	       2018年9月10日 下午5:11:41
+	 */
+	@Override
+	public DscContractCancelDto contractCancel(String applyNo) {
+		DscContractCancelDto cancelDto = new DscContractCancelDto();
+		
+		DscSalesApplyMain applyMain = DscSalesApplyMain.getByApplyNo(applyNo);
+		if(applyMain == null || StringUtils.isBlank(applyMain.getCapitalId())){
+			LOGGER.info("订单编号:{},合同取消接口，订单主信息不存在或者未准入资方，直接返回取消成功");
+			cancelDto.setCancelResult(CancelResultEnum.SUCCESS_REQUEST_BEFORE.getCode()); //已取消,请款前取消
+			cancelDto.setMessage(CancelResultEnum.SUCCESS_REQUEST_BEFORE.getDescribe()); //已取消,请款前取消
+			return cancelDto;
+		}
+		AssetFinanceInfo financeInfo = AssetFinanceInfo.get(AssetFinanceInfo.class, applyMain.getCapitalId());
+		if(financeInfo == null){
+			throw new BzException("未关联资方");
+		}
+		
+		String ctype = "1"; //取消
+		DscReverseFlowForAlixDto result = null;
+		try {
+			result = dscKeplerCommonService.keplerControl(applyNo,ctype);
+		} catch (BzException e) {
+			LOGGER.error("合同取消接口-请款前取消失败,applyNo:{},错误信息:{}",applyNo,e.getMessage());
+		} catch (Exception e) {
+			LOGGER.error("合同取消接口-请款前取消失败,applyNo{}",applyNo,e);
+		}
+		if(result == null){
+			throw new BzException("请款前取消失败");
+		}
+		
+		cancelDto = this.dscSettleCommonService.getCancelInfo(applyNo, financeInfo.getCode());
+		cancelDto.setBankInterest(BigDecimal.ZERO); //银行利息字段置为0
+		
+		if(CommonConstant.SUCCESS.equals(result.getCode())){ //取消成功
+			LOGGER.info("合同取消接口-请款前取消成功,订单编号：{}",applyNo);
+			cancelDto.setCancelResult(CancelResultEnum.SUCCESS_REQUEST_BEFORE.getCode()); //已取消,请款前取消
+			cancelDto.setMessage(CancelResultEnum.SUCCESS_REQUEST_BEFORE.getDescribe()); //已取消,请款前取消
+			//=========== 此处为了掉了合同取消接口之后再次调用 ==================================
+			if(CommonConstant.ONE.equals(cancelDto.getIsLoan())){ //1:放款成功
+				if(CommonConstant.ZERO.equals(cancelDto.getIsAllowed())){ //1:允许推车，0:不允许推车
+					cancelDto.setCancelResult(CancelResultEnum.FAILD_OTHER.getCode()); //不可取消,其他原因
+					cancelDto.setMessage("当前订单不支持退车"); //当前订单不支持退车
+					return cancelDto;
+				}
+				if(DateUtils.isSameDay(cancelDto.getFirstRepayDate(), cancelDto.getCurrentDate())
+						|| cancelDto.getCurrentDate().after(cancelDto.getFirstRepayDate())){
+					cancelDto.setCancelResult(CancelResultEnum.FAILD_OVER.getCode()); //不可取消,超过第一还款日
+					cancelDto.setMessage(CancelResultEnum.FAILD_OVER.getDescribe()); //不可取消,超过第一还款日
+					return cancelDto;
+				}
+				if(cancelDto.getBankInterest() == null){
+					cancelDto.setCancelResult(CancelResultEnum.FAILD_OTHER.getCode());
+					cancelDto.setMessage("不可取消,利息计算异常");
+				} else {
+					cancelDto.setCancelResult(CancelResultEnum.SUCCESS_AFTER_LOAN.getCode()); //请款后支付利息可取消,若取消请执行贷后逻辑
+					cancelDto.setMessage(CancelResultEnum.SUCCESS_AFTER_LOAN.getDescribe()); //请款后支付利息可取消,若取消请执行贷后逻辑
+				}
+				return cancelDto;
+			}
+			return cancelDto;
+		}  
+		if (CommonConstant.Message.CANCEL_FAILD_CREDITFRONT.equals(result.getMessage())){ //取消订单失败,该订单正在信审中
+			LOGGER.info("合同取消接口-取消订单失败,该订单正在信审中,订单编号：{}",applyNo);
+			cancelDto.setCancelResult(CancelResultEnum.FAILD_CREDITFRONT.getCode()); //不可取消，信审中
+			cancelDto.setMessage(CancelResultEnum.FAILD_CREDITFRONT.getDescribe()); //不可取消，信审中
+			return cancelDto;
+		}  
+		if (CommonConstant.Message.CANCEL_FAILD_REQUEST_ING.equals(result.getMessage())){ //取消订单失败,该订单正在请款中
+			LOGGER.info("合同取消接口-取消订单失败,该订单正在请款中,订单编号：{}",applyNo);
+			cancelDto.setCancelResult(CancelResultEnum.FAILD_REQUEST_FUNDS.getCode()); //不可取消,请款中
+			cancelDto.setMessage(CancelResultEnum.FAILD_REQUEST_FUNDS.getDescribe()); //不可取消,请款中
+			return cancelDto;
+		}  
+		if (CommonConstant.Message.CANCEL_FAILD_REQUEST_END.equals(result.getMessage())){ //取消订单失败,该订单已请款完成
+			LOGGER.info("合同取消接口-取消订单失败,该订单已请款完成,订单编号：{}",applyNo);
+			if(CommonConstant.ZERO.equals(cancelDto.getIsLoan())){ //0:未放款
+				cancelDto.setCancelResult(CancelResultEnum.FAILD_REQUEST_FUNDS.getCode()); //不可取消,请款中
+				cancelDto.setMessage(CancelResultEnum.FAILD_REQUEST_FUNDS.getDescribe()); //不可取消,请款中
+				return cancelDto;
+			}  
+			if(CommonConstant.ONE.equals(cancelDto.getIsLoan())){ //1:放款成功
+				if(CommonConstant.ZERO.equals(cancelDto.getIsAllowed())){ //1:允许推车，0:不允许推车
+					cancelDto.setCancelResult(CancelResultEnum.FAILD_OTHER.getCode()); //不可取消,其他原因
+					cancelDto.setMessage("当前订单不支持退车"); //当前订单不支持退车
+					return cancelDto;
+				}
+				if(DateUtils.isSameDay(cancelDto.getFirstRepayDate(), cancelDto.getCurrentDate())
+						|| cancelDto.getCurrentDate().after(cancelDto.getFirstRepayDate())){
+					cancelDto.setCancelResult(CancelResultEnum.FAILD_OVER.getCode()); //不可取消,超过第一还款日
+					cancelDto.setMessage(CancelResultEnum.FAILD_OVER.getDescribe()); //不可取消,超过第一还款日
+					return cancelDto;
+				}
+				if(cancelDto.getBankInterest() == null){
+					cancelDto.setCancelResult(CancelResultEnum.FAILD_OTHER.getCode());
+					cancelDto.setMessage("不可取消,利息计算异常");
+				} else {
+					cancelDto.setCancelResult(CancelResultEnum.SUCCESS_AFTER_LOAN.getCode()); //请款后支付利息可取消,若取消请执行贷后逻辑
+					cancelDto.setMessage(CancelResultEnum.SUCCESS_AFTER_LOAN.getDescribe()); //请款后支付利息可取消,若取消请执行贷后逻辑
+				}
+				return cancelDto;
+			}
+		}
+		cancelDto.setCancelResult(CancelResultEnum.FAILD_OTHER.getCode());
+		cancelDto.setMessage(CancelResultEnum.FAILD_OTHER.getDescribe());
+		return cancelDto;
+	}
+
+
+	@Override
+	public BaseMsgDTO modifyRepay(DscModifyRepayDTO dscModifyRepayDTO) {
+		DscSalesApplyMain main = DscSalesApplyMain.getByApplyNo(dscModifyRepayDTO.getApplyNo());
+		if (main == null) {
+			throw new com.yixin.common.exception.BzException("该订单不存在");
+		}
+		AssetMainInfo mainInfo = AssetMainInfo.getByApplyNo(dscModifyRepayDTO.getApplyNo());
+		if(mainInfo == null){
+			throw new com.yixin.common.exception.BzException("资方信息不存在");
+		}
+		Map<String,String> bankMap = commonService.parseBankCode(dscModifyRepayDTO.getBankCode());
+		if(MapUtils.isEmpty(bankMap)){
+			throw new com.yixin.common.exception.BzException("扣款银行码值非法");
+		}
+		//保存信息
+		main.setBankCode(dscModifyRepayDTO.getBankCode());
+		main.setAhkrjjkzh(dscModifyRepayDTO.getBankAccount());
+		main.update();
+		// 路由到具体的实现
+		BankRequestDataHandle bean = SpringContextUtil.getBean(mainInfo.getFinancialCode().concat("RequestDataHandle"), BankRequestDataHandle.class);
+		return bean.modifyRepayInfo(mainInfo);
+	}
+}

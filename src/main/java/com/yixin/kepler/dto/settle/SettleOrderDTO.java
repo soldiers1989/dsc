@@ -1,0 +1,724 @@
+package com.yixin.kepler.dto.settle;
+
+import java.io.Serializable;
+import java.math.BigDecimal;
+import java.util.List;
+
+public class SettleOrderDTO implements Serializable {
+
+    /**
+     *
+     */
+    private static final long serialVersionUID = 1L;
+
+    /**
+     * 订单编号
+     */
+    private String applyNo;
+    /**
+     * 借据编号
+     */
+    private List<String> lncfnos;
+
+    /**
+     * 资方id
+     */
+    private String stakeHolderId;
+
+    /**
+     * 资金方  结算（赵仙保）通知字段发生变化
+     */
+    private String stakeHolderCode;
+    /**
+     * 还款卡号
+     */
+    private String repayCardNumber;
+    /**
+     * 客户名称
+     */
+    private String custName;
+    /**
+     * 证件类型
+     */
+    private String certType;
+    /**
+     * 证件号码
+     */
+    private String certNumber;
+    /**
+     * 还款方式
+     */
+    private String repayMethod;
+
+    /**
+     * 提前还款限制期数
+     */
+    private Integer earlyRepayLimitPeriod;
+
+    /**
+     * 提前还款最小间隔天数
+     */
+    private Integer earlyRepayMinDay;
+    /**
+     * 逾期宽限期
+     */
+    private Integer gracePeriod;
+
+    /**
+     * 合同生效日期
+     */
+    private String contractEffectiveDate;
+    /**
+     * 订单状态
+     */
+    private String status;
+
+    /**
+     * 是否贴息产品
+     */
+    private String isDiscount;
+    /**
+     * 是否加融产品
+     */
+    private String isAddFinance;
+    /**
+     * 融资期限
+     */
+    private Integer financeMaturity;
+    /**
+     * 融资金额
+     */
+    private BigDecimal financeAmount;
+    /**
+     * 银行请款金额
+     */
+    private BigDecimal bankLoanAmount;
+    /**
+     * 银行放款日期
+     */
+    private String bankLoanDate;
+    /**
+     * Alix放款金额
+     */
+    private BigDecimal alixLoanAmount;
+    /**
+     * Alix放款日期
+     */
+    private String alixLoanDate;
+    /**
+     * 提前还款违约金收取比例
+     */
+    private String earlyRepayPenaltyProp;
+    /**
+     * 罚息比率类型
+     */
+    private String penaltyRateType;
+    /**
+     * 罚息率
+     */
+    private String penaltyRate;
+    /**
+     * 银行资金成本利率
+     */
+    private String bankCostInterestRate;
+    /**
+     * 银行资金成本费率
+     */
+    private String bankCostRate;
+    /**
+     * 结算利率
+     */
+    private String settleInterestRate;
+    /**
+     * 结算费率
+     */
+    private String settleRate;
+    /**
+     * 客户利率
+     */
+    private String custInterestRate;
+    /**
+     * 客户费率
+     */
+    private String custRate;
+    /**
+     * 融资项目集合
+     */
+    private List<SettleFinanceProjectDTO> financeProjectDTOs;
+
+    //新增字段--微众
+    /**
+     * 平台id
+     */
+    private String merchantId;
+
+    /**
+     * 操作员号
+     */
+    private String opId;
+
+    /**
+     * 渠道
+     */
+    private String channel;
+
+
+    /**
+     * 产品结构编号
+     */
+    private String psCode;
+
+    /**
+     * 车辆id
+     */
+    private String carId;
+
+    /**
+     * 车商id
+     */
+    private String vehicleId;
+
+    /**
+     * 车商id
+     */
+    private String dealerId;
+
+
+    /**
+     * 公司主体
+     */
+    private String companyBodyCode;
+
+    /**
+     * 公司主体名称
+     */
+    private String companyBodyName;
+
+
+    /**
+     * 总贴息金额
+     */
+    private BigDecimal totalDiscountAmount;
+
+    /**
+     * 是否经销商贴息产品
+     */
+    private String isDistributorDiscount;
+    /**
+     * 是否厂商贴息产品
+     */
+    private String isFirmDiscount;
+
+    /**
+     * 厂商贴息金额
+     */
+    private BigDecimal firmDiscountAmount;
+    /**
+     * 经销商贴息金额
+     */
+    private BigDecimal distributorDiscountAmount;
+
+    /**
+     * 车架号
+     */
+    private String vinNo;
+
+
+    /**
+     * 微众订单号
+     */
+    private String bankOrderNo;
+
+
+    /**
+     * 还款计划表
+     */
+    private List<PlanDTO> planDTOs;
+
+    /**
+     * 银行产品编码
+     */
+    private String bankProductCode;
+
+    /**
+     * venus订单号
+     */
+    private String venuApplyNo;
+    /**
+     * 补息标识 0-未贴息给银行，1-贴息给银行
+     */
+    private String whetherDiscount;
+
+    /**
+     * 实际补息金额
+     */
+    private BigDecimal discountActualAmount;
+
+
+    /**
+     * 产品编码
+     */
+    private String productCode;
+
+    /**
+     * 产品名称
+     */
+    private String productName;
+
+    /**
+     * 对客利率
+     */
+    private BigDecimal toCustInterestRate;
+
+
+    public String getProductCode() {
+        return productCode;
+    }
+
+    public void setProductCode(String productCode) {
+        this.productCode = productCode;
+    }
+
+    public String getProductName() {
+        return productName;
+    }
+
+    public void setProductName(String productName) {
+        this.productName = productName;
+    }
+
+    public String getVinNo() {
+        return vinNo;
+    }
+
+    public void setVinNo(String vinNo) {
+        this.vinNo = vinNo;
+    }
+
+    public String getBankOrderNo() {
+        return bankOrderNo;
+    }
+
+    public void setBankOrderNo(String bankOrderNo) {
+        this.bankOrderNo = bankOrderNo;
+    }
+
+    public String getMerchantId() {
+        return merchantId;
+    }
+
+    public void setMerchantId(String merchantId) {
+        this.merchantId = merchantId;
+    }
+
+    public String getOpId() {
+        return opId;
+    }
+
+    public void setOpId(String opId) {
+        this.opId = opId;
+    }
+
+    public String getChannel() {
+        return channel;
+    }
+
+    public void setChannel(String channel) {
+        this.channel = channel;
+    }
+
+
+    public String getPsCode() {
+        return psCode;
+    }
+
+    public void setPsCode(String psCode) {
+        this.psCode = psCode;
+    }
+
+    public String getCarId() {
+        return carId;
+    }
+
+    public void setCarId(String carId) {
+        this.carId = carId;
+    }
+
+    public String getVehicleId() {
+        return vehicleId;
+    }
+
+    public void setVehicleId(String vehicleId) {
+        this.vehicleId = vehicleId;
+    }
+
+    public String getDealerId() {
+        return dealerId;
+    }
+
+    public void setDealerId(String dealerId) {
+        this.dealerId = dealerId;
+    }
+
+
+    public String getApplyNo() {
+        return applyNo;
+    }
+
+    public void setApplyNo(String applyNo) {
+        this.applyNo = applyNo;
+    }
+
+    public List<String> getLncfnos() {
+        return lncfnos;
+    }
+
+    public void setLncfnos(List<String> lncfnos) {
+        this.lncfnos = lncfnos;
+    }
+
+    public String getStakeHolderCode() {
+        return stakeHolderCode;
+    }
+
+    public void setStakeHolderCode(String stakeHolderCode) {
+        this.stakeHolderCode = stakeHolderCode;
+    }
+
+    public String getRepayCardNumber() {
+        return repayCardNumber;
+    }
+
+    public void setRepayCardNumber(String repayCardNumber) {
+        this.repayCardNumber = repayCardNumber;
+    }
+
+    public String getRepayMethod() {
+        return repayMethod;
+    }
+
+    public void setRepayMethod(String repayMethod) {
+        this.repayMethod = repayMethod;
+    }
+
+    public String getContractEffectiveDate() {
+        return contractEffectiveDate;
+    }
+
+    public void setContractEffectiveDate(String contractEffectiveDate) {
+        this.contractEffectiveDate = contractEffectiveDate;
+    }
+
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
+    }
+
+    public String getIsDiscount() {
+        return isDiscount;
+    }
+
+    public void setIsDiscount(String isDiscount) {
+        this.isDiscount = isDiscount;
+    }
+
+    public String getIsAddFinance() {
+        return isAddFinance;
+    }
+
+    public void setIsAddFinance(String isAddFinance) {
+        this.isAddFinance = isAddFinance;
+    }
+
+    public Integer getFinanceMaturity() {
+        return financeMaturity;
+    }
+
+    public void setFinanceMaturity(Integer financeMaturity) {
+        this.financeMaturity = financeMaturity;
+    }
+
+    public BigDecimal getFinanceAmount() {
+        return financeAmount;
+    }
+
+    public void setFinanceAmount(BigDecimal financeAmount) {
+        this.financeAmount = financeAmount;
+    }
+
+    public BigDecimal getBankLoanAmount() {
+        return bankLoanAmount;
+    }
+
+    public void setBankLoanAmount(BigDecimal bankLoanAmount) {
+        this.bankLoanAmount = bankLoanAmount;
+    }
+
+    public BigDecimal getAlixLoanAmount() {
+        return alixLoanAmount;
+    }
+
+    public void setAlixLoanAmount(BigDecimal alixLoanAmount) {
+        this.alixLoanAmount = alixLoanAmount;
+    }
+
+    public String getPenaltyRateType() {
+        return penaltyRateType;
+    }
+
+    public void setPenaltyRateType(String penaltyRateType) {
+        this.penaltyRateType = penaltyRateType;
+    }
+
+    public String getBankLoanDate() {
+        return bankLoanDate;
+    }
+
+    public void setBankLoanDate(String bankLoanDate) {
+        this.bankLoanDate = bankLoanDate;
+    }
+
+    public String getAlixLoanDate() {
+        return alixLoanDate;
+    }
+
+    public void setAlixLoanDate(String alixLoanDate) {
+        this.alixLoanDate = alixLoanDate;
+    }
+
+    public String getPenaltyRate() {
+        return penaltyRate;
+    }
+
+    public void setPenaltyRate(String penaltyRate) {
+        this.penaltyRate = penaltyRate;
+    }
+
+    public List<SettleFinanceProjectDTO> getFinanceProjectDTOs() {
+        return financeProjectDTOs;
+    }
+
+    public void setFinanceProjectDTOs(List<SettleFinanceProjectDTO> financeProjectDTOs) {
+        this.financeProjectDTOs = financeProjectDTOs;
+    }
+
+    public String getCustName() {
+        return custName;
+    }
+
+    public void setCustName(String custName) {
+        this.custName = custName;
+    }
+
+    public String getCertType() {
+        return certType;
+    }
+
+    public void setCertType(String certType) {
+        this.certType = certType;
+    }
+
+    public String getCertNumber() {
+        return certNumber;
+    }
+
+    public void setCertNumber(String certNumber) {
+        this.certNumber = certNumber;
+    }
+
+    public Integer getEarlyRepayLimitPeriod() {
+        return earlyRepayLimitPeriod;
+    }
+
+    public void setEarlyRepayLimitPeriod(Integer earlyRepayLimitPeriod) {
+        this.earlyRepayLimitPeriod = earlyRepayLimitPeriod;
+    }
+
+    public Integer getEarlyRepayMinDay() {
+        return earlyRepayMinDay;
+    }
+
+    public void setEarlyRepayMinDay(Integer earlyRepayMinDay) {
+        this.earlyRepayMinDay = earlyRepayMinDay;
+    }
+
+    public Integer getGracePeriod() {
+        return gracePeriod;
+    }
+
+    public void setGracePeriod(Integer gracePeriod) {
+        this.gracePeriod = gracePeriod;
+    }
+
+    public String getEarlyRepayPenaltyProp() {
+        return earlyRepayPenaltyProp;
+    }
+
+    public void setEarlyRepayPenaltyProp(String earlyRepayPenaltyProp) {
+        this.earlyRepayPenaltyProp = earlyRepayPenaltyProp;
+    }
+
+    public String getBankCostInterestRate() {
+        return bankCostInterestRate;
+    }
+
+    public void setBankCostInterestRate(String bankCostInterestRate) {
+        this.bankCostInterestRate = bankCostInterestRate;
+    }
+
+    public String getBankCostRate() {
+        return bankCostRate;
+    }
+
+    public void setBankCostRate(String bankCostRate) {
+        this.bankCostRate = bankCostRate;
+    }
+
+    public String getSettleInterestRate() {
+        return settleInterestRate;
+    }
+
+    public void setSettleInterestRate(String settleInterestRate) {
+        this.settleInterestRate = settleInterestRate;
+    }
+
+    public String getSettleRate() {
+        return settleRate;
+    }
+
+    public void setSettleRate(String settleRate) {
+        this.settleRate = settleRate;
+    }
+
+    public String getCustInterestRate() {
+        return custInterestRate;
+    }
+
+    public void setCustInterestRate(String custInterestRate) {
+        this.custInterestRate = custInterestRate;
+    }
+
+    public String getCustRate() {
+        return custRate;
+    }
+
+    public void setCustRate(String custRate) {
+        this.custRate = custRate;
+    }
+
+    public String getCompanyBodyCode() {
+        return companyBodyCode;
+    }
+
+    public void setCompanyBodyCode(String companyBodyCode) {
+        this.companyBodyCode = companyBodyCode;
+    }
+
+    public String getCompanyBodyName() {
+        return companyBodyName;
+    }
+
+    public void setCompanyBodyName(String companyBodyName) {
+        this.companyBodyName = companyBodyName;
+    }
+
+    public String getStakeHolderId() {
+        return stakeHolderId;
+    }
+
+    public void setStakeHolderId(String stakeHolderId) {
+        this.stakeHolderId = stakeHolderId;
+    }
+
+    public BigDecimal getTotalDiscountAmount() {
+        return totalDiscountAmount;
+    }
+
+    public void setTotalDiscountAmount(BigDecimal totalDiscountAmount) {
+        this.totalDiscountAmount = totalDiscountAmount;
+    }
+
+    public String getIsDistributorDiscount() {
+        return isDistributorDiscount;
+    }
+
+    public void setIsDistributorDiscount(String isDistributorDiscount) {
+        this.isDistributorDiscount = isDistributorDiscount;
+    }
+
+    public String getIsFirmDiscount() {
+        return isFirmDiscount;
+    }
+
+    public void setIsFirmDiscount(String isFirmDiscount) {
+        this.isFirmDiscount = isFirmDiscount;
+    }
+
+    public BigDecimal getFirmDiscountAmount() {
+        return firmDiscountAmount;
+    }
+
+    public void setFirmDiscountAmount(BigDecimal firmDiscountAmount) {
+        this.firmDiscountAmount = firmDiscountAmount;
+    }
+
+    public BigDecimal getDistributorDiscountAmount() {
+        return distributorDiscountAmount;
+    }
+
+    public void setDistributorDiscountAmount(BigDecimal distributorDiscountAmount) {
+        this.distributorDiscountAmount = distributorDiscountAmount;
+    }
+
+
+    public List<PlanDTO> getPlanDTOs() {
+        return planDTOs;
+    }
+
+    public void setPlanDTOs(List<PlanDTO> planDTOs) {
+        this.planDTOs = planDTOs;
+    }
+
+    public String getBankProductCode() {
+        return bankProductCode;
+    }
+
+    public void setBankProductCode(String bankProductCode) {
+        this.bankProductCode = bankProductCode;
+    }
+
+    public String getVenuApplyNo() {
+        return venuApplyNo;
+    }
+
+    public void setVenuApplyNo(String venuApplyNo) {
+        this.venuApplyNo = venuApplyNo;
+    }
+
+    public String getWhetherDiscount() {
+        return whetherDiscount;
+    }
+
+    public void setWhetherDiscount(String whetherDiscount) {
+        this.whetherDiscount = whetherDiscount;
+    }
+
+    public BigDecimal getDiscountActualAmount() {
+        return discountActualAmount;
+    }
+
+    public void setDiscountActualAmount(BigDecimal discountActualAmount) {
+        this.discountActualAmount = discountActualAmount;
+    }
+
+    public BigDecimal getToCustInterestRate() {
+        return toCustInterestRate;
+    }
+
+    public void setToCustInterestRate(BigDecimal toCustInterestRate) {
+        this.toCustInterestRate = toCustInterestRate;
+    }
+}

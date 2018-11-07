@@ -1,0 +1,364 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>com.yixin</groupId>
+  <artifactId>dsc</artifactId>
+  <version>0.0.1-SNAPSHOT</version>
+  <packaging>war</packaging>
+
+  <name>dsc</name>
+  
+  
+  <!-- Inherit defaults from Spring Boot -->
+  <parent>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-parent</artifactId>
+    <version>2.0.1.RELEASE</version>
+  </parent>
+
+
+  <properties>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+    <common.service.version>0.1.3-SNAPSHOT</common.service.version>
+	<common.utils.version>0.1.3-SNAPSHOT</common.utils.version>
+	<shiro.version>1.2.4</shiro.version>
+  </properties>
+
+
+  <profiles>
+    <profile>
+      <id>dev</id>
+      <activation>
+          <activeByDefault>false</activeByDefault>
+      </activation>
+      <properties>
+          <profiles.active>dev</profiles.active>
+          <usc.version>1.0.1-SNAPSHOT</usc.version>
+          <!--<db.url>jdbc:mysql://localhost:3306/test</db.url>-->
+      </properties>
+    </profile>
+    <profile>
+      <id>docker</id>
+      <activation>
+        <activeByDefault>true</activeByDefault>
+      </activation>
+      <properties>
+        <profiles.active>docker</profiles.active>
+        <usc.version>1.0.1-SNAPSHOT</usc.version>
+      </properties>
+    </profile>
+    <profile>
+      <id>uat</id>
+      <activation>
+        <activeByDefault>false</activeByDefault>
+      </activation>
+      <properties>
+        <profiles.active>uat</profiles.active>
+        <usc.version>1.0.1</usc.version>
+      </properties>
+    </profile>
+    <profile>
+      <id>prd</id>
+      <activation>
+        <activeByDefault>false</activeByDefault>
+      </activation>
+      <properties>
+        <profiles.active>prd</profiles.active>
+        <usc.version>1.0.2-SNAPSHOT</usc.version>
+      </properties>
+    </profile>
+  </profiles>
+
+
+  <!-- 依赖  -->
+  <dependencies>
+    <!--  spring  -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-web</artifactId>
+      <exclusions>  
+                <exclusion>  
+                    <groupId>org.springframework.boot</groupId>  
+                    <artifactId>spring-boot-starter-tomcat</artifactId>  
+                </exclusion>  
+       </exclusions>  
+    </dependency>
+    <dependency>
+   <groupId>org.springframework.boot</groupId>
+	   <artifactId>spring-boot-starter-redis</artifactId>
+	   <version>1.4.6.RELEASE</version>
+	</dependency>
+	<dependency>
+	   <groupId>org.springframework.session</groupId>
+	   <artifactId>spring-session-data-redis</artifactId>
+	</dependency>
+    <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-tomcat</artifactId>
+            <scope>provided</scope>
+    </dependency>
+    <!-- jpa   -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-data-jpa</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>org.apache.tomcat.embed</groupId>
+      <artifactId>tomcat-embed-jasper</artifactId>
+      <scope>provided</scope>
+    </dependency>
+
+	<dependency>
+	     <groupId>org.springframework.boot</groupId>
+	     <artifactId>spring-boot-starter-actuator</artifactId>
+	</dependency>
+
+    <dependency>
+      <groupId>javax.servlet</groupId>
+      <artifactId>javax.servlet-api</artifactId>
+    </dependency>
+    <!-- jsp标签库 -->
+    <dependency>
+      <groupId>javax.servlet</groupId>
+      <artifactId>jstl</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>mysql</groupId>
+      <artifactId>mysql-connector-java</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.shiro</groupId>
+      <artifactId>shiro-spring</artifactId>
+      <version>1.4.0</version>
+    </dependency>
+
+    <dependency>
+      <groupId>com.alibaba</groupId>
+      <artifactId>druid</artifactId>
+      <version>1.0.26</version>
+    </dependency>
+    
+    <!-- common-lang3 -->
+    <dependency>
+		<groupId>org.apache.commons</groupId>
+		<artifactId>commons-lang3</artifactId>
+		<version>3.4</version>
+	</dependency>
+
+
+    <!-- mongodb -->
+     <dependency> 
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-data-mongodb</artifactId>
+    </dependency> 
+    
+    <!-- redis -->
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-data-redis</artifactId>
+    </dependency>
+
+    <!-- rabbitMq -->
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-amqp</artifactId>
+    </dependency>
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-test</artifactId>
+    </dependency>
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-aop</artifactId>
+    </dependency>
+    <dependency>
+        <groupId>org.springframework</groupId>
+        <artifactId>spring-test</artifactId>
+    </dependency>
+    <dependency>
+		<groupId>org.apache.shiro</groupId>
+		<artifactId>shiro-core</artifactId>
+		<version>${shiro.version}</version>
+	</dependency>
+	<dependency>
+		<groupId>org.apache.shiro</groupId>
+		<artifactId>shiro-spring</artifactId>
+		<version>${shiro.version}</version>
+	</dependency>
+	<dependency>
+		<groupId>org.apache.shiro</groupId>
+		<artifactId>shiro-cas</artifactId>
+		<version>${shiro.version}</version>
+	</dependency>
+	<dependency>
+		<groupId>org.apache.shiro</groupId>
+		<artifactId>shiro-web</artifactId>
+		<version>${shiro.version}</version>
+	</dependency>
+	<dependency>
+		<groupId>org.projectlombok</groupId>
+		<artifactId>lombok</artifactId>
+		<optional>true</optional>
+	</dependency>
+    <!-- junit -->
+    <dependency>
+        <groupId>junit</groupId>
+        <artifactId>junit</artifactId>
+        <version> 4.12</version>
+    </dependency>
+
+       <!-- fastjson -->
+       <dependency>
+        <groupId>com.alibaba</groupId>
+        <artifactId>fastjson</artifactId>
+        <version>1.2.15 </version>
+       </dependency>
+    
+     <!-- fel -->
+     <dependency>
+            <groupId>org.eweb4j</groupId>
+            <artifactId>fel</artifactId>
+            <version>0.8</version>
+        </dependency>
+        
+	<dependency>
+		<groupId>net.sf.dozer</groupId>
+		<artifactId>dozer</artifactId>
+		<version>5.4.0</version>
+        <exclusions>
+            <exclusion>
+                <artifactId>slf4j-log4j12</artifactId>
+                <groupId>org.slf4j</groupId>
+            </exclusion>
+        </exclusions>
+    </dependency>
+	<dependency>
+		<groupId>commons-collections</groupId>
+		<artifactId>commons-collections</artifactId>
+		<version>3.2.1</version>
+	</dependency>
+	
+	
+	<dependency>
+		<groupId>com.yixin</groupId>
+		<artifactId>common-utils</artifactId>
+		<version>${common.utils.version}</version>
+           <exclusions>
+           <exclusion>
+               <artifactId>slf4j-log4j12</artifactId>
+               <groupId>org.slf4j</groupId>
+           </exclusion>
+       </exclusions>
+	</dependency>
+	<dependency>
+		<groupId>com.yixin</groupId>
+		<artifactId>nusc-rpc</artifactId>
+		<version>${usc.version}</version>
+	</dependency>
+	<dependency>
+		<groupId>com.yixin</groupId>
+		<artifactId>common-service</artifactId>
+		<version>${common.service.version}</version>
+		<exclusions>
+			<exclusion>
+				<groupId>ch.qos.logback</groupId>
+				<artifactId>logback-classic</artifactId>
+			</exclusion>
+               <exclusion>
+                   <artifactId>log4j</artifactId>
+                   <groupId>log4j</groupId>
+               </exclusion>
+               <exclusion>
+                   <artifactId>slf4j-ext</artifactId>
+                   <groupId>org.slf4j</groupId>
+               </exclusion>
+           </exclusions>
+	</dependency>
+
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-maven-plugin</artifactId>
+        <configuration>
+          <mainClass>com.yixin.Application</mainClass>
+        </configuration>
+      </plugin>
+
+      <plugin>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <configuration>
+          <source>1.8</source>
+          <target>1.8</target>
+        </configuration>
+      </plugin>
+
+      <!--  解决pom继承了spring-boot-starter-parent 后引起的一些配置问题，比如占位符替换问题  -->
+      <plugin>
+        <artifactId>maven-resources-plugin</artifactId>
+        <configuration>
+          <encoding>utf-8</encoding>
+          <useDefaultDelimiters>true</useDefaultDelimiters>
+        </configuration>
+      </plugin>
+    </plugins>
+
+    <resources>
+    		<resource>
+                <directory>src/main/resources/docker</directory>
+                <targetPath>${project.build.directory}</targetPath>
+                <includes>
+                    <include>*</include>
+                </includes>
+                <filtering>true</filtering>
+         </resource>
+        <resource>
+          <directory>src/main/resources/</directory>
+          <excludes>
+            <exclude>META-INF/props/dev/*</exclude>
+            <exclude>META-INF/props/docker/*</exclude>
+            <exclude>META-INF/props/uat/*</exclude>
+            <exclude>META-INF/props/prd/*</exclude>
+          </excludes>
+          <filtering>true</filtering>
+        </resource>
+    </resources>
+    <filters>
+      <filter>src/main/resources/META-INF/props/${profiles.active}/database.properties</filter>
+      <filter>src/main/resources/META-INF/props/${profiles.active}/business.properties</filter>
+      <filter>src/main/resources/META-INF/props/${profiles.active}/rabbitmq.properties</filter>
+  </filters>
+
+  </build>
+
+ <repositories>
+    <repository>
+      <id>public-bak</id>
+      <url>http://nexus.yixincapital.com/repository/public/</url>
+      <releases>
+      </releases>
+      <snapshots>
+      </snapshots>
+    </repository>
+  </repositories>
+  <distributionManagement>
+    <repository>
+      <id>releases</id>
+      <name>releases</name>
+      <url>http://nexus.yixincapital.com/repository/releases/</url>
+    </repository>
+    <snapshotRepository>
+      <id>snapshots</id>
+      <name>snapshots</name>
+      <url>http://nexus.yixincapital.com/repository/snapshots/</url>
+    </snapshotRepository>
+  </distributionManagement>
+</project>

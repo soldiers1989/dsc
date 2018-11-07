@@ -1,0 +1,372 @@
+package com.yixin.kepler.core.config;/**
+ * Created by liushuai2 on 2018/4/11.
+ */
+
+import com.rabbitmq.client.Channel;
+import com.rabbitmq.client.ShutdownSignalException;
+import com.yixin.kepler.core.rabbitmq.RabbitmqConsumer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.amqp.core.AcknowledgeMode;
+import org.springframework.amqp.rabbit.config.SimpleRabbitListenerContainerFactory;
+import org.springframework.amqp.rabbit.connection.*;
+import org.springframework.amqp.rabbit.listener.SimpleMessageListenerContainer;
+import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.amqp.SimpleRabbitListenerContainerFactoryConfigurer;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
+
+/**
+ * Package : com.yixin.springboot.config
+ *
+ * @author YixinCapital -- liushuai2
+ *         2018年04月11日 23:00
+ */
+@Configuration
+public class RabbitmqConfig {
+    public static final Logger logger = LoggerFactory.getLogger(RabbitmqConfig.class);
+    /**
+     * spring.rabbitmq.osb.file.username=guest
+       spring.rabbitmq.osb.file.password=guest
+       spring.rabbitmq.osb.file.virtualhost=yx_osb_mq
+       spring.rabbitmq.osb.file.addresses=192.168.145.161:5672
+       spring.rabbitmq.osb.file.type=direct
+       spring.rabbitmq.osb.file.exchange=file_transfer_exchange
+       spring.rabbitmq.osb.file.queue=file_transfer_kepler_queue
+       spring.rabbitmq.osb.file.routing.key=file_transfer_kepler_dev_routingKey
+     */
+    
+    
+    @Value("${spring.rabbitmq.osb.file.addresses}")
+    private String addresses;
+    
+    @Value("${spring.rabbitmq.osb.file.username}")  
+    private String username;
+    
+    @Value("${spring.rabbitmq.osb.file.password}") 
+    private String password;
+    
+    @Value("${spring.rabbitmq.osb.file.virtual-host}") 
+    private String virtualHost;
+    
+    @Value("${spring.rabbitmq.osb.file.queue}")
+    private String queue;
+    //======================alix队列配置监听==================
+    @Value("${spring.rabbitmq.address}")
+    private String alixAddresses;
+
+    @Value("${spring.rabbitmq.username}")
+    private String alixUsername;
+
+    @Value("${spring.rabbitmq.password}")
+    private String alixPassword;
+
+    @Value("${spring.rabbitmq.virtualHost}")
+    private String alixVirtualHost;
+
+    @Value("${spring.rabitmq.electricsign.queue}")
+    private String alixQueue;
+
+
+    @Value("${spring.rabbitmq.port}")
+    private String alixPort;
+
+    
+    //======================压缩队列配置监听==================
+    @Value("${rabbitmq.compress.username}")
+    private String compressUsername;
+    
+    @Value("${${rabbitmq.compress.password}}")
+    private String compressPassword;
+    
+    @Value("${rabbitmq.compress.addresses}")
+    private String compressAddresses;
+    
+    @Value("${rabbitmq.compress.virtualhost}")
+    private String compressVirtualHost;
+
+    @Value("${rabbitmq.compress.queue}")
+    private String compressQueue;
+
+    @Value("${rabbitmq.compress.routing.key}")
+    private String compressRoutingKey;
+
+    @Value("${rabbitmq.compress.exchange}")
+    private String compressExchange;
+
+    
+    @Bean(name = "osbFileConnectionFactory")
+    public ConnectionFactory osbFileConnectionFactory(){
+    	
+        logger.info("初始化connectionFactory,address:{},username:{},password:{},"
+        		+ "virtual-host:{}",addresses, username, password, virtualHost);
+        
+        CachingConnectionFactory factory = new CachingConnectionFactory();
+        factory.setAddresses(addresses);
+        factory.setUsername(username);
+        factory.setPassword(password);
+        factory.setVirtualHost(virtualHost);
+        factory.addChannelListener(new ShutDownChannelListener() {
+            @Override
+            public void onShutDown(ShutdownSignalException signal) {
+                logger.info("rabbitmq closeed");
+            }
+
+            @Override
+            public void onCreate(Channel channel, boolean transactional) {
+                logger.info("rabbitmq created");
+
+            }
+        });
+        
+        // 先断开connection
+        factory.addConnectionListener(new ConnectionListener() {
+            @Override
+            public void onCreate(Connection connection) {
+                logger.info("rabbitmq connection created");
+
+            }
+
+            @Override
+            public void onClose(Connection connection) {
+                logger.info("rabbitmq connection close");
+                factory.resetConnection();
+            }
+
+            @Override
+            public void onShutDown(ShutdownSignalException signal) {
+                logger.info("rabbitmq connection shutdown");
+            }
+        });
+        return factory;
+    }
+
+    @Bean(name = "osbFileContainerFactory")
+    public SimpleRabbitListenerContainerFactory compressorContainerFactory(
+            SimpleRabbitListenerContainerFactoryConfigurer configurer,
+            @Qualifier("osbFileConnectionFactory") ConnectionFactory connectionFactory){
+
+        SimpleRabbitListenerContainerFactory containerFactory =
+                new SimpleRabbitListenerContainerFactory();
+
+        configurer.configure(containerFactory, connectionFactory);
+        // 这是手动应答方式
+        containerFactory.setAcknowledgeMode(AcknowledgeMode.MANUAL);
+        return containerFactory;
+    }
+    @Bean
+    public SimpleMessageListenerContainer osbFileListenerContainer() {
+
+        logger.info(" osbFileMessageListener inside listener");
+
+        SimpleMessageListenerContainer container =
+                new SimpleMessageListenerContainer();
+
+        container.setConnectionFactory(osbFileConnectionFactory());
+        container.setQueueNames(queue);
+        container.setMessageListener(new RabbitmqConsumer());
+        container.setMessageConverter(new Jackson2JsonMessageConverter());
+        container.setConcurrentConsumers(2);
+        container.setMaxConcurrentConsumers(20);
+        return container;
+    }
+    /**
+     * 配置alix队列地址监听地址
+     * @return
+     */
+    @Bean(name = "alixConnectionFactory")
+    @Primary
+    public ConnectionFactory alixConnectionFactory(){
+
+        logger.info("初始化alixConnectionFactory,address:{},alixPort:{},username:{},password:{},"
+                + "virtual-host:{}",alixAddresses,alixPort, alixUsername, alixPassword, alixVirtualHost);
+
+        CachingConnectionFactory factory = new CachingConnectionFactory();
+        factory.setAddresses(alixAddresses+":"+alixPort);
+        factory.setUsername(alixUsername);
+        factory.setPassword(alixPassword);
+        factory.setVirtualHost(alixVirtualHost);
+        factory.addChannelListener(new ShutDownChannelListener() {
+            @Override
+            public void onShutDown(ShutdownSignalException signal) {
+                logger.info("rabbitmq closeed");
+            }
+
+            @Override
+            public void onCreate(Channel channel, boolean transactional) {
+                logger.info("rabbitmq created");
+
+            }
+        });
+
+        // 先断开connection
+        factory.addConnectionListener(new ConnectionListener() {
+            @Override
+            public void onCreate(Connection connection) {
+                logger.info("rabbitmq connection created");
+
+            }
+
+            @Override
+            public void onClose(Connection connection) {
+                logger.info("rabbitmq connection close");
+                factory.resetConnection();
+            }
+
+            @Override
+            public void onShutDown(ShutdownSignalException signal) {
+                logger.info("rabbitmq connection shutdown");
+            }
+        });
+        return factory;
+    }
+
+
+    @Bean(name = "alixConnectionFactory")
+    public SimpleRabbitListenerContainerFactory alixContainerFactory(
+            SimpleRabbitListenerContainerFactoryConfigurer configurer,
+            @Qualifier("alixConnectionFactory") ConnectionFactory connectionFactory){
+
+        SimpleRabbitListenerContainerFactory containerFactory =
+                new SimpleRabbitListenerContainerFactory();
+
+        configurer.configure(containerFactory, connectionFactory);
+        // 这是手动应答方式
+        containerFactory.setAcknowledgeMode(AcknowledgeMode.MANUAL);
+        return containerFactory;
+    }
+
+
+
+
+    @Bean
+    public SimpleMessageListenerContainer alixListenerContainer() {
+
+        logger.info(" alixListenerContainer inside listener");
+
+        SimpleMessageListenerContainer container =
+                new SimpleMessageListenerContainer();
+
+        container.setConnectionFactory(alixConnectionFactory());
+        container.setQueueNames(alixQueue);
+        container.setMessageListener(new RabbitmqConsumer());
+        container.setMessageConverter(new Jackson2JsonMessageConverter());
+        container.setConcurrentConsumers(2);
+        container.setMaxConcurrentConsumers(20);
+        return container;
+    }
+    
+    
+    
+ /*   @Bean(name = "osbFileRabbitTemplate")
+    public AmqpTemplate template(){
+    	return new RabbitTemplate(osbFileConnectionFactory());
+    }*/
+
+ /*   @Bean
+    public Binding binding(){
+    	return BindingBuilder
+    			.bind(osbFileQueue())
+    			.to(new DirectExchange(exchange))
+    			.with(routingKey);
+    }
+    
+    @Bean(name = "osbFileQueue")
+    public Queue osbFileQueue(){
+        logger.info("初始化队列 queue:{}", queue);
+        return new Queue(queue,true);
+    }*/
+
+    
+    /**
+     * 压缩连接工厂
+     * @return 
+     * @author YixinCapital -- chen.lin
+     *	       2018年10月10日 下午2:16:59
+     */
+    @Bean(name = "compressConnectionFactory")
+    @Primary
+    public ConnectionFactory compressConnectionFactory(){
+    	logger.info("初始化compressConnectionFactory，address:{}，username:{}，password:{}，v-host:{}", compressAddresses, compressUsername, compressPassword, compressVirtualHost);
+        CachingConnectionFactory factory = new CachingConnectionFactory();
+        factory.setAddresses(compressAddresses);
+        factory.setUsername(compressUsername);
+        factory.setPassword(compressPassword);
+        factory.setVirtualHost(compressVirtualHost);
+        factory.addChannelListener(new ShutDownChannelListener() {
+            @Override
+            public void onShutDown(ShutdownSignalException signal) {
+                logger.info("rabbitmq closeed");
+            }
+            @Override
+            public void onCreate(Channel channel, boolean transactional) {
+                logger.info("rabbitmq created");
+
+            }
+        });
+        
+        // 先断开connection
+        factory.addConnectionListener(new ConnectionListener() {
+            @Override
+            public void onCreate(Connection connection) {
+                logger.info("rabbitmq connection created");
+
+            }
+            @Override
+            public void onClose(Connection connection) {
+                logger.info("rabbitmq connection close");
+                factory.resetConnection();
+            }
+            @Override
+            public void onShutDown(ShutdownSignalException signal) {
+                logger.info("rabbitmq connection shutdown");
+            }
+        });
+        return factory;
+    }
+    
+    
+    /**
+     * 创建消费端监听--压缩
+     * @param configurer
+     * @param connectionFactory
+     * @return 
+     * @author YixinCapital -- chen.lin
+     *	       2018年10月10日 下午2:25:18
+     */
+    @Bean(name = "compressMQContainerFactory")
+    public SimpleRabbitListenerContainerFactory compressMQContainerFactory(
+            SimpleRabbitListenerContainerFactoryConfigurer configurer,
+            @Qualifier("compressConnectionFactory") ConnectionFactory connectionFactory){
+        SimpleRabbitListenerContainerFactory containerFactory = new SimpleRabbitListenerContainerFactory();
+        configurer.configure(containerFactory, connectionFactory);
+        // 这是手动应答方式
+        containerFactory.setAcknowledgeMode(AcknowledgeMode.MANUAL);
+        return containerFactory;
+    }
+    
+    
+    /**
+     * 创建消费端监听--压缩
+     * @param configurer
+     * @param connectionFactory
+     * @return 
+     * @author YixinCapital -- chen.lin
+     *	       2018年10月10日 下午2:25:18
+     */
+    @Bean
+    public SimpleMessageListenerContainer compressMQListenerContainer() {
+        logger.info("compressMessageListener inside listener");
+        SimpleMessageListenerContainer container = new SimpleMessageListenerContainer();
+        container.setConnectionFactory(compressConnectionFactory());
+        container.setQueueNames(queue);
+        container.setMessageListener(new RabbitmqConsumer());
+        container.setMessageConverter(new Jackson2JsonMessageConverter());
+        container.setConcurrentConsumers(2);
+        container.setMaxConcurrentConsumers(20);
+        return container;
+    }
+}

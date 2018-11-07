@@ -1,0 +1,25 @@
+package com.yixin.web.common.constant;
+
+/**
+ * redis缓存相关常量
+ *
+ * @description:
+ * @date: 2018-10-08 18:32
+ */
+public interface RedisConstant {
+
+    /**
+     * 耗时级别配置 redis key 前缀
+     */
+    String TIME_CONSUME_LEVEL_PREFIX = "time_consume_level_";
+
+
+    /**
+     * 预警通知频率  redis key 前缀
+     */
+    String NOTICE_FREQUENCY_PREFIX = "notice_frequency_";
+    /**
+     * 预警通知频率配置
+     */
+    String NOTICE_FREQUENCY_RULE_KEY = "notice_frequency_rule";
+}

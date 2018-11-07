@@ -1,0 +1,94 @@
+package com.yixin.dsc.service.async;
+
+import com.yixin.dsc.dto.DscFlowResultForAlixDto;
+import com.yixin.dsc.dto.order.DscSyncDTO;
+import com.yixin.dsc.dto.rule.engine.BatchMatchResult;
+import com.yixin.dsc.v1.datapackage.dto.notice.DscAsyncMessageDto;
+import com.yixin.kepler.enity.AssetMainInfo;
+
+import java.util.List;
+
+/**
+ * 异步任务管理接口
+ * Package : com.yixin.dsc.service.async
+ *
+ * @author YixinCapital -- wangwenlong
+ *         2018年8月28日 下午12:57:22
+ */
+public interface AsyncTaskManagerService {
+
+    /**
+     * 记录资方规则匹配结果
+     *
+     * @param matchResult  匹配规则的结果包括规则通过和不通过的
+     * @param matchTrackId 匹配痕迹ID即批次
+     * @param applyNo      订单编号
+     * @author YixinCapital -- wangwenlong
+     * 2018年8月28日 上午9:49:09
+     */
+    void recordMatchRuleList(List<BatchMatchResult> batchMatchResultList, String matchTrackId, String applyNo);
+
+    /**
+     * 记录发起信审/请款的结果通知
+     *
+     * @param dscFlowResultForAlixDto
+     * @author YixinCapital -- wangwenlong
+     * 2018年9月4日 上午11:07:27
+     */
+    void recordflowResultNotice(DscFlowResultForAlixDto dscFlowResultForAlixDto);
+
+    /**
+     * 记录订单同步信息
+     *
+     * @param dscSyncDTO
+     * @author YixinCapital -- wangwenlong
+     * 2018年9月8日 上午11:05:52
+     */
+    void recordOrderSyncInfo(DscSyncDTO dscSyncDTO, String dateStr);
+
+    /**
+     * 云南信托签约导入
+     *
+     * @param mainInfo
+     * @author YixinCapital -- wangwenlong
+     * 2018年9月27日 下午9:20:12
+     */
+    void YTImportProtocol(AssetMainInfo mainInfo);
+
+
+    /**
+     * 记录匹配规则到mongo中，未运维提供查询规则匹配数据
+     *
+     * @param batchMatchResultList
+     * @param applyNo
+     * @author YixinCapital -- wangwenlong
+     * 2018年10月16日 上午11:13:24
+     */
+    void recordMatchRuleToMongo(List<BatchMatchResult> batchMatchResultList, String applyNo);
+
+    /**
+     * 记录通知alix 合同签署信息
+     *
+     * @param dscAsyncMessageDto
+     */
+    @SuppressWarnings("rawtypes")
+	void recordAsyncMessageNotice(DscAsyncMessageDto dscAsyncMessageDto);
+    
+    /**
+     * 异步订单取消处理
+     * @param venusApplyNo
+     * @param applyNo
+     * @param assetMainId 
+     * @author YixinCapital -- wangwenlong
+     *	       2018年10月20日 下午2:39:40
+     */
+    void syncOrderCancel(String venusApplyNo,String applyNo,String assetMainId);
+    
+    /**
+     * Venus 定时补救
+     * @param rescueType 
+     * @author YixinCapital -- wangwenlong
+     *	       2018年10月22日 下午3:57:07
+     */
+    void venusRescueJob(String rescueType);
+}

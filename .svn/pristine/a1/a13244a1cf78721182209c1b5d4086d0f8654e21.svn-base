@@ -1,0 +1,50 @@
+package com.yixin.kepler.v1.service.capital.yntrust;
+
+import com.yixin.dsc.dto.DscBankContractDTO;
+import com.yixin.dsc.dto.DscContractSignFileDTO;
+import com.yixin.kepler.dto.BaseMsgDTO;
+import com.yixin.kepler.enity.AssetContractTask;
+import com.yixin.kepler.v1.datapackage.dto.yntrust.YTFileUploadRequestDTO;
+
+/**
+ * @author sukang
+ */
+public interface YnContractService {
+
+    /**
+     * 获取签约短信
+     * @param dscBankContractDTO {@link DscBankContractDTO}
+     * @return 返回描述 {@link BaseMsgDTO}
+     */
+    BaseMsgDTO getBankContractId(DscBankContractDTO dscBankContractDTO);
+
+    /**
+     * 验证短信
+     * @param dscBankContractDTO {@link DscBankContractDTO}
+     * @return 返回描述 {@link BaseMsgDTO}
+     */
+    BaseMsgDTO verificationCode(DscBankContractDTO dscBankContractDTO);
+
+    /**
+     * 压缩并上传文件(单个)
+     * @param dscContractSignFileDTO
+     * @return 返回描述 {@link BaseMsgDTO}
+     */
+    BaseMsgDTO compressFileAndUpload(
+    		AssetContractTask dscContractSignFileDTO);
+
+    /**
+     * 压缩并上传文件(批量)
+     * @param ytFileUploadRequestDTO {@link YTFileUploadRequestDTO}
+     * @return 返回描述 {@link BaseMsgDTO}
+     */
+    BaseMsgDTO compressFileAndUpload(YTFileUploadRequestDTO ytFileUploadRequestDTO);
+
+
+    /**
+     * 获取单个合同文件
+     * @param assetContractTask {@link AssetContractTask}
+     * @return 返回描述 {@link BaseMsgDTO}
+     */
+    BaseMsgDTO getContractFile(AssetContractTask assetContractTask);
+}

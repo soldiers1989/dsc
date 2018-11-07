@@ -1,0 +1,183 @@
+package com.yixin.kepler.v1.service.capital.yntrust;
+
+import javax.annotation.Resource;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationContext;
+import org.springframework.stereotype.Service;
+
+import com.alibaba.fastjson.JSON;
+import com.alibaba.fastjson.JSONObject;
+import com.yixin.common.utils.JsonObjectUtils;
+import com.yixin.dsc.dto.DscCreditfrontBusinessDto;
+import com.yixin.dsc.dto.DscFlowResultForAlixDto;
+import com.yixin.dsc.enumpackage.DscAlixLinkEnum;
+import com.yixin.dsc.v1.service.capital.yntrust.YTCommonService;
+import com.yixin.kepler.common.enums.AssetStateEnum;
+import com.yixin.kepler.common.enums.BankPhaseEnum;
+import com.yixin.kepler.common.enums.CreditfrontResultEnum;
+import com.yixin.kepler.core.constant.CommonConstant;
+import com.yixin.kepler.core.listener.ResultNotifyEvent;
+import com.yixin.kepler.dto.BaseMsgDTO;
+import com.yixin.kepler.enity.AssetBankTran;
+import com.yixin.kepler.enity.AssetMainInfo;
+import com.yixin.kepler.enity.OsbFileLog;
+import com.yixin.kepler.v1.common.constants.BankRequestConstant;
+import com.yixin.kepler.v1.common.core.bankReq.BankRespResultHandle;
+import com.yixin.kepler.v1.common.enumpackage.YNTrustUrlEnum;
+import com.yixin.kepler.v1.datapackage.dto.BankRespResultHandleDTO;
+import com.yixin.kepler.v1.datapackage.dto.yntrust.YTCommonStatusDTO;
+import com.yixin.kepler.v1.datapackage.dto.yntrust.YTCreateOrderResponseDto;
+import com.yixin.kepler.v1.datapackage.entity.AssetBankRequest;
+
+/**
+ * 废弃-没有用
+ * Package : com.yixin.kepler.v1.service.capital.yntrust
+ * 
+ * @author YixinCapital -- wangwenlong
+ *		   2018年10月11日 下午8:21:46
+ *
+ */
+@Service("YNTRUSTRespResultHandle")
+public class YTRespResultHandle implements BankRespResultHandle {
+	
+	private static final Logger LOGGER = LoggerFactory.getLogger(YTRespResultHandle.class);
+	
+	@Resource
+    private YTCommonService commonService;
+	
+	@Resource
+	private ApplicationContext ioc;
+	
+	/**
+	 * 银行响应结果处理
+	 * @param resultDTO
+	 * @return 结果对象
+	 * @author YixinCapital -- chen.lin
+	 *	       2018年9月17日 下午5:28:55
+	 */
+	@Override
+	public BaseMsgDTO respResultHandle(BankRespResultHandleDTO resultDTO) {
+		//获取资产发起银行请求信息
+		AssetBankRequest bankRequest = AssetBankRequest.getById(resultDTO.getBankReqId());
+		String applyNo = bankRequest.getApplyNo();
+		String bankResultJosn = resultDTO.getBankResultJosn(); //接口响应报文
+		LOGGER.info("订单编号:{},云南信托请求信审创建订单(终审),返回报文为{}",applyNo,bankResultJosn);
+		//获取银行交易记录
+		AssetBankTran bankTran = AssetBankTran.getByTranNo(resultDTO.getTranNo(), CommonConstant.SenderType.YIXIN);
+		
+		LOGGER.info("订单编号:{},云南信托请求信审创建订单(终审),获取银行交互记录,id:{}",applyNo,bankTran.getId());
+		
+		String resultJson = commonService.parseResponse(bankResultJosn);
+		
+		YTCreateOrderResponseDto responseDTO = (YTCreateOrderResponseDto) JsonObjectUtils.jsonToObject(resultJson, new YTCreateOrderResponseDto());
+		LOGGER.info("订单编号:{},云南信托请求信审创建订单(终审),解析返回报文:{}",applyNo,JSON.toJSONString(responseDTO));
+		if(responseDTO == null || responseDTO.getStatus() == null){
+			this.updateBankTran(bankResultJosn, null, "云南信托请求信审创建订单(终审)返回结果为空", bankTran);
+			retry(bankRequest);
+			return BaseMsgDTO.failureData("信审收妥失败");
+		}
+		YTCommonStatusDTO status = responseDTO.getStatus();
+		if(status.getIsSuccess() == null){
+			this.updateBankTran(bankResultJosn, null, "云南信托请求信审创建订单(终审)返回结果为空", bankTran);
+			retry(bankRequest);
+			return BaseMsgDTO.failureData("信审收妥失败");
+		}
+		this.updateBankTran(bankResultJosn, status.getResponseCode(), status.getResponseMessage(), bankTran);
+		AssetMainInfo mainInfo = AssetMainInfo.getByApplyNo(applyNo);
+		if(status.getIsSuccess()){
+			mainInfo.setLastState(AssetStateEnum.SUCCESS.getState()); //终审成功
+			mainInfo.setAssetNo(responseDTO.getProductCode()); //云信返回的产品代码
+			mainInfo.setBankOrderNo(responseDTO.getSubAccount()); //虚拟子账户
+			mainInfo.setVenusApplyNo(responseDTO.getUniqueId()); //VenusApplyNo
+			mainInfo.update();
+			ioc.publishEvent(new ResultNotifyEvent(this.createForAliDto(
+					applyNo, CreditfrontResultEnum.SUCCESS.getCode(),CreditfrontResultEnum.SUCCESS.getMsg(),mainInfo)));
+			
+		} else if (status.getResponseCode().contains("60200040")){
+			//返回0040操作失败，先掉取消接口，然后更换requestid，uniqueid后重新发起创建订单接口（联调时特别注意下该情况，0040时云信侧可能落数可能没落数，如落数，不需要重新，不落数可重发，这种需要人工介入查询，还是做到系统角度）
+			
+		} else {
+			ioc.publishEvent(new ResultNotifyEvent(this.createForAliDto(
+					mainInfo.getApplyNo(), CreditfrontResultEnum.REFUSE.getCode(),status.getResponseMessage(),mainInfo)));
+			
+			mainInfo.setLastState(AssetStateEnum.FAILD.getState());
+			mainInfo.update();
+		}
+		return BaseMsgDTO.successData("success");
+	}
+	
+	public void retry(AssetBankRequest bankRequest){
+		bankRequest.setRepState(BankRequestConstant.RETRY_REQ_BANK);
+		int retryMark = bankRequest.getRetryMark();
+		bankRequest.setRetryMark(retryMark++);
+		bankRequest.update();
+	}
+
+	@Override
+	public String assembleOsb(AssetBankRequest requestDTO, OsbFileLog osbFileLog) {
+		
+		return null;
+	}
+	
+	/**
+	 * 更新银行交易结果
+	 * @param result
+	 * @param code
+	 * @param errorMsg
+	 * @param assetBankTran 
+	 * @author YixinCapital -- wangwenlong
+	 *	       2018年9月19日 下午3:28:05
+	 */
+	private void updateBankTran(String result,String code,String errorMsg,AssetBankTran assetBankTran){
+		LOGGER.info("订单编号:{},云南信托请求信审创建订单(终审),更新银行交互结果,code:{},errorMsg:{}",assetBankTran.getApplyNo(),code,errorMsg);
+		assetBankTran.setRepBody(result); //响应报文
+        assetBankTran.setApprovalCode(code); //错误码
+        assetBankTran.setApprovalDesc(errorMsg); //错误描述
+        assetBankTran.update();
+	}
+	
+	
+	public String requestBeforeHandle(AssetBankRequest task){
+		LOGGER.info("云南信托信审发送请求前数据处理开始，订单编号:{}",task.getApplyNo());
+		JSONObject jsonObject = JSONObject.parseObject(task.getAssetReqBody());
+		if(task.getRetryMark() != BankRequestConstant.RETRY_INIT_COUNT){ //重试
+			String requestId = commonService.getRequestId();
+			jsonObject.put("RequestId", requestId); //重新生产请求ID
+		}
+		//========= 银行交互保存 ===================================
+		LOGGER.info("云南信托信审发送请求前数据处理-创建银行交互记录，订单编号:{}",task.getApplyNo());
+		AssetBankTran assetBankTran = new AssetBankTran();
+		assetBankTran.setReqBody(task.getAssetReqBody());
+		assetBankTran.setApplyNo(task.getApplyNo());
+		assetBankTran.setAssetId(task.getBzId());
+		assetBankTran.setAssetNo(task.getAssetNo());
+		assetBankTran.setPhase(BankPhaseEnum.LAST_TRIAL.getPhase()); //终审
+		assetBankTran.setReqUrl(task.getReqUrl());
+		assetBankTran.setApiCode(YNTrustUrlEnum.CREATE_ORDER.getUrl());
+		assetBankTran.setSender(CommonConstant.SenderType.YIXIN);
+		assetBankTran.setTranNo(jsonObject.getString("RequestId"));
+		assetBankTran.setBankOrderNo(task.getBankOrderNo());
+		assetBankTran.create();
+		LOGGER.info("云南信托信审发送请求前数据处理结束，订单编号:{}",task.getApplyNo());
+		return jsonObject.toString();
+	};
+
+	
+	private DscFlowResultForAlixDto createForAliDto(String applyNo, String code,String message,AssetMainInfo mainInfo) {
+		DscFlowResultForAlixDto alixDto = new DscFlowResultForAlixDto();
+		alixDto.setApplyNo(applyNo);
+		alixDto.setCode(code);
+		alixDto.setLink(DscAlixLinkEnum.CREDITFRONT.getCode());
+		alixDto.setMessage(message);
+		if(CreditfrontResultEnum.SUCCESS.getCode().equals(code)){
+			DscCreditfrontBusinessDto businessInfo = new DscCreditfrontBusinessDto();
+			businessInfo.setCapitalProductCode(mainInfo.getAssetNo()); //云信返回的产品代码
+			businessInfo.setCapitalSubAccount(mainInfo.getBankOrderNo());//虚拟子账户
+			businessInfo.setVenusApplyNo(mainInfo.getVenusApplyNo()); //venus订单编号
+			alixDto.setBusinessInfo(businessInfo);
+		}
+		return alixDto;
+	}
+}

@@ -1,0 +1,238 @@
+package com.yixin.dsc.service.impl.rule.engine;
+
+import com.alibaba.fastjson.JSON;
+import com.yixin.dsc.common.exception.BzException;
+import com.yixin.dsc.dto.DscSupplyDto;
+import com.yixin.dsc.dto.DscSupplyFieldsDto;
+import com.yixin.dsc.dto.rule.DscMatchResultDto;
+import com.yixin.dsc.dto.rule.DscRuleDetailDto;
+import com.yixin.dsc.dto.rule.DscRuleDto;
+import com.yixin.dsc.dto.rule.engine.BatchMatchResult;
+import com.yixin.dsc.dto.rule.engine.DscMatchResult;
+import com.yixin.dsc.entity.order.DscSalesApplyMain;
+import com.yixin.dsc.entity.rule.DscRule;
+import com.yixin.dsc.enumpackage.DscRuleTypeEnum;
+import com.yixin.dsc.enumpackage.RuleEvalEnum;
+import com.yixin.dsc.service.rule.engine.RuleEngineService;
+import com.yixin.dsc.service.rule.engine.RuleService;
+import com.yixin.kepler.common.enums.BankPhaseEnum;
+import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections.MapUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.assertj.core.util.Lists;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.stereotype.Service;
+
+import java.util.Date;
+import java.util.List;
+import java.util.Map;
+
+
+/**
+ * 规则service
+ * Package : com.yixin.dsc.service.impl.rule.engine
+ * 
+ * @author YixinCapital -- huguoxing
+ *		   2018年6月6日 下午7:38:10
+ *
+ */
+
+@Service("ruleService")
+public class RuleServiceImpl  implements RuleService{
+	
+	private final static Logger LOGGER = LoggerFactory.getLogger(RuleServiceImpl.class);
+	
+	@Autowired
+	private RuleEngineManager  ruleEngineManager;
+
+	@Autowired
+	private MongoTemplate mongoTemplate;
+
+	@Override
+	public Map<Class, Object> getSourceMap(Map<String, Object> map) {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	@Override
+	public BatchMatchResult shuntRuleMatch(List<DscRuleDto> ruleDtoList,
+			Map<String, Object> sourceMap,String type) {
+		
+		if(ruleDtoList==null || ruleDtoList.isEmpty()){
+			throw new BzException("规则为空");
+		}
+		if(sourceMap==null){
+			throw new BzException("线索为空");
+		}
+		BatchMatchResult batchMatchResult = new BatchMatchResult();
+		RuleEngineService ruleEngineService = null;
+		 for (DscRuleDto dscRuleDto : ruleDtoList) {
+			ruleEngineService = ruleEngineManager.getEngineByMatchType(dscRuleDto.getRuleMatchingType());
+			DscRuleDetailDto dscRuleDetailDto = dscRuleDto.getDscRuleDetailDto();
+			DscMatchResult dscMatchResult = ruleEngineService.eval(dscRuleDetailDto, sourceMap,
+					dscRuleDto.getDscFieldFDtoList(), type);
+			if (dscMatchResult.isMach()) {
+				batchMatchResult.addMachRule(dscMatchResult);
+			} else {
+				// 不匹配数据存入，mongodb数据库
+				DscSalesApplyMain dscSalesApplyMain = (DscSalesApplyMain) sourceMap
+						.get(DscSalesApplyMain.class.getName());
+				String applyNo = dscSalesApplyMain.getApplyNo();// 订单号
+				DscMatchResultDto dscMatchResultDTO = new DscMatchResultDto();
+				BeanUtils.copyProperties(dscMatchResult, dscMatchResultDTO);
+				dscMatchResultDTO.setCreateTime(new Date());
+				dscMatchResultDTO.setApplyNo(applyNo);
+				dscMatchResultDTO.setMessage(dscRuleDetailDto.getMessage());
+				mongoTemplate.save(dscMatchResultDTO);
+				
+				LOGGER.error("规则匹配未通过，订单编号:{},{}",applyNo,JSON.toJSONString(dscMatchResultDTO));
+				batchMatchResult.addnoMachRule(dscMatchResult);
+			}
+		 }
+		return batchMatchResult;
+	}
+
+
+	/**
+	 *
+	 * 补充规则判断
+	 *
+	 * @param ruleDtoList
+	 * @param sourceMap
+	 * @return
+	 */
+	@Override
+	public Boolean supplyRuleMatch(List<DscRuleDto> ruleDtoList, Map<String, Object> sourceMap,String type) {
+		if(sourceMap==null){
+			throw new BzException("线索为空");
+		}
+		if(ruleDtoList==null || ruleDtoList.isEmpty()){
+			return false;
+		}
+		for (DscRuleDto dscRuleDto : ruleDtoList) {
+			RuleEngineService ruleEngineService = ruleEngineManager.getEngineByMatchType(dscRuleDto.getRuleMatchingType());
+			DscRuleDetailDto dscRuleDetailDto = dscRuleDto.getDscRuleDetailDto();
+			DscMatchResult dscMatchResult =ruleEngineService.eval(dscRuleDto.getDscRuleDetailDto(), sourceMap,
+					dscRuleDto.getDscFieldFDtoList(),type);
+			if(!dscMatchResult.isMach()){
+				DscSalesApplyMain dscSalesApplyMain = (DscSalesApplyMain)sourceMap.get(DscSalesApplyMain.class.getName());
+				String applyNo = dscSalesApplyMain.getApplyNo();//订单号
+				DscMatchResultDto dscMatchResultDTO = new DscMatchResultDto();
+				BeanUtils.copyProperties(dscMatchResult,dscMatchResultDTO);
+				dscMatchResultDTO.setMessage(dscRuleDetailDto.getMessage());
+				dscMatchResultDTO.setCreateTime(new Date());
+				dscMatchResultDTO.setApplyNo(applyNo);
+				mongoTemplate.save(dscMatchResultDTO);
+
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
+	 *
+	 * 补充规则判断-并返回不满足规则的属性列表
+	 *
+	 * @param ruleDtoList
+	 * @param sourceMap
+	 * @return
+	 */
+	@Override
+	public List<DscSupplyFieldsDto> supplyRuleMatchByFieldResult(List<DscRuleDto> ruleDtoList, Map<String, Object> sourceMap, String type) {
+		if(sourceMap==null){
+			throw new BzException("线索为空");
+		}
+		List<DscSupplyFieldsDto> result = Lists.newArrayList();
+		if(ruleDtoList==null || ruleDtoList.isEmpty()){
+			return result;
+		}
+		for (DscRuleDto dscRuleDto : ruleDtoList) {
+			RuleEngineService ruleEngineService = ruleEngineManager.getEngineByMatchType(dscRuleDto.getRuleMatchingType());
+			DscMatchResult dscMatchResult =ruleEngineService.eval(dscRuleDto.getDscRuleDetailDto(), sourceMap,
+					dscRuleDto.getDscFieldFDtoList(),type);
+			LOGGER.error("规则匹配后返回，result{}", JSON.toJSONString(dscMatchResult));
+			// 补充规则-在不匹配的情况下，截取returnStr，获取不匹配的字段列表
+			if(!dscMatchResult.isMach()){
+				dscMatchResult.getMatchResultMap().forEach((k,v)->{
+					Map fieldMap = (Map)v;
+					result.add(new DscSupplyFieldsDto(String.valueOf(fieldMap.get("fieldCode")), String.valueOf(fieldMap.get("fieldName"))));
+				});
+//				if (!dscMatchResult.isMach()){
+//					String fieldStr = dscMatchResult.getReturnStr();
+//					Lists.newArrayList(fieldStr.substring(fieldStr.indexOf("：") + 1).split(",")).forEach(field->{
+//						result.add(new DscSupplyFieldsDto(field));
+//					});
+//				}
+			}
+		}
+		return result;
+	}
+
+	/**
+	 * 阶段性校验
+	 * @param capitalId 资方ID
+	 * @param phaseEnum 阶段
+	 * @param sourceMap 数据来源
+	 * @return 
+	 * @author YixinCapital -- wangwenlong
+	 *	       2018年9月6日 下午12:59:26
+	 */
+	@Override
+	public DscSupplyDto phaseCheck(String capitalId, BankPhaseEnum phaseEnum,Map<String, Object> sourceMap) {
+		String ruleType = "";
+		if(BankPhaseEnum.LAST_TRIAL.getPhase().equals(phaseEnum.getPhase())){ //终审阶段
+			ruleType = DscRuleTypeEnum.CREDITFRONT_CHECK.getType(); //信审前校验规则
+		} else if(BankPhaseEnum.PAYMENT.getPhase().equals(phaseEnum.getPhase())){ //请款阶段
+			ruleType = DscRuleTypeEnum.REQUEST_FUNDS_CHECK.getType(); //请款前校验规则
+		} else if(BankPhaseEnum.AFTER_LOAN.getPhase().equals(phaseEnum.getPhase())) { //贷后阶段
+			ruleType = DscRuleTypeEnum.AFTER_LOAN_CHECK.getType(); //贷后校验规则
+		}
+		//====== 通过资方ID获取补充规则明细规则明细
+		List<DscRuleDto> ruleDtoList = DscRule.getListByCapitalIdRuleType(capitalId, ruleType);
+		return phaseRuleCheck(ruleDtoList, sourceMap,ruleType);
+	}
+	
+	/**
+	 * 规则校验
+	 * @param ruleDtoList
+	 * @param sourceMap
+	 * @return
+	 */
+	public DscSupplyDto phaseRuleCheck(List<DscRuleDto> ruleDtoList, Map<String, Object> sourceMap,String type) {
+		if(CollectionUtils.isEmpty(ruleDtoList)){
+			return null;
+		}
+		List<DscMatchResult> matchResultList = Lists.newArrayList();
+		for (DscRuleDto dscRuleDto : ruleDtoList) {
+			RuleEngineService ruleEngineService = ruleEngineManager.getEngineByMatchType(RuleEvalEnum.JSCOM.getType());//jsCompiled
+			DscMatchResult dscMatchResult = ruleEngineService.eval(dscRuleDto.getDscRuleDetailDto(), sourceMap,
+					dscRuleDto.getDscFieldFDtoList(),type);
+			if(!dscMatchResult.isMach()){
+				matchResultList.add(dscMatchResult);
+			}
+		}
+		if(CollectionUtils.isEmpty(matchResultList)){
+			return null;
+		}
+		DscSupplyDto dscSupply = new DscSupplyDto();
+		for(DscMatchResult matchResult:matchResultList){
+			if(StringUtils.isNotBlank(matchResult.getRuleMessage())){
+				dscSupply.setSupplyMessage(matchResult.getRuleMessage());
+			} else if(MapUtils.isNotEmpty(matchResult.getMatchResultMap())){
+				DscSupplyFieldsDto supplyField = null;
+				List<DscSupplyFieldsDto> fieldList = Lists.newArrayList();
+				for(Map.Entry<String,Object> entry : matchResult.getMatchResultMap().entrySet()){
+					supplyField = JSON.parseObject(JSON.toJSONString(entry.getValue()), DscSupplyFieldsDto.class);
+					fieldList.add(supplyField);
+	            }
+				dscSupply.setFieldList(fieldList); //补充的字段
+			}
+		}
+		return dscSupply;
+	}
+}

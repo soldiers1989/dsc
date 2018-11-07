@@ -1,0 +1,239 @@
+package com.yixin.kepler.v1.service.capital.icbc;
+
+import java.util.Arrays;
+import java.util.Date;
+import java.util.HashSet;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationContext;
+import org.springframework.scheduling.annotation.Async;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.Assert;
+
+import com.alibaba.fastjson.JSONObject;
+import com.yixin.common.exception.BzException;
+import com.yixin.common.utils.DateUitls;
+import com.yixin.common.utils.JsonObjectUtils;
+import com.yixin.dsc.dto.DscFlowResultForAlixDto;
+import com.yixin.dsc.enumpackage.DscAlixLinkEnum;
+import com.yixin.dsc.util.MailMessageUtils;
+import com.yixin.kepler.common.enums.AssetStateEnum;
+import com.yixin.kepler.common.enums.CreditfrontResultEnum;
+import com.yixin.kepler.core.constant.CommonConstant;
+import com.yixin.kepler.core.listener.ResultNotifyEvent;
+import com.yixin.kepler.dto.BaseMsgDTO;
+import com.yixin.kepler.enity.AssetBankTran;
+import com.yixin.kepler.enity.AssetMainInfo;
+import com.yixin.kepler.enity.OsbFile;
+import com.yixin.kepler.enity.OsbFileLog;
+import com.yixin.kepler.v1.common.constants.BankRequestConstant;
+import com.yixin.kepler.v1.common.constants.IcbcConstant;
+import com.yixin.kepler.v1.common.core.bankReq.BankRespResultHandle;
+import com.yixin.kepler.v1.datapackage.dto.BankRespResultHandleDTO;
+import com.yixin.kepler.v1.datapackage.dto.icbc.ICBCFirstTrialDataDTO;
+import com.yixin.kepler.v1.datapackage.dto.icbc.ICBCRequestFundsDTO;
+import com.yixin.kepler.v1.datapackage.dto.icbc.IcbcAckDataDTO;
+import com.yixin.kepler.v1.datapackage.dto.icbc.IcbcApplyDTO;
+import com.yixin.kepler.v1.datapackage.entity.AssetBankRequest;
+import com.yixin.kepler.v1.utils.JacksonUtils;
+
+/**
+ * 银行响应结果处理任务
+ * Package : com.yixin.kepler.v1.job
+ * 
+ * @author YixinCapital -- chen.lin
+ *		   2018年9月17日 下午5:31:21
+ *
+ */
+@Service("ICBCRespResultHandle")
+public class ICBCRespResultHandle implements BankRespResultHandle {
+
+	
+	private static final Logger logger = LoggerFactory.getLogger(ICBCRespResultHandle.class);
+
+    @Autowired
+    private ApplicationContext ioc;
+	
+	
+	/**
+	 * 银行响应结果处理
+	 * @param resultDTO
+	 * @return 结果对象
+	 * @author YixinCapital -- chen.lin
+	 *	       2018年9月17日 下午5:28:55
+	 */
+	@Override
+	@Transactional
+	public BaseMsgDTO respResultHandle(BankRespResultHandleDTO resultDTO) {
+		
+		//获取资产发起银行请求信息
+		AssetBankRequest bankRequest = AssetBankRequest.getById(resultDTO.getBankReqId());
+		try {
+			//处理银行实时收妥报文
+			IcbcApplyDTO<IcbcAckDataDTO> response = null;
+			response = (IcbcApplyDTO<IcbcAckDataDTO>) JacksonUtils.getObjectFromJson(resultDTO.getBankResultJosn(), IcbcApplyDTO.class, IcbcAckDataDTO.class);
+			
+			AssetMainInfo assetMainInfo = AssetMainInfo.getByApplyNo(resultDTO.getApplyNo());
+			if (assetMainInfo == null) {
+				logger.info("申请单号为{}，订单还未发起信审", resultDTO.getApplyNo());
+				throw new BzException("订单还未发起信审");
+			}
+			
+			//获取银行交易记录
+			AssetBankTran assetBankTran = AssetBankTran.getByTranNo(resultDTO.getTranNo(), CommonConstant.SenderType.YIXIN);
+			assetBankTran.setReqBody(resultDTO.getVenusRespJosn());
+			assetBankTran.setRepBody(resultDTO.getBankResultJosn());
+			assetBankTran.setApprovalCode(response.getData().getProcflag()); //交易结果码值
+			assetBankTran.setApprovalDesc(response.getData().getErrmsg()); //交易结果码值
+			
+			String requestResult = response.getData().getProcflag();
+			String requestFlag = response.getComm().getTrxcode();
+			Assert.notNull(requestResult, "id["+resultDTO.getBankReqId()+"]applyNo["+resultDTO.getApplyNo()+"] Procflag is empty");
+			Assert.notNull(requestFlag, "id["+resultDTO.getBankReqId()+"]applyNo["+resultDTO.getApplyNo()+"] Trxcode is empty");
+			
+			/*****************************处理银行结果开始**********************************/
+			if (requestResult.contains(IcbcConstant.APPROVAL_CODE_SUCCESS)) {
+				if (requestFlag.equals(IcbcConstant.TRXCODE_10101) || requestFlag.equals(IcbcConstant.TRXCODE_10181)){//信审
+					assetMainInfo.setLastState(AssetStateEnum.DOING.getState()); 
+				}else if (requestFlag.equals(IcbcConstant.TRXCODE_40101) || requestFlag.equals(IcbcConstant.TRXCODE_40181)){//请款
+					assetMainInfo.setPaymentState(AssetStateEnum.DOING.getState()); 
+				}
+				bankRequest.setReqState(BankRequestConstant.REQ_BANK_SUCCESS);
+				//更新数据
+				bankRequest.update();
+				assetMainInfo.update();
+				assetBankTran.update();
+				return new BaseMsgDTO(CommonConstant.SUCCESS, "银行受理成功");
+			} else {
+				if (requestFlag.equals(IcbcConstant.TRXCODE_10101) || requestFlag.equals(IcbcConstant.TRXCODE_10181)){//信审
+					assetMainInfo.setLastState(AssetStateEnum.ACCEPT_FAILD.getState()); 
+				}else if (requestFlag.equals(IcbcConstant.TRXCODE_40101) || requestFlag.equals(IcbcConstant.TRXCODE_40181)){//请款
+					assetMainInfo.setPaymentState(AssetStateEnum.ACCEPT_FAILD.getState()); 
+				}
+				bankRequest.setReqState(BankRequestConstant.REQ_BANK_FAIL);
+				//更新数据
+				bankRequest.update();
+				assetMainInfo.update();
+				assetBankTran.update();
+				asyncNotifyResult(response);
+				return new BaseMsgDTO(CommonConstant.FAILURE, "银行受理失败");
+			}
+			/*****************************处理银行结果结束**********************************/
+		} catch (Exception e) {
+			bankRequest.setReqState(BankRequestConstant.RETRY_REQ_EXCEP);
+			//更新数据
+			bankRequest.update();
+			logger.error("订单号(" + resultDTO.getApplyNo() + ")银行响应结果处理异常，请关注！msg={}", e);
+			MailMessageUtils.sendException(e, "订单号(" + resultDTO.getApplyNo() + ")银行响应结果处理异常，请关注");
+			return new BaseMsgDTO(CommonConstant.FAILURE, "业务处理失败");
+		}
+	}
+	
+	
+	/**
+	 * 异步通知给请求方银行结果
+     * @param feedback 
+     * @author YixinCapital -- chen.lin
+     *	       2018年9月13日 下午8:42:25
+     */
+	@Async                            
+	protected void asyncNotifyResult (IcbcApplyDTO<IcbcAckDataDTO> feedback){
+        DscFlowResultForAlixDto alixDto = new DscFlowResultForAlixDto();
+        // 需要通过银行编号反查提报端申请编号
+		AssetMainInfo mainInfo = AssetMainInfo.getByVenusApplyNo(feedback.getData().getOrderno());
+        alixDto.setApplyNo(mainInfo.getApplyNo());
+        alixDto.setCode(CreditfrontResultEnum.REJECT.getCode()); 
+		if (IcbcConstant.TRXCODE_10101.equals(feedback.getComm().getTrxcode()) || IcbcConstant.TRXCODE_10181.equals(feedback.getComm().getTrxcode())){//信审
+	        alixDto.setLink(DscAlixLinkEnum.CREDITFRONT.getCode());
+		}else if(IcbcConstant.TRXCODE_40101.equals(feedback.getComm().getTrxcode()) || IcbcConstant.TRXCODE_40181.equals(feedback.getComm().getTrxcode())){//请款
+	        alixDto.setLink(DscAlixLinkEnum.REQUEST_FUNDS.getCode());
+		}
+        alixDto.setMessage(feedback.getData().getErrmsg());
+        ioc.publishEvent(new ResultNotifyEvent(alixDto));
+	}
+
+
+	/**
+	 * 组装osb信息，返回最后的请求json
+	 * 		--适用于文件上传成功后跑批发起银行请求的业务
+     * @param requestDTO
+     * @param osbFileLog
+     * @return 
+     * @author YixinCapital -- chen.lin
+     *	       2018年9月19日 上午10:44:10
+     */
+	@Override
+	public String assembleOsb(AssetBankRequest requestDTO, OsbFileLog osbFileLog) {
+		try {
+			if(new HashSet<>(Arrays.asList(BankRequestConstant.LAST_TRIAL)).contains(requestDTO.getPhase())){	
+				IcbcApplyDTO<ICBCFirstTrialDataDTO> firstDataDTO = null;
+				firstDataDTO = (IcbcApplyDTO<ICBCFirstTrialDataDTO>) JacksonUtils.getObjectFromJson(requestDTO.getAssetReqBody(), IcbcApplyDTO.class, ICBCFirstTrialDataDTO.class);
+				logger.info("审信时获取上传文件信息:{}",  JacksonUtils.fromObjectToJson(osbFileLog));
+				if(osbFileLog != null){
+					OsbFile file = OsbFile.getOsbFilesByTranNo(osbFileLog.getTranNo());
+					logger.info("[工行信审]获取审信时文件信息osbFile：{}", JacksonUtils.fromObjectToJson(file));
+					firstDataDTO.getData().setFilename(osbFileLog.getCompressName()+IcbcConstant.ICBC_FILE_ZIP);// 打包文件名
+					firstDataDTO.getData().setFilepasswd(osbFileLog.getEncryptKey());
+					if(null != file){
+						firstDataDTO.getData().setFilesize(String.valueOf(file.getFileSize()));// 文件字节数
+					}
+				}
+				else{
+					firstDataDTO.getData().setFilepasswd(IcbcConstant.ICBC_FILE_PASSWORD);// 文件加密密码
+					firstDataDTO.getData().setFilename(IcbcConstant.ICBC_FILE_NAME);// 打包文件名
+					firstDataDTO.getData().setFilesize(IcbcConstant.ICBC_FILE_SIZE);// 文件字节数
+				}
+				firstDataDTO.getData().setFiletrans(IcbcConstant.ICBC_FILETRANS_YES);
+				return JsonObjectUtils.objectToJson(firstDataDTO);		
+			}else if(new HashSet<>(Arrays.asList(BankRequestConstant.PAY_MENT)).contains(requestDTO.getPhase())){	
+				IcbcApplyDTO<ICBCRequestFundsDTO> paymentDataDTO = null;
+				paymentDataDTO = (IcbcApplyDTO<ICBCRequestFundsDTO>) JacksonUtils.getObjectFromJson(requestDTO.getAssetReqBody(), IcbcApplyDTO.class, ICBCRequestFundsDTO.class);
+				logger.info("请款时获取上传文件信息:{}",  JacksonUtils.fromObjectToJson(osbFileLog));
+				if(osbFileLog != null){
+					OsbFile file = OsbFile.getOsbFilesByTranNo(osbFileLog.getTranNo());
+					logger.info("[工行请款]获取请款时文件信息osbFile：{}", JacksonUtils.fromObjectToJson(file));
+					paymentDataDTO.getData().setFilename(osbFileLog.getCompressName()+IcbcConstant.ICBC_FILE_ZIP);// 打包文件名
+					paymentDataDTO.getData().setFilepasswd(osbFileLog.getEncryptKey());
+					if(null != file){
+						paymentDataDTO.getData().setFilesize(String.valueOf(file.getFileSize()));// 文件字节数
+					}
+				}
+				else{
+					paymentDataDTO.getData().setFilepasswd(IcbcConstant.ICBC_FILE_PASSWORD);// 文件加密密码
+					paymentDataDTO.getData().setFilename(IcbcConstant.ICBC_FILE_NAME);// 打包文件名
+					paymentDataDTO.getData().setFilesize(IcbcConstant.ICBC_FILE_SIZE);// 文件字节数
+				}
+				paymentDataDTO.getData().setFiletrans(IcbcConstant.ICBC_FILETRANS_YES);
+				return JsonObjectUtils.objectToJson(paymentDataDTO);		
+			}
+		} catch (Exception e) {
+			MailMessageUtils.sendException(e, "订单号(" + requestDTO.getApplyNo() + ")组装osb信息，返回最后的请求json处理异常，请关注");
+			return null;		
+		}
+		return null;		
+	}
+	
+	
+	/**
+	 * 工行请求前重置请求时间
+	 * @param task
+	 * @return 请求json
+	 * @author YixinCapital -- chen.lin
+	 *	       2018年10月23日 下午2:23:54
+	 */
+	public String requestBeforeHandle(AssetBankRequest task){
+		logger.info("工行请求前重置请求时间开始：{}", task.getApplyNo());
+		JSONObject jsonObject = JSONObject.parseObject(task.getAssetReqBody());
+		if(jsonObject != null && jsonObject.containsKey("sendtime")){
+			String sendTime = DateUitls.dateToStr(new Date(), "yyyyMMdd HH:mm:ss");
+			jsonObject.put("sendtime", sendTime); //重新生成请求时间
+			logger.info("重置请求时间成功，applyNo：{}，时间：{}", task.getApplyNo(), sendTime);
+		} else{
+			logger.error("重置请求时间失败，applyNo：{}", task.getApplyNo());
+		}
+		return jsonObject.toString();
+	};
+}

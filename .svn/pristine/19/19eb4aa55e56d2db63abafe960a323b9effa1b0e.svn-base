@@ -1,0 +1,448 @@
+package com.yixin.kepler.v1.service.capital.yillion;
+
+import com.alibaba.fastjson.JSON;
+import com.google.common.collect.Maps;
+import com.yixin.common.exception.BzException;
+import com.yixin.common.system.util.BeanCopyUtil;
+import com.yixin.common.utils.InvokeResult;
+import com.yixin.dsc.dto.DscSupplyAttachmentsDto;
+import com.yixin.dsc.dto.DscSupplyDto;
+import com.yixin.dsc.entity.order.DscFileAttachment;
+import com.yixin.dsc.entity.order.DscSalesApplyCar;
+import com.yixin.dsc.entity.order.DscSalesApplyCost;
+import com.yixin.dsc.entity.order.DscSalesApplyMain;
+import com.yixin.dsc.util.StrUtil;
+import com.yixin.kepler.common.JacksonUtil;
+import com.yixin.kepler.common.ScriptEngineUtil;
+import com.yixin.kepler.common.enums.BankPhaseEnum;
+import com.yixin.kepler.core.attachment.AttachmentRuleParamMap;
+import com.yixin.kepler.core.attachment.OsbFileDomain;
+import com.yixin.kepler.core.attachment.OsbFileUrl;
+import com.yixin.kepler.core.attachment.UploadAttachmentDomain;
+import com.yixin.kepler.core.constant.CommonConstant;
+import com.yixin.kepler.dto.OsbAttachmentDTO;
+import com.yixin.kepler.enity.AssetAttachmentRule;
+import com.yixin.kepler.enity.AssetFinanceInfo;
+import com.yixin.kepler.enity.AssetMainInfo;
+import com.yixin.kepler.enity.OsbFileLog;
+import com.yixin.kepler.v1.common.constants.YILLIONConstant;
+import com.yixin.kepler.v1.datapackage.dto.yillion.Attachment4UploadDTO;
+import org.apache.commons.collections.CollectionUtils;
+import org.assertj.core.util.Lists;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.util.Assert;
+
+import javax.annotation.ManagedBean;
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+/**
+ * 亿联文件上传
+ *
+ * @author sukang
+ */
+
+@ManagedBean(value = "YILLIONUploadAttachment")
+public class UploadAttachment extends UploadAttachmentDomain<OsbAttachmentDTO> {
+
+    private final Logger logger = LoggerFactory.getLogger(getClass());
+
+    /**
+     * 文件路径
+     */
+    private final static String FILE_PATH_FORMAT = "/filetransfer/In/image/%s/%s/%s";
+
+    /**
+     * 资方编码
+     */
+    private final static String FINANCIAL_CODE = CommonConstant.BankName.YILLION_BANK;
+
+    @Override
+    public void doIt(OsbAttachmentDTO inputDto) throws BzException {
+        try {
+            uploadAttachment(inputDto);
+        } catch (Exception e) {
+            String errorInfo = String.format("订单号(%s),阶段为(%s)上传文件发生异常", inputDto.getBzId(), inputDto.getBzType());
+            logger.error(errorInfo, e);
+        }
+    }
+
+
+    /**
+     * 上传附件到银行sftp
+     *
+     * @param attachmentInfo
+     */
+    private void uploadAttachment(OsbAttachmentDTO attachmentInfo) {
+        //订单编号
+        String applyNo = attachmentInfo.getBzId();
+        //阶段
+        String phase = attachmentInfo.getBzType();
+
+        //订单基础信息
+        DscSalesApplyMain applyMainInfo = DscSalesApplyMain.getByApplyNo(applyNo);
+        String mainId = applyMainInfo.getId();
+        String rentingCompanyCode = applyMainInfo.getRentingCompanyCode();
+
+        AssetMainInfo assetMainInfo = AssetMainInfo.getByApplyNo(applyNo);
+
+        String venusApplyNo = assetMainInfo.getVenusApplyNo();
+        String bankOrderNo = YILLIONConstant.ORDER_NO_PREFIX + venusApplyNo;
+
+        //1.找到需要上传的附件
+        List<Attachment4UploadDTO> attachmentList = findAttachmentNeedUpload(mainId, applyNo, phase, bankOrderNo);
+
+        //2.做对应的预处理
+        String osbFileJson = generateOsbFileJson(attachmentList);
+
+        //3.发起上传任务
+        String serverFilePath = generateServerFilePath(bankOrderNo, rentingCompanyCode);
+        attachmentUpload(applyNo, phase, osbFileJson, serverFilePath);
+    }
+
+
+    /**
+     * 根据资方对应的附件配置，找出所有需要上传的附件
+     * <p>
+     * 如果所需附件不全直接抛出异常
+     *
+     * @param applyNo
+     * @param phase
+     * @return
+     */
+    private List<Attachment4UploadDTO> findAttachmentNeedUpload(String mainId, String applyNo, String phase, String bankOrderNo) {
+
+        DscSalesApplyCost applyCost = DscSalesApplyCost.getByMainId(mainId);
+        //客户融资总额-附件校验参数
+        BigDecimal loanAmount = applyCost.getFrze();
+
+        //资方附件配置规则
+        List<AssetAttachmentRule> ruleList = AssetAttachmentRule.getByFinancialCodeAndPhase(FINANCIAL_CODE, phase);
+        if (ruleList == null || ruleList.size() <= 0) {
+            return null;
+        }
+        //订单附件
+        List<DscFileAttachment> attachmentList = DscFileAttachment.lists(mainId);
+        if (attachmentList == null || attachmentList.size() <= 0) {
+            throw new BzException("订单附件缺失");
+        }
+
+        List<Attachment4UploadDTO> result = Lists.newArrayList();
+        Map<String, List<DscFileAttachment>> attachmentMap = attachmentList.stream().collect(Collectors.groupingBy(DscFileAttachment::getAttachSubClass));
+
+        //遍历规则
+        for (AssetAttachmentRule attachmentRule : ruleList) {
+
+            String attachmentType = attachmentRule.getAttachMainType();
+            List<DscFileAttachment> attachments = attachmentMap.get(attachmentType);
+
+            List<Attachment4UploadDTO> attachment4Uploads = assembleAttachment4Upload(attachments, attachmentRule, bankOrderNo);
+            if (attachment4Uploads != null && attachment4Uploads.size() > 0) {
+                result.addAll(attachment4Uploads);
+            }
+
+            String checkRule = attachmentRule.getRule();
+            if (StrUtil.isEmpty(checkRule)) {
+                continue;
+            }
+
+            boolean checkResult = attachmentCheck(checkRule, attachments, loanAmount);
+            if (!checkResult) {
+                logger.error("find attachment need upload, attachment check error, mainId:{}, applyNo:{}, phase:{}, check rule:{}", mainId, applyNo, phase, checkRule);
+                throw new BzException("订单编号（" + applyNo + "）缺失必要附件，规则为（" + checkRule + ")");
+            }
+        }
+        return result;
+    }
+
+    /**
+     * 将需要上传的附件转换成osb上传需要的数据
+     * <p>
+     *
+     * @param attachmentList
+     * @return
+     */
+    private String generateOsbFileJson(List<Attachment4UploadDTO> attachmentList) {
+
+        List<Map<String, String>> osbFileParamData = Lists.newArrayList();
+
+        for (Attachment4UploadDTO attachment : attachmentList) {
+
+            List<Map<String, String>> attachmentDatas = generateAttachmentData(attachment);
+
+            osbFileParamData.addAll(attachmentDatas);
+        }
+        return JSON.toJSONString(osbFileParamData);
+    }
+
+    /**
+     * 开始上传文件
+     *
+     * @param applyNo
+     * @param phase
+     * @param osbFileJson
+     */
+    private void attachmentUpload(String applyNo, String phase, String osbFileJson, String serverFilePath) {
+        OsbFileLog osbFileLog = osbFileDomain.createOsbFileLog(applyNo, phase, FINANCIAL_CODE, false, "",
+                "", true, osbFileJson, serverFilePath);
+
+        String url = sftpConfig.getSftp().get(OsbFileDomain.OSB_DOWNLOAD_HOST) + OsbFileUrl.CMBC_OSB_UPLOAD_URI;
+        osbFileDomain.uploadOsbData(osbFileLog, getUploadData(osbFileLog), url);
+    }
+
+
+    /**
+     * DscFileAttachment list 转换为 Attachment4UploadDTO list
+     *
+     * @param attachments
+     * @param attachmentRule
+     * @return
+     */
+    private List<Attachment4UploadDTO> assembleAttachment4Upload(List<DscFileAttachment> attachments, AssetAttachmentRule attachmentRule, String orderNo) {
+
+        if (attachments == null || attachments.size() <= 0) {
+            return null;
+        }
+        String nameFormat = attachmentRule.getNameFormat();
+
+        List<Attachment4UploadDTO> result = Lists.newArrayList();
+        for (int i = 0; i < attachments.size(); i++) {
+
+            DscFileAttachment attachment = attachments.get(i);
+            Attachment4UploadDTO attachment4Upload = BeanCopyUtil.map(attachment, Attachment4UploadDTO.class);
+
+            attachment4Upload.setBankAttachClass(attachmentRule.getAttachMainType());
+
+            int attachNo = i + 1;
+            String targetName = generateFileName(nameFormat, attachNo, orderNo);
+            attachment4Upload.setTargetName(targetName);
+            attachment4Upload.setFileType(attachmentRule.getAttachSubType());
+            result.add(attachment4Upload);
+        }
+
+        return result;
+    }
+
+    /**
+     * 根据附件规则检查附件信息
+     *
+     * @param attachments
+     * @param loanAmount
+     * @return
+     */
+    private boolean attachmentCheck(String rule, List<DscFileAttachment> attachments, BigDecimal loanAmount) {
+
+        int size = CollectionUtils.isEmpty(attachments) ? 0 : attachments.size();
+
+        boolean checkResult = (boolean) ScriptEngineUtil.eval(rule, "toDo", size, loanAmount);
+
+        return checkResult;
+    }
+
+    /**
+     * 订单编号_大类编号+子类编号+文件序号_时间戳
+     * <p>
+     * 不带文件后缀
+     *
+     * @param nameFormat
+     * @param index
+     * @param orderNo
+     * @return
+     */
+    private String generateFileName(String nameFormat, int index, String orderNo) {
+        String timestamp = DateTimeFormatter.ofPattern("yyyyMMddHHmmss").format(LocalDateTime.now());
+        String fileIndex = String.format("%02d", index);
+        return String.format(nameFormat, orderNo, fileIndex, timestamp);
+    }
+
+
+    /**
+     * 重命名
+     * 格式转换
+     * md5
+     * alix地址转换为文件服务地址
+     *
+     * @param attachment
+     * @return
+     */
+    private List<Map<String, String>> generateAttachmentData(Attachment4UploadDTO attachment) {
+        String orignFileId = attachment.getFileId();
+        String targetName = attachment.getTargetName();
+        String targetFileType = attachment.getTargetFileType();
+
+        //todo
+
+        List<Map<String, String>> reslut = Lists.newArrayList();
+
+        Map<String, String> fileData = Maps.newHashMap();
+        fileData.put("fileId", "");
+        fileData.put("fileName", "");
+        reslut.add(fileData);
+
+        Map<String, String> fileMD5Data = Maps.newHashMap();
+        fileMD5Data.put("fileId", "");
+        fileMD5Data.put("fileName", "");
+        reslut.add(fileMD5Data);
+
+        return reslut;
+    }
+
+
+    /**
+     * /filetransfer/In/image/渠道号/申请日期/订单编号
+     * <p>
+     * 渠道号，银行定义的外部数据源
+     * 天津易鑫：10002
+     * 上海易鑫：
+     *
+     * @param orderNo
+     * @param rentingCompanyCode 根据不同公司对应文件
+     * @return
+     */
+    public String generateServerFilePath(String orderNo, String rentingCompanyCode) {
+        String date = DateTimeFormatter.ofPattern("yyyyMMdd").format(LocalDate.now());
+
+        String serverFilePath = String.format(FILE_PATH_FORMAT, "10002", date, orderNo);
+
+        return serverFilePath;
+    }
+
+
+    private String getUploadData(OsbFileLog osbFileLog) {
+        logger.info("[osb文件处理]需要处理的osbFileLog：{}", JacksonUtil.fromObjectToJson(osbFileLog));
+
+        Map<String, Object> data = new HashMap<>(12);
+        data.put("archives", osbFileLog.isArchives());
+        data.put("compress", osbFileLog.isCompress());
+        data.put("compressPackageName", osbFileLog.getCompressName());
+        data.put("filePath", osbFileLog.getServerFilePath());
+        data.put("password", osbFileLog.getCompressPwd());
+        data.put("serialNumber", osbFileLog.getTranNo());
+        data.put("server", osbFileLog.getServerType());
+        data.put("serverIP", osbFileLog.getServerIp());
+        data.put("serverPassword", osbFileLog.getServerPwd());
+        data.put("serverPort", osbFileLog.getServerPort());
+        data.put("serverUserName", osbFileLog.getServerUname());
+        data.put("systemId", osbFileLog.getRoutingKey());
+        data.put("files", osbFileLog.getFileJson());
+        data.put("compressFormat", osbFileLog.getCompressFormat());
+        logger.info("[osb文件处理]即将传递给osb的参数信息JSON：{}", data.toString());
+        return data.toString();
+    }
+
+    @Override
+    protected void getData() throws BzException {
+
+    }
+
+    @Override
+    protected String getFinancialId() {
+        AssetFinanceInfo assetFinanceInfo = AssetFinanceInfo.getByCode(getBankCode());
+        Assert.notNull(assetFinanceInfo, "未获取到资方id");
+        return assetFinanceInfo.getId();
+    }
+
+    @Override
+    public String getBankCode() {
+        return CommonConstant.BankName.YILLION_BANK;
+    }
+
+
+    /**
+     * 订单编号_大类编号+子类编号+文件序号_时间戳.文件后缀
+     */
+    @Override
+    public String rename(AttachmentRuleParamMap paramMap, Map<String, AssetAttachmentRule> rules, List<Map<String, String>> renamedList) {
+        return null;
+    }
+
+
+    @Override
+    public void upLoadTask(String bzId, String bzType, List<Map<String, String>> renamedList) {
+
+    }
+
+
+    @Override
+    public String getPackageName() {
+        return "";
+    }
+
+    @Override
+    public String getServerFilePath() {
+        return null;
+    }
+
+
+    @Override
+    public InvokeResult<DscSupplyDto> checkAttachmentFile(OsbAttachmentDTO osbAttachmentDTO) {
+        InvokeResult<DscSupplyDto> invokeResult = new InvokeResult<>();
+
+        DscSalesApplyMain dscSalesApplyMain = DscSalesApplyMain.getByApplyNo(osbAttachmentDTO.getBzId());
+        Map<String, List<DscFileAttachment>> attachmentMap = DscFileAttachment.get(
+                dscSalesApplyMain.getId());
+
+        Map<String, AssetAttachmentRule> rules = AssetAttachmentRule
+                .getRule(dscSalesApplyMain.getCapitalId())
+                .get(BankPhaseEnum.get(osbAttachmentDTO.getBzType()));
+
+        dealAttachmentMap(rules, attachmentMap);
+
+
+        DscSalesApplyCar salesApplyCar = DscSalesApplyCar.getBymainId(
+                dscSalesApplyMain.getId());
+        //js规则入参
+        boolean isNew = "1".equals(salesApplyCar.getAcllx());
+
+        //js入参 客户融资额
+        BigDecimal frze = DscSalesApplyCost.getByMainId(
+                dscSalesApplyMain.getId()).getFrze();
+
+
+        DscSupplyDto dscSupplyDto = null;
+        List<DscSupplyAttachmentsDto> results = null;
+
+        for (Map.Entry<String, AssetAttachmentRule> rule : rules.entrySet()) {
+            List<DscFileAttachment> list = attachmentMap.get(rule.getKey());
+
+            int size = list == null ? 0 : list.size();
+            boolean checkRs = (boolean) ScriptEngineUtil.eval(rule.getValue().getRule(),
+                    "toDo", size, isNew, frze);
+            if (!checkRs) {
+                //组装errorInfo;
+                if (dscSupplyDto == null) {
+                    dscSupplyDto = new DscSupplyDto();
+                    results = new ArrayList<>();
+                }
+                DscSupplyAttachmentsDto attachmentsDto = new DscSupplyAttachmentsDto(1, -1);
+                attachmentsDto.setAttName(rule.getValue().getAttachName());
+
+                String subType = rule.getValue().getAttachMainType();
+                String mergerAttachType = rule.getValue().getMergerAttachType();
+
+                attachmentsDto.setAttType(
+                        org.apache.commons.lang3.StringUtils.isBlank(mergerAttachType)
+                                ? subType : mergerAttachType);
+                results.add(attachmentsDto);
+            }
+
+        }
+
+        if (dscSupplyDto != null) {
+            dscSupplyDto.setAttList(results);
+            invokeResult.failure("缺少必要附件类型").setData(dscSupplyDto);
+            return invokeResult;
+        }
+        return invokeResult.success();
+    }
+}
+
+

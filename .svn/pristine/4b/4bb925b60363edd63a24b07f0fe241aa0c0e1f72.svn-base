@@ -1,0 +1,845 @@
+package com.yixin.dsc.entity.order;
+
+import com.yixin.common.system.domain.BZBaseEntiy;
+
+import javax.persistence.Column;
+import javax.persistence.Entity;
+import javax.persistence.Table;
+import java.math.BigDecimal;
+import java.util.Date;
+import java.util.List;
+
+/**
+ * 申请车辆信息
+ * Package : com.yixin.dsc.entity
+ * 
+ * @author YixinCapital -- wangwenlong
+ *		   2018年6月4日 下午2:15:38
+ *
+ */
+@Entity
+@Table(name = "dsc_sales_apply_car")
+public class DscSalesApplyCar extends BZBaseEntiy{
+	
+	private static final long serialVersionUID = -6103774036028591333L;
+	/**
+	 * 	制造商
+	 */
+	@Column(name = "azcs", columnDefinition = "varchar(64) comment '制造商'")
+	private String azcs;
+	/**
+	 * 	品牌
+	 */
+	@Column(name = "app_name", columnDefinition = "varchar(64) comment '品牌'")
+	private String appName;
+	/**
+	 * 	车系
+	 */
+	@Column(name = "acxi_name", columnDefinition = "varchar(64) comment '车系'")
+	private String acxiName;
+	/**
+	 * 	车型
+	 */
+	@Column(name = "acx_name", columnDefinition = "varchar(64) comment '车型'")
+	private String acxName;
+	/**
+	 * 	新车指导价
+	 */
+	@Column(name = "fzdj", columnDefinition = "decimal(19,2) comment '新车指导价'")
+	private BigDecimal fzdj;
+	/**
+	 * 	实际销售价
+	 */
+	@Column(name = "fxsj", columnDefinition = "decimal(19,2) comment '实际销售价'")
+	private BigDecimal fxsj;
+	/**
+	 * 	购车目的
+	 */
+	@Column(name = "agcmd", columnDefinition = "varchar(64) comment '购车目的'")
+	private String agcmd;
+	/**
+	 * 	预计上牌省份
+	 */
+	@Column(name = "ayjspsf_name", columnDefinition = "varchar(64) comment '预计上牌省份'")
+	private String ayjspsfName;
+	/**
+	 * 	预计上牌城市
+	 */
+	@Column(name = "ayjspcs_name", columnDefinition = "varchar(64) comment '预计上牌城市'")
+	private String ayjspcsName;
+	/**
+	 * 	是否送拍照
+	 */
+	@Column(name = "asfspz", columnDefinition = "varchar(64) comment '是否送拍照'")
+	private String asfspz;
+	/**
+	 * 	车辆开票单位
+	 */
+	@Column(name = "axhdw_name", columnDefinition = "varchar(64) comment '车辆开票单位'")
+	private String axhdwName;
+	/**
+	 * 	客户来源
+	 */
+	@Column(name = "client_source", columnDefinition = "varchar(64) comment '客户来源'")
+	private String clientSource;
+	/**
+	 * 	网点名称
+	 */
+	@Column(name = "branch_name", columnDefinition = "varchar(64) comment '网点名称'")
+	private String branchName;
+	/**
+	 * 	公司三级销售管理
+	 */
+	@Column(name = "salesmans", columnDefinition = "varchar(64) comment '公司三级销售管理'")
+	private String salesmans;
+	/**
+	 * 	分公司金融经理
+	 */
+	@Column(name = "financial_manager_name", columnDefinition = "varchar(64) comment '分公司金融经理'")
+	private String financialManagerName;
+	
+	
+	
+	/**
+	 * 	公里数(万公里)
+	 */
+	@Column(name = "fescgls", columnDefinition = "decimal(19,2) comment '公里数(万公里)'")
+	private BigDecimal fescgls;
+	/**
+	 * 	提报预估价
+	 */
+	@Column(name = "fescpgjebg", columnDefinition = "decimal(19,2) comment '提报预估价'")
+	private BigDecimal fescpgjebg;
+	/**
+	 * 	车架号（VIN码）
+	 */
+	@Column(name = "acjh", columnDefinition = "varchar(64) comment '车架号'")
+	private String acjh;
+
+	/**
+	 * 发动机号
+	 */
+	@Column(name = "afdjh", columnDefinition = "varchar(64) comment '发动机号'")
+	private String afdjh;
+
+	/**
+	 * 	出厂日期
+	 */
+	@Column(name = "descccrq",columnDefinition = "datetime comment '出厂日期'")
+	private Date descccrq;
+	/**
+	 * 	初登日期
+	 */
+	@Column(name = "desccdrq",columnDefinition = "datetime comment '初登日期'")
+	private Date desccdrq;
+	/**
+	 * 	当前牌照
+	 */
+	@Column(name = "acarnojc", columnDefinition = "varchar(64) comment '当前牌照'")
+	private String acarnojc;
+	/**
+	 * 	二手车评估机构
+	 */
+	@Column(name = "old_car_company_name", columnDefinition = "varchar(64) comment '二手车评估机构'")
+	private String oldcarcompanyName;
+
+	/**
+	 * 订单主表ID
+	 */
+	@Column(name = "main_id", columnDefinition = "varchar(50) comment '订单主表ID'")
+	private String mainId;
+
+	/**
+	 * 	座位数
+	 */
+	@Column(name = "izws", columnDefinition = "int(10) comment '座位数'")
+	private Integer izws;
+	/**
+	 * 	排量
+	 */
+	@Column(name = "aclpl", columnDefinition = "varchar(64) comment '排量'")
+	private String aclpl;
+	/**
+	 * 	车龄(月)
+	 */
+	@Column(name = "icl", columnDefinition = "int(10) comment '车龄(月)'")
+	private Integer icl;
+
+
+
+	//------------------ 0609wxl补充字段 start
+
+	/**
+	 * 车辆用途 aclyt
+	 */
+	@Column(name = "aclyt", columnDefinition = "varchar(64) comment '车辆用途'")
+	private String aclyt;
+
+	/**
+	 * 	车辆开票金额（fclfpje）
+	 */
+	@Column(name = "fclfpje", columnDefinition = "decimal(19,2) comment '开票金额'")
+	private BigDecimal fclfpje;
+	/**
+	 * 	车辆开票日期（dclkprq）
+	 */
+	@Column(name = "dclkprq", columnDefinition = "datetime comment '车辆开票日期'")
+	private Date dclkprq;
+
+
+	//------------------ 0609wxl补充字段 end
+
+	/**
+	 * //是否是新能源车
+	 */
+	@Column(name = "is_xnyc", columnDefinition = "varchar(64) comment '是否是新能源车'")
+	private String isXnyc;
+
+
+	/**
+	 * 是否是LCV
+	 */
+	@Column(name = "isLCV", columnDefinition = "varchar(64) comment '是否是LCV'")
+	private String isLCV;
+	/**
+	 *保证金剩余金
+	 */
+	@Column(name = "fbzj", columnDefinition = "decimal(19,2) comment '保证金剩余金'")
+	private BigDecimal fbzj;
+	/**
+	 * 尾付金额
+	 */
+	@Column(name = "fsfje", columnDefinition = "decimal(19,2) comment '尾付金额'")
+	private BigDecimal fsfje;
+	/**
+	 * 车辆类型 ---新车、资源车、二手车  WBCarTypeEnum
+	 */
+	@Column(name = "acllx", columnDefinition = "varchar(50) comment '车辆类型'")
+	private String acllx;
+
+	/**
+	 * 二手车评估价格
+	 */
+	@Column(name = "appraisalprice", columnDefinition = "decimal(19,2) comment '二手车评估价格'")
+	private BigDecimal appraisalprice;
+	
+	
+	//============== 2018/07/11 新增字段  =============================
+	/**
+	 * 二手车评估机构  1:穗圣、2:精真估、3:看车网、0:免评估、4:线上评估、 5:人人车
+	 */
+	@Column(name = "oldcarcompany", columnDefinition = "varchar(32) comment '二手车评估机构  1:穗圣、2:精真估、3:看车网、0:免评估、4:线上评估、 5:人人车'")
+	private String oldcarcompany;
+	
+	/**
+	 * alix拿到评估报告的时间  0:免评估时 没有评估报告，就没有评估时间
+	 */
+	@Column(name = "assess_time", columnDefinition = "datetime comment 'alix拿到评估报告的时间  0:免评估时 没有评估报告，就没有评估时间'")
+	private Date assessTime;
+	
+	/**
+	 * 车辆ID，四级 1111_2222_3333_4444
+	 */
+	@Column(name = "car_id", columnDefinition = "varchar(128) comment '车辆ID，四级 1111_2222_3333_4444'")
+	private String carId;
+	
+	/**
+	 * 车辆类型"新车-Y二手车-N"
+	 */
+	@Column(name = "is_new_car", columnDefinition = "varchar(32) comment '车辆类型 新车-Y 二手车-N'")
+	private String isNewCar;
+	
+	/**
+	 * 车辆性质 01：乘用车&微面  02：轻卡  03：LCV（皮卡、微卡）
+	 */
+	@Column(name = "vehicle_pro", columnDefinition = "varchar(32) comment '车辆性质 01：乘用车&微面  02：轻卡  03：LCV（皮卡、微卡）'")
+	private String vehiclePro;
+	
+	/**
+	 * 过户次数,新车为0
+	 */
+	@Column(name = "xfr_times", columnDefinition = "int(10) comment '过户次数,新车为0'")
+	private Integer xfrTimes;
+	
+	/**
+	 * (LCV用途)0:非商用  1:商用 
+	 */
+	@Column(name = "purposeofusingforlcv", columnDefinition = "varchar(32) comment '(LCV用途)0:非商用  1:商用 '")
+	private String purposeofusingforlcv;
+	
+	
+	//--------------- 同步贷后资料接口 ----------------
+	/**
+	 * 上牌日期
+	 */
+	@Column(name = "registrate_time", columnDefinition = "datetime comment '上牌日期'")
+	private Date registrateTime;
+	
+	/**
+	 * 抵押登记日期
+	 */
+	@Column(name = "mortgage_reg_date", columnDefinition = "datetime comment '抵押登记日期'")
+	private Date mortgageRegDate;
+	
+	/**
+	 * 抵押办理城市码值
+	 */
+	@Column(name = "mortgage_city_code", columnDefinition = "varchar(32) comment '抵押办理城市码值'")
+	private String mortgageCityCode;
+	
+	/**
+	 * 抵押办理城市名称
+	 */
+	@Column(name = "mortgage_city_name", columnDefinition = "varchar(64) comment '抵押办理城市名称'")
+	private String mortgageCityName;
+	
+	//--------------- 同步贷后资料接口 ----------------
+	
+	//--------------- 同步请款资料接口 ----------------
+	/**
+	 * 二手车保险到日期（二手车才有）
+	 */
+	@Column(name = "insurance_maturity_date", columnDefinition = "datetime comment '二手车保险到日期（二手车才有）'")
+	private Date insuranceMaturityDate;
+	
+	/**
+	 * 车辆过户完成日期
+	 */
+	@Column(name = "car_pass_date", columnDefinition = "datetime comment '车辆过户完成日期'")
+	private Date carPassDate;
+	
+	/**
+	 * GPS是否激活
+	 * Y 是 N 否
+	 */
+	@Column(name = "is_gps_active", columnDefinition = "varchar(16) comment 'GPS是否激活Y 是 N 否'")
+	private String isGpsActive;
+	
+	/**
+	 * GPS激活时间
+	 */
+	@Column(name = "gps_active_time", columnDefinition = "datetime comment 'GPS激活时间'")
+	private Date gpsActiveTime;
+	
+	/**
+	 * GPS设备码1
+	 */
+	@Column(name = "gps_code1", columnDefinition = "varchar(64) comment 'GPS设备码1'")
+	private String gpsCode1;
+	
+	/**
+	 * GPS设备码2
+	 */
+	@Column(name = "gps_code2", columnDefinition = "varchar(64) comment 'GPS设备码2'")
+	private String gpsCode2;
+	
+	/**
+	 * GPS设备码3
+	 */
+	@Column(name = "gps_code3", columnDefinition = "varchar(64) comment 'GPS设备码3'")
+	private String gpsCode3;
+	//--------------- 同步请款资料接口 ----------------
+	//============== 2018/07/11 新增字段  =============================
+
+	//============== 2018/09/05  新增字段开始  add by wangwenlong  =============================
+	/**
+	 * 是否返贷 0/否  1/是
+	 */
+	@Column(name = "asffd", columnDefinition = "varchar(32) comment '是否返贷 0/否  1/是'")
+	private String asffd; 
+	//============== 2018/09/05  新增字段结束  =============================
+	/**
+	 * 购车年月--工行项目新增字段（20180925）
+	 */
+	@Column(name = "buy_car_time",columnDefinition = "datetime comment '购车年月'")
+	private Date buyCarTime;
+
+	//============== 2018/10/17  新增字段结束需求9982  =============================
+	/**
+	 * 预选准入银行--工行项目新增字段（20180117）
+	 */
+	@Column(name = "ayxzryh",columnDefinition = "varchar(32)  comment '预选准入银行'")
+	private String ayxzryh;
+
+	@Column(name = "asfwpxjkc",columnDefinition = "varchar(32)  comment '是否是平行进口车'")
+	private String asfwpxjkc;
+
+	public String getAyxzryh() {
+		return ayxzryh;
+	}
+
+	public void setAyxzryh(String ayxzryh) {
+		this.ayxzryh = ayxzryh;
+	}
+
+	public Date getBuyCarTime() {
+		return buyCarTime;
+	}
+
+	public void setBuyCarTime(Date buyCarTime) {
+		this.buyCarTime = buyCarTime;
+	}
+
+	public String getMainId() {
+		return mainId;
+	}
+
+	public Date getRegistrateTime() {
+		return registrateTime;
+	}
+
+	public String getPurposeofusingforlcv() {
+		return purposeofusingforlcv;
+	}
+
+	public void setPurposeofusingforlcv(String purposeofusingforlcv) {
+		this.purposeofusingforlcv = purposeofusingforlcv;
+	}
+
+	public void setRegistrateTime(Date registrateTime) {
+		this.registrateTime = registrateTime;
+	}
+
+	public Date getMortgageRegDate() {
+		return mortgageRegDate;
+	}
+
+	public void setMortgageRegDate(Date mortgageRegDate) {
+		this.mortgageRegDate = mortgageRegDate;
+	}
+
+	public String getMortgageCityCode() {
+		return mortgageCityCode;
+	}
+
+	public void setMortgageCityCode(String mortgageCityCode) {
+		this.mortgageCityCode = mortgageCityCode;
+	}
+
+	public String getMortgageCityName() {
+		return mortgageCityName;
+	}
+
+	public void setMortgageCityName(String mortgageCityName) {
+		this.mortgageCityName = mortgageCityName;
+	}
+
+	public Date getCarPassDate() {
+		return carPassDate;
+	}
+
+	public void setCarPassDate(Date carPassDate) {
+		this.carPassDate = carPassDate;
+	}
+
+	public String getIsGpsActive() {
+		return isGpsActive;
+	}
+
+	public void setIsGpsActive(String isGpsActive) {
+		this.isGpsActive = isGpsActive;
+	}
+
+	public Date getGpsActiveTime() {
+		return gpsActiveTime;
+	}
+
+	public void setGpsActiveTime(Date gpsActiveTime) {
+		this.gpsActiveTime = gpsActiveTime;
+	}
+
+	public String getGpsCode1() {
+		return gpsCode1;
+	}
+
+	public void setGpsCode1(String gpsCode1) {
+		this.gpsCode1 = gpsCode1;
+	}
+
+	public String getGpsCode2() {
+		return gpsCode2;
+	}
+
+	public void setGpsCode2(String gpsCode2) {
+		this.gpsCode2 = gpsCode2;
+	}
+
+	public String getGpsCode3() {
+		return gpsCode3;
+	}
+
+	public void setGpsCode3(String gpsCode3) {
+		this.gpsCode3 = gpsCode3;
+	}
+
+	public String getOldcarcompany() {
+		return oldcarcompany;
+	}
+
+	public void setOldcarcompany(String oldcarcompany) {
+		this.oldcarcompany = oldcarcompany;
+	}
+
+	public Date getAssessTime() {
+		return assessTime;
+	}
+
+	public void setAssessTime(Date assessTime) {
+		this.assessTime = assessTime;
+	}
+
+	public String getCarId() {
+		return carId;
+	}
+
+	public void setCarId(String carId) {
+		this.carId = carId;
+	}
+	public Date getInsuranceMaturityDate() {
+		return insuranceMaturityDate;
+	}
+
+	public void setInsuranceMaturityDate(Date insuranceMaturityDate) {
+		this.insuranceMaturityDate = insuranceMaturityDate;
+	}
+
+	public String getIsNewCar() {
+		return isNewCar;
+	}
+
+	public void setIsNewCar(String isNewCar) {
+		this.isNewCar = isNewCar;
+	}
+
+	public String getVehiclePro() {
+		return vehiclePro;
+	}
+
+	public void setVehiclePro(String vehiclePro) {
+		this.vehiclePro = vehiclePro;
+	}
+
+	public Integer getXfrTimes() {
+		return xfrTimes;
+	}
+
+	public void setXfrTimes(Integer xfrTimes) {
+		this.xfrTimes = xfrTimes;
+	}
+
+	public void setMainId(String mainId) {
+		this.mainId = mainId;
+	}
+
+	public Integer getIzws() {
+		return izws;
+	}
+
+	public void setIzws(Integer izws) {
+		this.izws = izws;
+	}
+
+	public String getAclpl() {
+		return aclpl;
+	}
+
+	public void setAclpl(String aclpl) {
+		this.aclpl = aclpl;
+	}
+
+	public Integer getIcl() {
+		return icl;
+	}
+
+	public void setIcl(Integer icl) {
+		this.icl = icl;
+	}
+
+	public String getAzcs() {
+		return azcs;
+	}
+
+	public void setAzcs(String azcs) {
+		this.azcs = azcs;
+	}
+
+	public String getAppName() {
+		return appName;
+	}
+
+	public void setAppName(String appName) {
+		this.appName = appName;
+	}
+
+	public String getAcxiName() {
+		return acxiName;
+	}
+
+	public void setAcxiName(String acxiName) {
+		this.acxiName = acxiName;
+	}
+
+	public String getAcxName() {
+		return acxName;
+	}
+
+	public void setAcxName(String acxName) {
+		this.acxName = acxName;
+	}
+
+	public BigDecimal getFzdj() {
+		return fzdj;
+	}
+
+	public void setFzdj(BigDecimal fzdj) {
+		this.fzdj = fzdj;
+	}
+
+	public BigDecimal getFxsj() {
+		return fxsj;
+	}
+
+	public void setFxsj(BigDecimal fxsj) {
+		this.fxsj = fxsj;
+	}
+
+	public String getAgcmd() {
+		return agcmd;
+	}
+
+	public void setAgcmd(String agcmd) {
+		this.agcmd = agcmd;
+	}
+
+	public String getAyjspsfName() {
+		return ayjspsfName;
+	}
+
+	public void setAyjspsfName(String ayjspsfName) {
+		this.ayjspsfName = ayjspsfName;
+	}
+
+	public String getAyjspcsName() {
+		return ayjspcsName;
+	}
+
+	public void setAyjspcsName(String ayjspcsName) {
+		this.ayjspcsName = ayjspcsName;
+	}
+
+	public String getAsfspz() {
+		return asfspz;
+	}
+
+	public void setAsfspz(String asfspz) {
+		this.asfspz = asfspz;
+	}
+
+	public String getAxhdwName() {
+		return axhdwName;
+	}
+
+	public void setAxhdwName(String axhdwName) {
+		this.axhdwName = axhdwName;
+	}
+
+	public String getClientSource() {
+		return clientSource;
+	}
+
+	public void setClientSource(String clientSource) {
+		this.clientSource = clientSource;
+	}
+
+	public String getBranchName() {
+		return branchName;
+	}
+
+	public void setBranchName(String branchName) {
+		this.branchName = branchName;
+	}
+
+	public String getSalesmans() {
+		return salesmans;
+	}
+
+	public void setSalesmans(String salesmans) {
+		this.salesmans = salesmans;
+	}
+
+	public String getFinancialManagerName() {
+		return financialManagerName;
+	}
+
+	public void setFinancialManagerName(String financialManagerName) {
+		this.financialManagerName = financialManagerName;
+	}
+
+	public BigDecimal getFescgls() {
+		return fescgls;
+	}
+
+	public void setFescgls(BigDecimal fescgls) {
+		this.fescgls = fescgls;
+	}
+
+	public BigDecimal getFescpgjebg() {
+		return fescpgjebg;
+	}
+
+	public void setFescpgjebg(BigDecimal fescpgjebg) {
+		this.fescpgjebg = fescpgjebg;
+	}
+
+	public String getAcjh() {
+		return acjh;
+	}
+
+	public void setAcjh(String acjh) {
+		this.acjh = acjh;
+	}
+
+	public Date getDescccrq() {
+		return descccrq;
+	}
+
+	public void setDescccrq(Date descccrq) {
+		this.descccrq = descccrq;
+	}
+
+	public Date getDesccdrq() {
+		return desccdrq;
+	}
+
+	public void setDesccdrq(Date desccdrq) {
+		this.desccdrq = desccdrq;
+	}
+
+	public String getAcarnojc() {
+		return acarnojc;
+	}
+
+	public void setAcarnojc(String acarnojc) {
+		this.acarnojc = acarnojc;
+	}
+
+	public String getOldcarcompanyName() {
+		return oldcarcompanyName;
+	}
+
+	public void setOldcarcompanyName(String oldcarcompanyName) {
+		this.oldcarcompanyName = oldcarcompanyName;
+	}
+
+	public String getAclyt() {
+		return aclyt;
+	}
+
+	public void setAclyt(String aclyt) {
+		this.aclyt = aclyt;
+	}
+
+	public BigDecimal getFclfpje() {
+		return fclfpje;
+	}
+
+	public void setFclfpje(BigDecimal fclfpje) {
+		this.fclfpje = fclfpje;
+	}
+
+	public Date getDclkprq() {
+		return dclkprq;
+	}
+
+	public void setDclkprq(Date dclkprq) {
+		this.dclkprq = dclkprq;
+	}
+
+	public String getIsXnyc() {
+		return isXnyc;
+	}
+
+	public void setIsXnyc(String isXnyc) {
+		this.isXnyc = isXnyc;
+	}
+
+	public String getIsLCV() {
+		return isLCV;
+	}
+
+	public void setIsLCV(String isLCV) {
+		this.isLCV = isLCV;
+	}
+
+	public BigDecimal getFbzj() {
+		return fbzj;
+	}
+
+	public void setFbzj(BigDecimal fbzj) {
+		this.fbzj = fbzj;
+	}
+
+	public BigDecimal getFsfje() {
+		return fsfje;
+	}
+
+	public void setFsfje(BigDecimal fsfje) {
+		this.fsfje = fsfje;
+	}
+
+	public String getAcllx() {
+		return acllx;
+	}
+
+	public void setAcllx(String acllx) {
+		this.acllx = acllx;
+	}
+
+	public BigDecimal getAppraisalprice() {
+		return appraisalprice;
+	}
+
+	public void setAppraisalprice(BigDecimal appraisalprice) {
+		this.appraisalprice = appraisalprice;
+	}
+
+	public String getAfdjh() {
+		return afdjh;
+	}
+
+	public void setAfdjh(String afdjh) {
+		this.afdjh = afdjh;
+	}
+
+	public String getAsffd() {
+		return asffd;
+	}
+
+	public void setAsffd(String asffd) {
+		this.asffd = asffd;
+	}
+
+	/**
+	 * 通过订单主表ID删除
+	 * @param mainId
+	 */
+	public static void deleteBymainId(String mainId){
+		List<DscSalesApplyCar> lis = DscSalesApplyCar.findByProperty(DscSalesApplyCar.class, "mainId", mainId);
+		if(lis!=null && !lis.isEmpty()) {
+			for (DscSalesApplyCar att : lis) {
+				att.remove();
+			}
+		}
+	}
+
+
+	/**
+	 * 通过订单主表ID查询
+	 * @param mainId
+	 */
+	public static DscSalesApplyCar getBymainId(String mainId){
+		return DscSalesApplyCar.findFirstByProperty(DscSalesApplyCar.class, "mainId", mainId);
+	}
+
+
+}

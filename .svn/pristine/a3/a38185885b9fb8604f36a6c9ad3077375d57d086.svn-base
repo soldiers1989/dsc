@@ -1,0 +1,44 @@
+package com.yixin.kepler.v1.datapackage.entity;
+
+import com.yixin.common.system.domain.BZBaseEntiy;
+
+import javax.persistence.Column;
+import javax.persistence.Entity;
+import javax.persistence.Table;
+
+/**
+ * @author YixinCapital -- chenjiacheng
+ *         2018年09月25日 15:34
+ **/
+@Entity
+@Table(name = "sys_standard_city")
+public class SysStandardCity extends BZBaseEntiy {
+
+	/**
+	 * 编号
+	 */
+	@Column(name = "number",columnDefinition = "varchar(20) comment '编号'")
+	private String number;
+
+	/**
+	 * 省市名称
+	 */
+	@Column(name = "name", columnDefinition = "varchar(255) comment '名称'")
+	private String name;
+
+	public String getNumber() {
+		return number;
+	}
+
+	public void setNumber(String number) {
+		this.number = number;
+	}
+
+	public String getName() {
+		return name;
+	}
+
+	public void setName(String name) {
+		this.name = name;
+	}
+}

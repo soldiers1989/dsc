@@ -1,0 +1,109 @@
+package com.yixin.kepler.v1.service.impl.yntrust;
+
+import com.yixin.kepler.common.enums.AssetStateEnum;
+import com.yixin.kepler.core.listener.ContractSignEvent;
+import com.yixin.kepler.dto.BaseMsgDTO;
+import com.yixin.kepler.enity.AssetContractTask;
+import com.yixin.kepler.enity.AssetMainInfo;
+import com.yixin.kepler.v1.service.capital.yntrust.YnContractService;
+
+import com.yixin.kepler.v1.service.capital.yntrust.YnContractTaskService;
+import org.apache.commons.collections.CollectionUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationContext;
+import org.springframework.stereotype.Service;
+
+import javax.annotation.Resource;
+import java.util.List;
+import java.util.stream.Collectors;
+
+/**
+ * @author sukang
+ */
+@Service
+public class YnContractTaskServiceImpl implements YnContractTaskService {
+
+    private final Logger logger = LoggerFactory.getLogger(getClass());
+
+    @Resource
+    private YnContractService ynContractServiceImpl;
+
+    @Resource
+    private ApplicationContext applicationContext;
+
+    @Override
+    public void uploadContractFile(AssetContractTask assetContractTask) {
+
+        try {
+            BaseMsgDTO baseMsgDTO = ynContractServiceImpl.compressFileAndUpload(
+                    assetContractTask);
+
+            if (baseMsgDTO.successed()){
+                assetContractTask.setCompressFileState(1);
+                assetContractTask.update();
+            }
+            logger.info("订单号{},贷款标识{}获取到的文件上传结果为{}"
+                ,assetContractTask.getApplyNo(),assetContractTask.getVenusApplyNo(),
+                    baseMsgDTO);
+        }catch (Exception e){
+            logger.error("订单号{},贷款标识{}上传文件异常",
+                    assetContractTask.getApplyNo(),
+                    assetContractTask.getVenusApplyNo());
+        }
+    }
+
+    @Override
+    public void getContractFile(AssetContractTask assetContractTask) {
+
+        try {
+
+            BaseMsgDTO contractFile = ynContractServiceImpl.getContractFile(
+                    assetContractTask);
+
+            logger.info("订单号{},贷款标识号{},获取合同文件结果为{}",
+                    assetContractTask.getApplyNo(),assetContractTask.getVenusApplyNo()
+                    ,contractFile);
+
+            if (contractFile.successed()){
+                assetContractTask.setEnd(true);
+                assetContractTask.setSuccess(true);
+                assetContractTask.setSignState(1);
+                assetContractTask.setSignFileId(contractFile.getMessage());
+                assetContractTask.update();
+            }
+
+            //如果所有的签章合同完成发送事件
+            if (complete(assetContractTask.getVenusApplyNo())){
+
+                AssetMainInfo mainInfo = AssetMainInfo.getByVenusApplyNo(assetContractTask.getVenusApplyNo());
+                mainInfo.setContractSignState(AssetStateEnum.SUCCESS.getState());
+                mainInfo.update();
+                applicationContext.publishEvent(
+                        new ContractSignEvent(assetContractTask.getVenusApplyNo()));
+            }
+
+        }catch (Exception e){
+            logger.error("订单号{},贷款标识{}获取签章合同文件异常"
+                ,assetContractTask.getApplyNo(),
+                    assetContractTask.getVenusApplyNo());
+        }
+    }
+
+    private boolean complete(String venusApplyNo) {
+
+        List<AssetContractTask> contractTask = AssetContractTask
+                .getContractTask(venusApplyNo);
+
+        if (CollectionUtils.isEmpty(contractTask)){
+            return false;
+        }
+
+        List<AssetContractTask> filter = contractTask.stream()
+                .filter(t -> t.getSignState() == 1)
+                .collect(Collectors.toList());
+
+        return  CollectionUtils.isNotEmpty(filter)
+                 && filter.size() == contractTask.size();
+    }
+}

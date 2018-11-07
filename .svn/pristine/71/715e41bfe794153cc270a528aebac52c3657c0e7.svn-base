@@ -1,0 +1,219 @@
+package com.yixin.dsc.service.impl.own;
+
+import com.yixin.dsc.entity.capital.DscCapitalRuleRelation;
+import com.yixin.dsc.entity.rule.DscRule;
+import com.yixin.dsc.entity.rule.DscRuleDetail;
+import com.yixin.dsc.entity.rule.DscRuleFieldRelation;
+import com.yixin.dsc.enumpackage.DscRuleTypeEnum;
+import com.yixin.dsc.service.own.DscOwnService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+
+/**
+ * 运维接口service
+ * Package : com.yixin.dsc.service.own
+ * 
+ * @author YixinCapital -- wangwenlong
+ *		   2018年10月17日 下午1:57:19
+ *
+ */
+@Service("dscOwnService")
+public class DscOwnServiceImpl implements DscOwnService {
+
+    private final Logger logger = LoggerFactory.getLogger(this.getClass());
+    @Override
+    public String exportSql(String capitalId) {
+        String ss = null;
+        try {
+            StringBuilder str = new StringBuilder();
+            for (DscRuleTypeEnum typeEnum:DscRuleTypeEnum.values()) {
+                List<DscRule> ruleList = DscRule.getDscRuleList(capitalId, typeEnum.getType());
+                for (DscRule dscRule : ruleList) {
+                    str.append("-- "+typeEnum.getName()+"  " + dscRule.getId() + "开始");
+                    //#############规则信息表################
+                    str.append(System.getProperty("line.separator"));
+                    str.append("INSERT INTO dsc_rule VALUES ('");
+//				`id`, `create_time`, `creator_id`, `rule_matching_type`,
+//				`rule_name`, `rule_type`, `update_time`, `updator_id`,
+//				`version`, `bz_id`, `creator_department_id`, `creator_department_name`,
+//				`creator_name`, `is_deleted`, `updator_department_id`,
+//				`updator_department_name`, `updator_name`
+                    str.append(dscRule.getId());//id
+                    str.append("',");
+                    str.append("now()");//create_time
+                    str.append(",'");
+                    str.append(dscRule.getCreatorId());//creator_id
+                    str.append("','");
+                    str.append(dscRule.getRuleMatchingType());//rule_matching_type
+                    str.append("','");
+                    str.append(dscRule.getRuleName());//rule_name
+                    str.append("','");
+                    str.append(dscRule.getRuleType());//rule_type
+                    str.append("',");
+                    str.append("now()");//update_time
+                    str.append(",'");
+                    str.append(dscRule.getUpdatorId());//updator_id
+                    str.append("','");
+                    str.append(dscRule.getVersion());//version
+                    str.append("','");
+                    str.append(dscRule.getBzId());//bz_id
+                    str.append("','");
+                    str.append(dscRule.getCreatorDepartmentId());//creator_department_id
+                    str.append("','");
+                    str.append(dscRule.getCreatorDepartmentId());//creator_department_name
+                    str.append("','");
+                    str.append(dscRule.getCreatorName());//creator_name
+                    str.append("','");
+                    str.append(dscRule.isDeleted() ? "\\1" : "\\0");//is_deleted
+                    str.append("','");
+                    str.append(dscRule.getUpdatorDepartmentId());//updator_department_id
+                    str.append("','");
+                    str.append(dscRule.getUpdatorDepartmentName());//updator_department_name
+                    str.append("','");
+                    str.append(dscRule.getUpdatorName());//updator_name
+                    str.append("');");
+                    String ruleId = dscRule.getId();
+                    List<DscRuleDetail> ruleDetailList = DscRuleDetail.getListByRuleId(ruleId);
+                    List<DscRuleFieldRelation> dscRuleFieldRelationList = DscRuleFieldRelation.getListByRuleId(ruleId);
+                    for (DscRuleDetail detail : ruleDetailList) {
+                        str.append(System.getProperty("line.separator"));
+                        str.append("INSERT INTO dsc_rule_detail  VALUES (");
+//				`id`, `create_time`, `message`, `rule_formula`, `rule_id`, `bz_id`,
+//				`creator_department_id`, `creator_department_name`, `creator_id`, `creator_name`,
+//				`is_deleted`, `update_time`, `updator_department_id`, `updator_department_name`,
+//				`updator_id`, `updator_name`, `version`
+                        str.append("REPLACE(UUID(),'-','')");//id
+                        str.append(",");
+                        str.append("now()");//create_time
+                        str.append(",'");
+                        str.append(detail.getMessage());//message
+                        str.append("','");
+                        str.append(detail.getRuleFormula());//rule_formula
+                        str.append("','");
+                        str.append(detail.getRuleId());//rule_id
+                        str.append("','");
+                        str.append(detail.getBzId());//bz_id
+                        str.append("','");
+                        str.append(detail.getCreatorDepartmentId());//creator_department_id
+                        str.append("','");
+                        str.append(detail.getCreatorDepartmentName());//creator_department_name
+                        str.append("','");
+                        str.append(detail.getCreatorId());//creator_id
+                        str.append("','");
+                        str.append(detail.getCreatorName());//creator_name
+                        str.append("','");
+                        str.append(detail.isDeleted() ? "\\1" : "\\0");//is_deleted
+                        str.append("',");
+                        str.append("now()");//update_time
+                        str.append(",'");
+                        str.append(detail.getUpdatorDepartmentId());//updator_department_id
+                        str.append("','");
+                        str.append(detail.getUpdatorDepartmentName());//updator_department_name
+                        str.append("','");
+                        str.append(detail.getUpdatorId());//updator_id
+                        str.append("','");
+                        str.append(detail.getUpdatorName());//updator_name
+                        str.append("','");
+                        str.append(detail.getVersion());//version
+                        str.append("');");
+                        str.append(System.getProperty("line.separator"));
+                    }
+
+                    for (DscRuleFieldRelation relation : dscRuleFieldRelationList) {
+                        str.append(System.getProperty("line.separator"));
+                        str.append("INSERT INTO dsc_rule_field_relation VALUES (");
+//				`id`, `create_time`, `field_code`, `rule_id`,
+//				`bz_id`, `creator_department_id`, `creator_department_name`,
+//				`creator_id`, `creator_name`, `is_deleted`, `update_time`,
+//				`updator_department_id`, `updator_department_name`, `updator_id`,
+//				`updator_name`, `version`, `sequence`
+                        str.append("REPLACE(UUID(),'-',''),");//id
+                        str.append("now(),'");//create_time
+                        str.append(relation.getFieldCode());//field_code
+                        str.append("','");
+                        str.append(relation.getRuleId());//rule_id
+                        str.append("','");
+                        str.append(relation.getBzId());//bz_id
+                        str.append("','");
+                        str.append(relation.getCreatorDepartmentId());//creator_department_id
+                        str.append("','");
+                        str.append(relation.getCreatorDepartmentName());//creator_department_name
+                        str.append("','");
+                        str.append(relation.getCreatorId());//creator_id
+                        str.append("','");
+                        str.append(relation.getCreatorName());//creator_name
+                        str.append("','");
+                        str.append(relation.isDeleted() ? "\\1" : "\\0");//is_deleted
+                        str.append("',");
+                        str.append("now()");//update_time
+                        str.append(",'");
+                        str.append(relation.getUpdatorDepartmentId());//updator_department_id
+                        str.append("','");
+                        str.append(relation.getUpdatorDepartmentName());//updator_department_name
+                        str.append("','");
+                        str.append(relation.getUpdatorId());//updator_id
+                        str.append("','");
+                        str.append(relation.getUpdatorName());//updator_name
+                        str.append("','");
+                        str.append(relation.getVersion());//version
+                        str.append("','");
+                        str.append(relation.getSequence());//sequence
+                        str.append("');");
+                    }
+                    List<DscCapitalRuleRelation> ruleRelations = DscCapitalRuleRelation.getListByParms(ruleId,
+                            capitalId);
+                    for (DscCapitalRuleRelation re : ruleRelations) {
+                        str.append(System.getProperty("line.separator"));
+                        str.append("INSERT INTO dsc_capital_rule_relation VALUES (");
+//				`id`, `capital_id`, `rule_id`, `bz_id`, `create_time`,
+//				`creator_department_id`, `creator_department_name`,
+//				`creator_id`, `creator_name`, `is_deleted`, `update_time`,
+//				`updator_department_id`, `updator_department_name`,
+//				`updator_id`, `updator_name`, `version`s
+                        str.append("REPLACE(UUID(),'-',''),'");//id
+                        str.append(re.getCapitalId());//capital_id
+                        str.append("','");
+                        str.append(re.getRuleId());//rule_id
+                        str.append("','");
+                        str.append(re.getBzId());//bz_id
+                        str.append("',");
+                        str.append("now()");//create_time
+                        str.append(",'");
+                        str.append(re.getCreatorDepartmentId());//creator_department_id
+                        str.append("','");
+                        str.append(re.getCreatorDepartmentName());//creator_department_name
+                        str.append("','");
+                        str.append(re.getCapitalId());//creator_id
+                        str.append("','");
+                        str.append(re.getCreatorName());//creator_name
+                        str.append("','");
+                        str.append(re.isDeleted() ? "\\1" : "\\0");//is_deleted
+                        str.append("',");
+                        str.append("now()");//update_time
+                        str.append(",'");
+                        str.append(re.getUpdatorDepartmentId());//updator_department_id
+                        str.append("','");
+                        str.append(re.getUpdatorDepartmentName());//updator_department_name
+                        str.append("','");
+                        str.append(re.getUpdatorId());//updator_id
+                        str.append("','");
+                        str.append(re.getUpdatorName());//updator_name
+                        str.append("','");
+                        str.append(re.getVersion());//version
+                        str.append("');");
+                    }
+                    str.append(System.getProperty("line.separator"));
+                    str.append("-- "+typeEnum.getName()+"  " + dscRule.getId() + "结束");
+                    str.append(System.getProperty("line.separator"));
+                }
+            }
+            ss = str.toString();
+        } catch (Exception e) {
+            logger.error("导出准入sql出错"+e);
+        }
+        return ss.replace("'null'","NULL");
+    }
+}

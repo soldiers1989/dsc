@@ -1,0 +1,55 @@
+package com.yixin.kepler.v1.datapackage.dto.yntrust;
+
+import com.fasterxml.jackson.annotation.JsonProperty;
+
+/**
+ * 云南信托创建订单dto
+ * @author YixinCapital -- chenjiacheng
+ *         2018年09月19日 10:10
+ **/
+
+public class YTCreateOrderDto extends YTCommonRequestDTO{
+
+	/**
+	 * 唯一标示 对应maininfo表venusApplyNo字段
+	 */
+	@JsonProperty("UniqueId")
+	private String uniqueId;
+
+	/**
+	 * 借款人信息
+	 */
+	@JsonProperty("Borrower")
+	private YTCreateOrderBorrowerDto borrower;
+
+
+	/**
+	 * 合同信息
+	 */
+	@JsonProperty("Loan")
+	private YTCreateOrderLoanDto loan;
+
+	public String getUniqueId() {
+		return uniqueId;
+	}
+
+	public void setUniqueId(String uniqueId) {
+		this.uniqueId = uniqueId;
+	}
+
+	public YTCreateOrderBorrowerDto getBorrower() {
+		return borrower;
+	}
+
+	public void setBorrower(YTCreateOrderBorrowerDto borrower) {
+		this.borrower = borrower;
+	}
+
+	public YTCreateOrderLoanDto getLoan() {
+		return loan;
+	}
+
+	public void setLoan(YTCreateOrderLoanDto loan) {
+		this.loan = loan;
+	}
+}

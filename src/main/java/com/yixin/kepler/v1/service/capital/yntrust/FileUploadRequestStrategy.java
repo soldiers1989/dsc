@@ -1,0 +1,139 @@
+package com.yixin.kepler.v1.service.capital.yntrust;
+
+import com.alibaba.fastjson.JSON;
+import com.yixin.common.exception.BzException;
+import com.yixin.common.utils.InvokeResult;
+import com.yixin.common.utils.JsonObjectUtils;
+import com.yixin.dsc.entity.order.DscSalesApplyCust;
+import com.yixin.dsc.entity.order.DscSalesApplyMain;
+import com.yixin.dsc.util.PropertiesManager;
+import com.yixin.dsc.v1.service.capital.yntrust.YTCommonService;
+import com.yixin.kepler.common.FileUtils;
+import com.yixin.kepler.common.RestTemplateUtil;
+import com.yixin.kepler.common.UrlConstant;
+import com.yixin.kepler.common.enums.AssetBankTransEnum;
+import com.yixin.kepler.core.base.AbstractBaseDealDomain;
+import com.yixin.kepler.core.constant.CommonConstant;
+import com.yixin.kepler.dto.BaseMsgDTO;
+import com.yixin.kepler.enity.AssetBankTran;
+import com.yixin.kepler.enity.AssetMainInfo;
+import com.yixin.kepler.v1.common.enumpackage.YNTrustUrlEnum;
+import com.yixin.kepler.v1.datapackage.dto.yntrust.YTCommonResponseDTO;
+import com.yixin.kepler.v1.datapackage.dto.yntrust.YTCommonStatusDTO;
+import com.yixin.kepler.v1.datapackage.dto.yntrust.YTFileUploadRequestDTO;
+
+import com.yixin.kepler.v1.datapackage.dto.yntrust.YTImageContentDTO;
+import net.sf.json.JSONObject;
+import org.apache.commons.lang.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
+
+import javax.annotation.Resource;
+import java.util.Objects;
+
+/**
+ * @author sukang
+ */
+
+@Service(value = "YNTRUSTFileUploadRequsetStrategy")
+public class FileUploadRequestStrategy extends AbstractBaseDealDomain<YTFileUploadRequestDTO,BaseMsgDTO>{
+
+
+    private final Logger logger = LoggerFactory.getLogger(getClass());
+
+    @Resource
+    private PropertiesManager propertiesManager;
+    @Resource
+    private YTCommonService commonService;
+
+    @Override
+    protected void getData() throws BzException {
+
+        YTFileUploadRequestDTO ytFileUploadRequestDto = inputDto.get();
+        String applyNo = ytFileUploadRequestDto.getRemark();
+        DscSalesApplyMain dscSalesApplyMain = DscSalesApplyMain
+                .getByApplyNo(applyNo);
+
+        DscSalesApplyCust dscSalesApplyCust =
+                DscSalesApplyCust.getApplyCostByMianId(dscSalesApplyMain.getId());
+
+        AssetMainInfo mainInfo = AssetMainInfo.getByApplyNo(applyNo);
+
+        ytFileUploadRequestDto.setRequestId(commonService.getRequestId());
+        ytFileUploadRequestDto.setIdCardNo(dscSalesApplyCust.getAzjhm());
+        ytFileUploadRequestDto.setUrl(YNTrustUrlEnum.FILE_UPLOAD.getUrl());
+        ytFileUploadRequestDto.setUniqueId(mainInfo.getVenusApplyNo());
+    }
+
+    @Override
+    protected void assembler() throws BzException {
+
+    }
+
+    @Override
+    protected InvokeResult<BaseMsgDTO> message() throws BzException {
+
+        YTFileUploadRequestDTO ytFileUploadRequestDto = inputDto.get();
+        inputDto.remove();
+        String reqJson = JsonObjectUtils.objectToJson(ytFileUploadRequestDto);
+
+
+
+        AssetBankTran bankTran = new AssetBankTran();
+        bankTran.setApplyNo(ytFileUploadRequestDto.getRemark());
+        bankTran.setPhase(AssetBankTransEnum.YT_FILE_UPLOAD.getPhase());
+        bankTran.setReqBody(reqJson);
+
+        String url = propertiesManager.getOsbEnvironment()
+                .concat(UrlConstant.OsbSystemUrl.ynTrustFileInterface);
+
+        bankTran.setReqUrl(url.concat(ytFileUploadRequestDto.getUrl()));
+        bankTran.setTranNo(ytFileUploadRequestDto.getRequestId());
+        bankTran.setSender(CommonConstant.SenderType.YIXIN);
+        bankTran.create();
+
+
+        logger.info("云信单号{},上传文件请求路径为{},请求参数为{}",
+                ytFileUploadRequestDto.getRemark(),url,reqJson);
+
+        ytFileUploadRequestDto.getImageContent().forEach(t -> t.setContent(
+                FileUtils.getBytesFromFileId(t.getContent())
+        ));
+
+        /*logger.info("\n单号{}云信上传文件请求路径为{},请求报文{}",
+                ytFileUploadRequestDto.getRemark(),url,
+                JsonObjectUtils.objectToJson(ytFileUploadRequestDto));*/
+
+        String result = RestTemplateUtil.sendRequestByFile(url,
+                ytFileUploadRequestDto, CommonConstant.BankName.YNTRUST_BANK);
+        bankTran.setRepBody(result);
+        logger.info("\n云信单号{},上传文件接口返回报文为{}",
+                ytFileUploadRequestDto.getRemark(),result);
+
+
+        BaseMsgDTO baseMsgDTO = BaseMsgDTO.failureData("接口异常");
+        if (StringUtils.isNotEmpty(result)){
+            YTCommonResponseDTO ytCommonResponseDTO = JSON.parseObject(result, YTCommonResponseDTO.class);
+            YTCommonStatusDTO status = ytCommonResponseDTO.getStatus();
+            //文件提示已上传当作成功处理
+            if (status.success() ||
+                    Objects.equals(CommonConstant.YNTrustErrorCode.HAS_BEEN_UPLOAD
+                                    ,status.getResponseCode())){
+                bankTran.setApprovalCode(status.getResponseCode());
+                bankTran.setApprovalDesc(status.getResponseMessage());
+                baseMsgDTO = BaseMsgDTO.successData("success");
+            }else {
+
+                bankTran.setApprovalCode(status.getResponseCode());
+                bankTran.setApprovalDesc(status.getWarningMessage() == null ?
+                        status.getResponseMessage():status.getWarningMessage());
+
+                baseMsgDTO = BaseMsgDTO.failureData(bankTran.getApprovalDesc());
+            }
+        }
+
+        bankTran.update();
+        return new InvokeResult<>(baseMsgDTO);
+    }
+}

@@ -1,0 +1,639 @@
+package com.yixin.kepler.core.domain;
+
+import static com.yixin.kepler.core.constant.CommonConstant.FAILURE;
+
+import java.util.Map;
+import java.util.Objects;
+
+import javax.annotation.Resource;
+
+import org.apache.commons.lang3.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import com.alibaba.fastjson.JSON;
+import com.alibaba.fastjson.JSONObject;
+import com.yixin.common.exception.BzException;
+import com.yixin.common.system.ioc.SpringContextUtil;
+import com.yixin.common.utils.InvokeResult;
+import com.yixin.common.utils.JsonObjectUtils;
+import com.yixin.dsc.common.DscContant;
+import com.yixin.dsc.dto.DscContractSignFileDTO;
+import com.yixin.dsc.dto.DscSupplyDto;
+import com.yixin.dsc.entity.order.DscSalesApplyMain;
+import com.yixin.dsc.enumpackage.RequestPreposeEnum;
+import com.yixin.kepler.common.enums.AssetPhaseEnum;
+import com.yixin.kepler.common.enums.AssetStateEnum;
+import com.yixin.kepler.common.enums.BankPhaseEnum;
+import com.yixin.kepler.common.enums.CMBCRepStatus;
+import com.yixin.kepler.core.config.CMBCConfig;
+import com.yixin.kepler.core.constant.CommonConstant;
+import com.yixin.kepler.core.domain.cmbc.ApplyStateQueryRequest;
+import com.yixin.kepler.core.domain.cmbc.CreditStateQueryRequest;
+import com.yixin.kepler.core.domain.cmbc.StateChangeRequest;
+import com.yixin.kepler.core.domain.webank.WBOrderCancelRequest;
+import com.yixin.kepler.core.domain.webank.WbCommonRequestToBank;
+import com.yixin.kepler.core.service.AfterLoanService;
+import com.yixin.kepler.dto.BaseMsgDTO;
+import com.yixin.kepler.dto.OsbAttachmentDTO;
+import com.yixin.kepler.dto.PretrialDTO;
+import com.yixin.kepler.dto.StatusDTO;
+import com.yixin.kepler.dto.webank.WBComputerRespDTO;
+import com.yixin.kepler.enity.AssetFinanceInfo;
+import com.yixin.kepler.enity.AssetMainInfo;
+import com.yixin.kepler.enity.AssetPaymentTask;
+import com.yixin.kepler.enity.AssetResultTask;
+import com.yixin.kepler.enity.OsbFileLog;
+import com.yixin.kepler.v1.common.constants.IcbcConstant;
+import com.yixin.kepler.v1.service.capital.icbc.OrderCancelRequest;
+import com.yixin.kepler.v1.service.capital.yntrust.ContractSignService;
+import com.yixin.kepler.v1.service.capital.yntrust.YTOrderCancelRequest;
+
+
+
+@Service
+public class LoanDomain {
+
+    private static final Logger logger = LoggerFactory.getLogger(LoanDomain.class);
+
+    @Autowired
+    private AsyncTask asyncTask;
+    
+    @Resource
+    private CMBCConfig cmbcConfig;
+    
+    @Resource
+    private StateChangeRequest stateChangeRequest;
+    @Resource
+	private WBOrderCancelRequest wbOrderCancelRequest;
+    
+    @Resource
+    private ApplyStateQueryRequest applyStateQueryRequest;
+    
+    @Resource
+    private CreditStateQueryRequest creditStateQueryRequest;
+
+    @Resource
+    private WbCommonRequestToBank wbCommonRequestToBank;
+
+	@Resource
+	private OrderCancelRequest orderCancelRequest;
+
+    @Resource
+    private AttachmentUploadFactory attachmentUploadFactory;
+
+    @Resource
+	private YTOrderCancelRequest ytOrderCancelRequest;
+
+
+	/**
+
+	@Resource
+	private YTOrderCancelRequest ytOrderCancelRequest;
+
+    /**
+     * 信审
+     *
+     * @param applyNo 申请编号
+     * @return
+     * @author sukang
+     * @date 2018/6/7 上午9:51
+     */
+    public InvokeResult<BaseMsgDTO> loanApply(String applyNo) throws BzException {
+
+		DscSalesApplyMain mainInfo = DscSalesApplyMain.getByApplyNo(applyNo);
+		if (mainInfo == null) {
+			logger.error("订单信息不存在 applyNo：{}", applyNo);
+			return new InvokeResult<BaseMsgDTO>().failure("订单信息不存在");
+		}
+		AssetFinanceInfo assetFinanceInfo = AssetFinanceInfo.get(AssetFinanceInfo.class, mainInfo.getCapitalId());
+		if (assetFinanceInfo == null) {
+			logger.error("资方信息不存在 applyNo：{}，CapitalId：{}", applyNo, mainInfo.getCapitalId());
+			return new InvokeResult<BaseMsgDTO>().failure("资方信息不存在");
+		}
+
+		//=========== 发起信审前校验附件和字段信息 ======================================
+        /*DscFlowService dscFlowService = SpringContextUtil.getBean(DscFlowService.class);
+    	DscActionResultDTO checkResult = dscFlowService.phaseCheck(applyNo, BankPhaseEnum.LAST_TRIAL);
+        if(checkResult.getNeedSupply()){ //信审阶段需要补充信息
+        	
+        }*/
+
+		AssetMainInfo assetMainInfo = AssetMainInfo.getByApplyNo(applyNo);
+		if (CommonConstant.BankName.CMBC.equals(assetFinanceInfo.getCode())) {
+			//民生/经过预审的银行
+			if (assetMainInfo == null) {
+				return new InvokeResult<BaseMsgDTO>().failure("申请编号不存在");
+			}
+			if (AssetPhaseEnum.PAYMENT_TRIAL.getPhase().equals(
+					assetMainInfo.getAssetPhase())) {
+				return new InvokeResult<BaseMsgDTO>().failure("已完成信审");
+			}
+
+
+			OsbFileLog osbFileLog = OsbFileLog.getOk(applyNo,
+					BankPhaseEnum.LAST_TRIAL.getPhase());
+
+			if (osbFileLog == null) {
+				return new InvokeResult<BaseMsgDTO>().failure("未找到影像资料文件");
+			}
+
+			if (!Objects.equals(assetMainInfo.getCreditSignState(), AssetStateEnum.SUCCESS.getState())) {
+				return new InvokeResult<BaseMsgDTO>().failure("征信授权书未签署");
+			}
+
+
+			if (AssetPhaseEnum.PRE_TRIAL.getPhase().equals(assetMainInfo.getAssetPhase())) {
+
+				if (Objects.equals(assetMainInfo.getPreState(), AssetStateEnum.SUCCESS.getState())
+						&& Objects.equals(assetMainInfo.getLastState(), AssetStateEnum.INIT.getState())) {
+
+					return asyncTask.requestBank(applyNo, BankPhaseEnum.LAST_TRIAL);
+				} else if (Objects.equals(assetMainInfo.getLastState(), AssetStateEnum.DOING.getState())) {
+					return new InvokeResult<BaseMsgDTO>().failure("信审进行中");
+				} else if (Objects.equals(assetMainInfo.getLastState(), AssetStateEnum.SUCCESS.getState())) {
+					return new InvokeResult<BaseMsgDTO>().failure("已完成信审，请勿重复提交");
+				} else if (Objects.equals(assetMainInfo.getLastState(), AssetStateEnum.FAILD.getState())) {
+					return new InvokeResult<BaseMsgDTO>().failure("信审已失败,请先撤销");
+				}
+			}
+			return new InvokeResult<BaseMsgDTO>().failure("请先完成预审");
+		} else if (CommonConstant.BankName.WB_BANK.equals(assetFinanceInfo.getCode())) {
+			//微众银行
+			BaseMsgDTO preposeMsg = asyncTask.requestPrepose(applyNo, assetFinanceInfo.getCode(), RequestPreposeEnum.FIRST_TRIAL);
+			logger.info("发起信审前，申请编号:{} ,一审前置处理结果：{}", applyNo, JSON.toJSONString(preposeMsg));
+			if (CommonConstant.PreposeResultCode.NORMAL.equals(preposeMsg.getCode())) {  //正常流程
+				return asyncTask.requestBank(applyNo, assetFinanceInfo.getCode(), BankPhaseEnum.FIRST_TRIAL);
+			} else if (CommonConstant.PreposeResultCode.SKIP.equals(preposeMsg.getCode())) { //跳转
+				return asyncTask.requestBank(applyNo, assetFinanceInfo.getCode(), BankPhaseEnum.LAST_TRIAL);
+			} else {
+				return new InvokeResult<>(preposeMsg);
+			}
+		} else {
+			//除民生及微众以外的银行调用接口通用调用
+			logger.info("订单号为{}，发送信审请求开始", applyNo);
+			InvokeResult<BaseMsgDTO> resultDto = null;
+
+			//*****************向银行发起信审请求
+			BaseMsgDTO preposeMsg = asyncTask.requestPrepose(applyNo, assetFinanceInfo.getCode(), RequestPreposeEnum.FIRST_TRIAL);
+			logger.info("发起信审前，申请编号:{} ,一审前置处理结果：{}", applyNo, JSON.toJSONString(preposeMsg));
+			if (CommonConstant.PreposeResultCode.NORMAL.equals(preposeMsg.getCode())) {  //正常流程
+				resultDto = asyncTask.requestBank(applyNo, assetFinanceInfo.getCode(), BankPhaseEnum.FIRST_TRIAL);
+			} else if (CommonConstant.PreposeResultCode.SKIP.equals(preposeMsg.getCode())) { //跳转
+				resultDto = asyncTask.requestBank(applyNo, assetFinanceInfo.getCode(), BankPhaseEnum.LAST_TRIAL);
+			} else {
+				return new InvokeResult<>(preposeMsg);
+			}
+			
+			//*****************信审阶段附件上传
+			if(resultDto.getData() != null && ((BaseMsgDTO)resultDto.getData()).successed()){
+				OsbAttachmentDTO attachmentDTO = new OsbAttachmentDTO();
+				attachmentDTO.setBzId(applyNo);
+				attachmentDTO.setBzType(BankPhaseEnum.LAST_TRIAL.getPhase());
+				logger.info("订单号{}，信审阶段影像件文件上传任务", applyNo);
+				asyncTask.uploadAttachment(attachmentDTO);
+			}
+			logger.info("订单号为{}，发送信审请求结束", applyNo);
+			return resultDto;
+		}
+	}
+    
+    
+    /**
+     * 订单操作
+     *
+     * @param applyNo 申请编号
+     * @param ctype   操作类型 1：取消，2：提回 3：退回 4 拒绝 类型
+     */
+    public InvokeResult<BaseMsgDTO> loanControl(String applyNo, String ctype) {
+
+        switch (ctype) {
+            case "1":
+                return cancelOrder(applyNo);
+            case "2":
+                return cancelOrder(applyNo);
+            case "3":
+                return cancelOrder(applyNo);
+            case "4":
+                return cancelOrder(applyNo);
+            default: {
+                return new InvokeResult<>(new BaseMsgDTO(FAILURE, "无此操作类型"))
+                        .failure("无此操作类型");
+            }
+        }
+    }
+    
+    
+
+    /**
+     * 取消订单
+     * @param applyNo 申请编号
+     */
+    private InvokeResult<BaseMsgDTO> cancelOrder(String applyNo) {
+
+        AssetMainInfo assetMainInfo = AssetMainInfo.getByApplyNo(applyNo);
+		//由于微众信审还没有落数，当alix调用时直接返回成功
+        if (assetMainInfo == null) {
+			return new InvokeResult<>(new BaseMsgDTO(CommonConstant.SUCCESS, "取消订单成功"))
+					.success();
+		}
+        if(Objects.equals(assetMainInfo.getFirstState(), AssetStateEnum.DOING.getState())
+        		|| Objects.equals(assetMainInfo.getLastState(), AssetStateEnum.DOING.getState())){
+        	//取消订单失败,该订单正在信审中
+        	return new InvokeResult<>(new BaseMsgDTO(CommonConstant.FAILURE, CommonConstant.Message.CANCEL_FAILD_CREDITFRONT))
+					.success();
+        }
+        if (Objects.equals(AssetStateEnum.DOING.getState(), assetMainInfo.getPaymentState())) {
+        	//取消订单失败,该订单正在请款中
+        	return new InvokeResult<>(new BaseMsgDTO(CommonConstant.FAILURE, CommonConstant.Message.CANCEL_FAILD_REQUEST_ING))
+        			.success();
+        }
+        if (AssetStateEnum.SUCCESS.getState().equals(assetMainInfo.getPaymentState())) {
+        	//取消订单失败,该订单已请款完成
+        	return new InvokeResult<>(new BaseMsgDTO(CommonConstant.FAILURE, CommonConstant.Message.CANCEL_FAILD_REQUEST_END))
+        			.success();
+        }
+        AssetResultTask assetResultTask = AssetResultTask.getByApplyNo(applyNo);
+        
+        if (Objects.equals(assetMainInfo.getLastState(), AssetStateEnum.SUCCESS.getState())) {
+        	try {
+				BaseMsgDTO sendResult = new BaseMsgDTO();
+        		//民生银行
+				if(StringUtils.equals(assetMainInfo.getFinancialCode(),CommonConstant.BankName.CMBC)){
+					sendResult = stateChangeRequest.sendResult(
+							assetMainInfo, CMBCRepStatus.CNCL.getStatus());
+				//微众银行
+				}else if(StringUtils.equals(assetMainInfo.getFinancialCode(),CommonConstant.BankName.WB_BANK)){
+					sendResult = wbOrderCancelRequest.sendResult(assetMainInfo,CommonConstant.TC001);
+				}
+				//工商银行
+				else if(StringUtils.equals(assetMainInfo.getFinancialCode(),CommonConstant.BankName.ICBC_BANK)){
+					sendResult = orderCancelRequest.sendResult(assetMainInfo, IcbcConstant.TRXCODE_20101);
+				} else if (StringUtils.equals(assetMainInfo.getFinancialCode(), CommonConstant.BankName.YNTRUST_BANK)) {
+					sendResult = ytOrderCancelRequest.sendResult(assetMainInfo.getVenusApplyNo(),applyNo,assetMainInfo.getId());
+				}
+		        if (CommonConstant.SUCCESS.equals(sendResult.getCode())) {
+        			if (null != assetResultTask) {
+        				assetResultTask.setIsEnd(1);
+        				assetResultTask.setDeleted(true);
+        				assetResultTask.update();
+        			}
+        			
+        			AssetPaymentTask paymentTask = AssetPaymentTask.getByApplyNo(applyNo);
+        			
+        			if (paymentTask != null) {
+						paymentTask.setIsEnd(true);
+						paymentTask.setDeleted(true);
+						paymentTask.update();
+					}
+        			
+        			assetMainInfo.setDeleted(true);
+        			assetMainInfo.update();
+        			return new InvokeResult<>(new BaseMsgDTO(CommonConstant.SUCCESS, "取消订单成功"))
+        					.success();
+        		}
+        	} catch (Exception e) {
+        		logger.info("取消订单"+applyNo+"异常，异常信息为",e);
+        	}
+		}else {
+			if (assetResultTask != null) {
+				assetResultTask.setDeleted(true);
+				assetResultTask.setIsEnd(1);
+				assetResultTask.update();
+			}
+			assetMainInfo.setDeleted(true);
+			assetMainInfo.update();
+			return new InvokeResult<>(new BaseMsgDTO(CommonConstant.SUCCESS, "取消订单成功"))
+					.success();
+		}
+        
+        return new InvokeResult<BaseMsgDTO>().failure("取消订单失败");
+    }
+
+    /**
+     * <B>功能简述</B><br>
+     * 预审请求，对应民生初审
+     *
+     * @param pretrialDTO
+     * @return
+     * @date 2018/6/15 下午5:43
+     * @author liuhongshen
+     */
+    public InvokeResult<BaseMsgDTO> pretrialRequest(PretrialDTO pretrialDTO) {
+
+        try {
+            AssetMainInfo assetMainInfo = AssetMainInfo.getByApplyNo(pretrialDTO.getApplyNo());
+
+            if (assetMainInfo != null  && assetMainInfo.getPreState() == 1) {
+				return new InvokeResult<>(new BaseMsgDTO(CommonConstant.SUCCESS, "预审申请成功")).success();
+			}
+
+            return asyncTask.preTrialReq(pretrialDTO);
+
+        } catch (Exception e) {
+            logger.error("发起预审请求异常", e);
+            AssetMainInfo assetMainInfo = AssetMainInfo.getByApplyNo(pretrialDTO.getApplyNo());
+            assetMainInfo.setDeleted(true);
+            assetMainInfo.update();
+        }
+        return new InvokeResult<BaseMsgDTO>().failure("发起预审请求异常");
+    }
+
+
+    /**
+     * 同步贷后资料
+     *
+     * @param applyNo 申请编号
+     * @return
+     * @author liuhongshen
+     * @date 2018/6/7 上午9:51
+     */
+    public InvokeResult<BaseMsgDTO> syncLoanInfo(String applyNo) {
+        logger.info("同步贷后资料 LoanDomain 入参：{}",applyNo);
+        InvokeResult<BaseMsgDTO> result = new InvokeResult<>();
+        try {
+			//获取请款成功的订单
+			AssetMainInfo assetMainInfo = AssetMainInfo.getPaymentSuccessByApplyNo(applyNo);
+			if (assetMainInfo == null){
+				result.failure("申请编号"+applyNo+"未请款").setData(BaseMsgDTO.failureData("申请编号未请款"));
+				return result;
+			}
+
+			//校验文件完整
+
+			InvokeResult<DscSupplyDto> checkAttachmentFile = CommonDomainUtil.checkAttachmentFile(applyNo,
+					BankPhaseEnum.AFTER_LOAN);
+
+			if (checkAttachmentFile.isHasErrors() == true &&
+					checkAttachmentFile.isSuccess() == false) {
+				result.failure("贷后文件缺失").setData(BaseMsgDTO.failureData(net.sf.json.JSONObject.fromObject(
+						checkAttachmentFile.getData()).toString()));
+				return result;
+			}
+
+			//异步处理文件
+			OsbAttachmentDTO inputDto = new OsbAttachmentDTO();
+			inputDto.setBzId(applyNo);
+			inputDto.setBzType(BankPhaseEnum.AFTER_LOAN.getPhase());
+			asyncTask.uploadAttachment(inputDto);
+
+			//路由到不同资方的贷后处理service;
+			String beanName = assetMainInfo.getFinancialCode().concat("AfterLoanService");
+
+			BaseMsgDTO baseMsgDTO = SpringContextUtil.getBean(beanName, AfterLoanService.class).afterLoan(applyNo);
+			logger.info("订单号{},调用贷后获取到的参数为{}",applyNo,baseMsgDTO.toString());
+			result.success().setData(baseMsgDTO);
+			return result;
+		}catch (Exception e){
+        	logger.error("{}同步贷后资料异常，异常信息为",applyNo,e);
+			result.failure("接口异常").setData(BaseMsgDTO.failureData("接口异常"));
+		}
+        return result;
+    }
+
+    /**
+     * <B>功能简述</B><br>
+     * 获取订单各类型的状态
+     *
+     * @return
+     * @date 2018/6/10 下午4:59
+     * @author liuhongshen
+     */
+    public InvokeResult<StatusDTO> getStatus(String applyNo, String type) {
+
+        Integer status = 0; // 状态值
+
+        AssetMainInfo assetMainInfo = AssetMainInfo.getByApplyNo(applyNo);
+
+        if (null == assetMainInfo) {
+            return new InvokeResult<StatusDTO>().failure("申请编号不存在");
+        }
+        
+        switch (type) {
+		case "1"://授权书签署状态
+			try {
+				status = assetMainInfo.getCreditSignState();
+				if(CommonConstant.BankName.CMBC.equals(assetMainInfo.getFinancialCode())){ //民生银行
+					logger.info("【民生银行】查询征信授权书签署状态，订单编号：{}",assetMainInfo.getApplyNo());
+					if (status == null || status == 0) {
+						status = getCreditSignState(assetMainInfo);
+					}
+				}
+			} catch (Exception e) {
+				logger.error("获取授权书签署状态异常",e);
+				status = 0;
+			}
+			break;
+		case "2":
+			status = assetMainInfo.getLastState();
+			break;
+		case "3"://合同签署状态
+			try {
+				status = assetMainInfo.getContractSignState();
+				if(CommonConstant.BankName.CMBC.equals(assetMainInfo.getFinancialCode())){ //民生银行
+					logger.info("【民生银行】查询合同签署状态，订单编号：{}",assetMainInfo.getApplyNo());
+					if (status == null || status == 0) {
+						status = getContractSignState(assetMainInfo);
+					}
+				}
+			} catch (Exception e) {
+				logger.error("查询合同签署状态发生异常,异常信息为:",e);
+				status = 0;
+			}
+			break;
+		case "4":
+			status = assetMainInfo.getPaymentState();
+			break;
+		default:
+			 return new InvokeResult<StatusDTO>().failure("无此类型状态");
+		}
+        
+        logger.info("查询订单各类型状态,ApplyNo:{}, Type:{}, Status:{}", applyNo, type, status);
+        
+        return new InvokeResult<>(new StatusDTO(
+        		status == 1 ? DscContant.KeplerStatus.OK:DscContant.KeplerStatus.FALSE,
+        				type)).success();
+    }
+
+    /**
+     * 获取签署授权书状态
+     * @author sukang
+     * 
+     */
+    public Integer getCreditSignState(AssetMainInfo assetMainInfo) {
+	
+    	boolean sendResult = creditStateQueryRequest.
+    			sendResult(assetMainInfo.getApplyNo());
+    	
+    	if (sendResult) {
+    		assetMainInfo.setCreditSignState(1);
+            assetMainInfo.update();
+            return 1;
+		}
+        return 0;
+    }
+
+    /**
+     * <B>功能简述</B><br>
+     * 获取合同签署状态
+     * @param
+     * @author sukang
+     */
+    public Integer getContractSignState(AssetMainInfo assetMainInfo) {
+    	
+    	String sendResult = applyStateQueryRequest.sendResult(assetMainInfo.getApplyNo());
+    	
+    	if (CMBCRepStatus.COMP.getStatus().equals(sendResult)) {
+    		assetMainInfo.setContractSignState(1);
+    		assetMainInfo.update();
+			return 1;
+		}
+        return 0;
+    }
+    
+    
+    
+    
+    
+    
+    /**
+     * 获取请款状态
+     * @param applyNo
+     * @return
+     */
+    public BaseMsgDTO paymentStatus(String applyNo) {
+        AssetMainInfo assetMainInfo = AssetMainInfo.getByApplyNo(applyNo);
+        
+        switch (assetMainInfo.getPaymentState()) {
+        case 1:
+     	   return BaseMsgDTO.successData("请款成功");
+        case 2:
+     	   return BaseMsgDTO.failureData("请款申请失败");
+        case 3:
+	        return BaseMsgDTO.processData("请款进行中");
+        default:
+        	return BaseMsgDTO.untreatedReq();
+        }
+    }
+
+	/**
+	 * 借据试算
+	 * @param applyNo 申请编号
+	 * @return 试算结果
+	 * @author YixinCapital -- chenjiacheng
+	 *             2018/7/6 10:27
+	 */
+	public InvokeResult<WBComputerRespDTO> computer(String applyNo,Map<String,Object> paramMap) {
+		InvokeResult<WBComputerRespDTO> invokeResult = new InvokeResult<>();
+		String result = null;
+		try {
+			result = wbCommonRequestToBank.computerRequest(paramMap);
+			if (StringUtils.isBlank(result)) {
+				return invokeResult.failure("试算失败");
+			}
+			JSONObject resultObject = JSONObject.parseObject(result);
+			if (!resultObject.getString("code").contains(CommonConstant.WB_RESP_CODE)) {
+				return invokeResult.failure(resultObject.getString("msg"));
+			}
+
+			WBComputerRespDTO respDTO = new WBComputerRespDTO();
+			respDTO = (WBComputerRespDTO) JsonObjectUtils.jsonToObject(resultObject.getString("jsonData"), respDTO); //使用JsonObjectUtils类进行转换
+			logger.info("将银行返回的数据转换为dto,respDto={}", JSON.toJSONString(respDTO));
+			invokeResult.setData(respDTO);
+		} catch (Exception e) {
+			logger.error("借据试算出现异常", e);
+			invokeResult.failure("借据试算失败");
+		}
+		return invokeResult;
+	}
+
+
+	/**
+	 * 免预审处理，即初始化 AssetMainInfo
+	 * @param pretrialDTO
+	 * @return 
+	 * @author YixinCapital -- wangwenlong
+	 *	       2018年7月12日 上午10:28:23
+	 */
+	public InvokeResult<BaseMsgDTO> noPretrialHandle(PretrialDTO pretrialDTO) {
+		logger.info("免预审处理，入参：{}",JSON.toJSONString(pretrialDTO));
+        try {
+            AssetMainInfo assetMainInfo = AssetMainInfo.getByApplyNo(pretrialDTO.getApplyNo());
+
+            if (assetMainInfo != null && assetMainInfo.getPreState() == AssetStateEnum.SUCCESS.getState()) {
+				return new InvokeResult<>(new BaseMsgDTO(CommonConstant.SUCCESS, "免预审处理成功")).success();
+			}
+            this.createNoPretrialAssertMainInfo(pretrialDTO);
+            return new InvokeResult<BaseMsgDTO>().failure("免预审处理成功");
+
+        } catch (Exception e) {
+            logger.error("发起预审请求异常", e);
+        }
+        return new InvokeResult<BaseMsgDTO>().failure("免预审处理异常");
+	}
+	
+	private AssetMainInfo createNoPretrialAssertMainInfo(PretrialDTO pretrialDTO) {
+		AssetFinanceInfo assetFinanceInfo = AssetFinanceInfo.get(AssetFinanceInfo.class, pretrialDTO.getCapitalId());
+		
+		AssetMainInfo mainInfo = new AssetMainInfo();
+        mainInfo.setApplyNo(pretrialDTO.getApplyNo()); // 申请编号
+        mainInfo.setAssetPhase(AssetPhaseEnum.PRE_TRIAL.getPhase());
+        mainInfo.setContractSignState(AssetStateEnum.INIT.getState());
+        mainInfo.setContractSignState(AssetStateEnum.INIT.getState());
+        mainInfo.setFirstState(AssetStateEnum.INIT.getState());
+        mainInfo.setLastState(AssetStateEnum.INIT.getState());
+        mainInfo.setPreState(AssetStateEnum.SUCCESS.getState());
+        mainInfo.setPaymentState(AssetStateEnum.INIT.getState());
+        mainInfo.setAssetNo(null);
+        mainInfo.setChannelCode(pretrialDTO.getChannelCode()); // 渠道编号
+        mainInfo.setChannelName(pretrialDTO.getChannelName()); // 渠道名称
+        mainInfo.setCompanyCode(pretrialDTO.getCompanyCode()); // 发起融资公司编号
+        mainInfo.setFinancialCode(assetFinanceInfo.getCode());
+        mainInfo.setFinancialId(assetFinanceInfo.getId());
+        mainInfo.create();
+        return mainInfo;
+	}
+	
+	
+	/**
+	 * 放款结果查询
+	 * @param applyNo
+	 * @return 
+	 * @author YixinCapital -- wangwenlong
+	 *	       2018年7月30日 下午1:19:05
+	 */
+	public Object loanStatusQuery(String applyNo) {
+		
+		AssetMainInfo assetMainInfo = AssetMainInfo.getByApplyNo(applyNo);
+		if(assetMainInfo == null){
+			throw new BzException("该订单还未向银行发起请款");
+		}
+		if(!AssetStateEnum.SUCCESS.getState().equals(assetMainInfo.getPaymentState())){
+			throw new BzException("该订单未请款成功");
+		}
+		if(CommonConstant.BankName.WB_BANK.equals(assetMainInfo.getFinancialCode())){ //微众
+			return wbCommonRequestToBank.loanStatusQuery(applyNo);
+		} else {
+			return null;
+		}
+	}
+
+    public InvokeResult<Object> contractUploadFile(
+    		DscContractSignFileDTO dscContractSignFileDTO) {
+
+		AssetMainInfo mainInfo = AssetMainInfo.getByApplyNo(dscContractSignFileDTO.getApplyNo());
+		if (mainInfo == null){
+			return new InvokeResult<>().failure("申请编号记录不存在");
+		}
+
+		if (!Objects.equals(AssetStateEnum.SUCCESS.getState(),mainInfo.getLastState())){
+			return new InvokeResult<>().failure("申请编号信审未通过");
+		}
+
+		return SpringContextUtil.getBean(mainInfo.getFinancialCode()
+				.concat("ContractService"), ContractSignService.class)
+				.contractSign(dscContractSignFileDTO);
+    }
+}

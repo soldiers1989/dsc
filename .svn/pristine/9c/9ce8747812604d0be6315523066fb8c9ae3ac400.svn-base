@@ -1,0 +1,842 @@
+package com.yixin.dsc.service.impl.shunt;
+
+import java.util.Collections;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+import javax.annotation.Resource;
+
+import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.assertj.core.util.Lists;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
+
+import com.alibaba.fastjson.JSON;
+import com.yixin.common.utils.InvokeResult;
+import com.yixin.common.utils.JsonObjectUtils;
+import com.yixin.dsc.assembler.DscSalesApplyFinancingInfoAssembler;
+import com.yixin.dsc.assembler.DscSalesApplyRiskAssembler;
+import com.yixin.dsc.common.DscContant;
+import com.yixin.dsc.common.exception.BzException;
+import com.yixin.dsc.dto.DscAdmittanceReturnDto;
+import com.yixin.dsc.dto.DscCapitalDto;
+import com.yixin.dsc.dto.DscSupplyDto;
+import com.yixin.dsc.dto.DscSupplyFieldsDto;
+import com.yixin.dsc.dto.http.DscKeplerDto;
+import com.yixin.dsc.dto.order.DscSalesApplyFinancingInfoDTO;
+import com.yixin.dsc.dto.order.DscSalesApplyRiskInfoDTO;
+import com.yixin.dsc.dto.own.DscRuleVerifyCapitalDto;
+import com.yixin.dsc.dto.own.DscRuleVerifyResultDto;
+import com.yixin.dsc.dto.rule.DscRuleDto;
+import com.yixin.dsc.dto.rule.engine.BatchMatchResult;
+import com.yixin.dsc.entity.capital.DscCapitalConfig;
+import com.yixin.dsc.entity.kepler.DscOrderTrack;
+import com.yixin.dsc.entity.order.DscSalesApplyBondsman;
+import com.yixin.dsc.entity.order.DscSalesApplyCar;
+import com.yixin.dsc.entity.order.DscSalesApplyCost;
+import com.yixin.dsc.entity.order.DscSalesApplyCust;
+import com.yixin.dsc.entity.order.DscSalesApplyFinancing;
+import com.yixin.dsc.entity.order.DscSalesApplyMain;
+import com.yixin.dsc.entity.order.DscSalesApplyPayee;
+import com.yixin.dsc.entity.order.DscSalesApplyRisk;
+import com.yixin.dsc.entity.order.DscSalesInsureInfo;
+import com.yixin.dsc.entity.rule.DscRule;
+import com.yixin.dsc.entity.shunt.DscAccessCapital;
+import com.yixin.dsc.entity.shunt.DscOrderSupplementInfo;
+import com.yixin.dsc.enumpackage.AssetPhaseEnum;
+import com.yixin.dsc.enumpackage.BankCostRateEnum;
+import com.yixin.dsc.enumpackage.DscAlixLinkEnum;
+import com.yixin.dsc.enumpackage.DscRuleTypeEnum;
+import com.yixin.dsc.enumpackage.OrderTrackTypeEnum;
+import com.yixin.dsc.enumpackage.ShuntRefuseTypeEnum;
+import com.yixin.dsc.service.async.AsyncTaskManagerService;
+import com.yixin.dsc.service.common.DscKeplerCommonService;
+import com.yixin.dsc.service.rule.engine.RuleService;
+import com.yixin.dsc.service.shunt.DscCapitalComparator;
+import com.yixin.dsc.service.shunt.DscShuntService;
+import com.yixin.dsc.v1.service.capital.AfterShuntDeal;
+import com.yixin.kepler.common.enums.BankPhaseEnum;
+import com.yixin.kepler.core.constant.CommonConstant;
+import com.yixin.kepler.core.domain.AfterShuntDealFactory;
+import com.yixin.kepler.core.domain.CommonDomainUtil;
+import com.yixin.kepler.dto.PretrialDTO;
+import com.yixin.kepler.enity.AssetFinanceInfo;
+import com.yixin.kepler.enity.AssetMainInfo;
+import com.yixin.kepler.enity.AssetProductFinancialRel;
+
+/**
+ * 准入规则校验接口实现
+ * Package : com.yixin.dsc.service.impl.shunt
+ * 
+ * @author YixinCapital -- wangwenlong
+ *		   2018年6月7日 下午2:53:40
+ *
+ */
+@Service("dscShuntService")
+public class DscShuntImpl implements DscShuntService {
+
+	private static final Logger LOGGER = LoggerFactory.getLogger(DscShuntImpl.class);
+
+	@Resource
+	private RuleService ruleService;
+	
+	@Resource
+	private DscKeplerCommonService dscKeplerCommonService;
+	
+	@Resource(name = "asyncTaskManagerSpringImpl")
+	private AsyncTaskManagerService asyncTaskManagerService;
+	
+	@Resource
+	private DscCapitalComparator<DscCapitalDto> dscCapitalComparator;
+
+	@Resource
+    private AfterShuntDealFactory afterShuntDealFactory;
+
+
+	/**
+	 * 准入规则校验
+	 * 前置1 根据订单编号，校验当前订单是否可再次准入。
+	 * 前置2 是否存在旧数据，存在旧数据数据清洗
+	 * 1 根据产品获取资方列表
+	 * 2 遍历资方列表，分别取每个资方准入规则进行匹配，匹配上记录到machlist中，匹配不上的规则记录到moMatchlist中。
+	 * 3 machlist中资金方排序（排序方法当前是空方法），取前十条落数到表“准入资方记录表”
+	 * 4 取“准入资方记录表”中第一条数据，
+	 * 5 判断是否需要预审，需要预审调用资方接口进行预审，预审通过进行第6步，预审不通过，取“准入资方记录表”中下一个资方，重复第5步；不需要进行第6步
+	 * 6 记录最终资方信息，更新“准入资方记录表”中当前生效资方。
+	 * 7根据最优资金方id，获取补充规则list
+	 * 8遍历补充规则list，获取补充的，字段、动作、附件信息及对应的校验规则，落数到表“订单补充信息表”
+	 * 9 封装返回alix对象（准入结果、资方信息、补充的字段信息、材料信息、动作）
+	 * @param applyNo 订单编号
+	 * @param capitalId 资方ID
+	 * @return 
+	 * @author YixinCapital -- wangwenlong
+	 *	       2018年6月7日 下午3:08:31
+	 */
+	@Override
+	public DscAdmittanceReturnDto capitalAccessCheck(String applyNo, String capitalId,String capitalCode) {
+		
+		String shuntId = DscOrderTrack.recordTrack(applyNo, OrderTrackTypeEnum.SHUNT,null);
+		
+		LOGGER.info("准入规则校验-前置条件1 校验当前订单是否可以准入-开始。 订单编号:{}",applyNo);
+		this.checkOrderCanShunt(applyNo,capitalId);
+		LOGGER.info("准入规则校验-前置条件1 校验当前订单是否可以准入-结束。 订单编号:{}",applyNo);
+		
+		//如果资方ID为空时，准入需要处理前置
+		LOGGER.info("准入规则校验-前置条件2 是否存在旧数据，存在旧数据数据清洗-开始。 订单编号:{}",applyNo);
+		this.removeOldShuntData(applyNo);
+		LOGGER.info("准入规则校验-前置条件2 是否存在旧数据，存在旧数据数据清洗-结束。 订单编号:{}",applyNo);
+
+		LOGGER.info("准入规则校验-获取属性取值来源-开始。 订单编号:{}",applyNo);
+		Map<String,Object> sourceMap = this.getOrderDataSource(applyNo); //属性取值来源
+		LOGGER.info("准入规则校验-获取属性取值来源-结束。 订单编号:{}",applyNo);
+		List<DscCapitalDto> capitalList = Lists.newArrayList();
+		//如果有资方ID不需要去获取 对应资方 直接校验
+		if(StringUtils.isBlank(capitalId)){ //资方id为空
+			LOGGER.info("准入规则校验-入参资方id为空，获取资方列表-开始。 订单编号:{}",applyNo);
+			List<DscCapitalDto> matchingCapitalList = this.getCapitalListByApplyNo(applyNo,sourceMap);
+			LOGGER.info("准入规则校验-入参资方id为空，获取资方列表-结束。 订单编号:{}，获取到的资方列表：{}",applyNo,JSON.toJSONString(matchingCapitalList));
+			if(CollectionUtils.isEmpty(matchingCapitalList)){ //根据订单获取到的资方列表为空
+				LOGGER.error("准入规则校验,根据订单获取到的资方为空，订单编号：{}",applyNo);
+				return this.supplementAlixReturnData(ShuntRefuseTypeEnum.PRODUCT_NO_CAPITAL,shuntId);
+
+			}
+			capitalList.addAll(matchingCapitalList);
+		} else {
+			LOGGER.info("准入规则校验-入参资方id不为空。 订单编号:{}",applyNo);
+			capitalList.add(new DscCapitalDto(capitalId,null,capitalCode));
+		}
+
+		LOGGER.info("准入规则校验-遍历资方列表准入规则匹配-开始。 订单编号:{}",applyNo);
+		List<DscCapitalDto> matchedCapitalList = this.capitalShuntMatch(capitalList,applyNo,sourceMap,shuntId);
+		LOGGER.info("准入规则校验-遍历资方列表准入规则匹配-结束。 订单编号:{}，待匹配资方个数：{},匹配通过资方个数：{}",applyNo,capitalList.size(),matchedCapitalList.size());
+		if(CollectionUtils.isEmpty(matchedCapitalList)){
+			LOGGER.info("准入规则校验,遍历资方列表准入规则匹配,未获取到匹配的资方，订单编号：{}",applyNo);
+			return this.supplementAlixReturnData(ShuntRefuseTypeEnum.RULE_NO_MATCH,shuntId);
+		}
+
+		//如果资方ID为空时，准入需要记录处理结果
+		LOGGER.info("准入规则校验-获取优先级高的资方-开始。 订单编号:{}",applyNo);
+		List<DscCapitalDto> priorCapitalList = this.capitalListPrior(matchedCapitalList,applyNo);
+		LOGGER.info("准入规则校验-获取优先级高的资方-结束。 订单编号:{}",applyNo);
+
+		// 20181017-9982需求-判断提报端传入的意向银行
+		LOGGER.info("准入规则校验-过滤资方-开始。 订单编号:{}，过滤前资方列表:{}",applyNo, JSON.toJSONString(priorCapitalList));
+        priorCapitalList = this.filterCapitalList(priorCapitalList, applyNo);
+		LOGGER.info("准入规则校验-过滤资方-结束。 订单编号:{}，过滤后资方列表:{}",applyNo, JSON.toJSONString(priorCapitalList));
+
+		DscCapitalDto finalCapitalDto = null;
+		LOGGER.info("准入规则校验-资方预审-开始。 订单编号:{}", applyNo);
+		// 20180930-xjt-重构预审为按银行处理的策略模式
+		// finalCapitalDto = this.capitalPretrial(priorCapitalList, applyNo,sourceMap);
+		finalCapitalDto = this.afterShuntDeal(priorCapitalList, applyNo,sourceMap);
+		LOGGER.info("准入规则校验-资方预审-结束。 订单编号:{}，通过预审的资方:{}", applyNo, JSON.toJSONString(finalCapitalDto));
+		if (finalCapitalDto == null) {
+			LOGGER.error("准入规则校验,未获取到通过预审的资方，订单编号：{}", applyNo);
+			return this.supplementAlixReturnData(ShuntRefuseTypeEnum.PRETRIAL_NO_PASS,shuntId);
+		}
+		
+
+		LOGGER.info("准入规则校验-记录资方信息-开始。 订单编号:{}",applyNo);
+		this.recordCapitalInfo(priorCapitalList, finalCapitalDto,applyNo);
+		LOGGER.info("准入规则校验-记录资方信息-结束。 订单编号:{}",applyNo);
+
+		
+		LOGGER.info("准入规则校验-补充给Alix的返回对象-开始。 订单编号:{}",applyNo);
+		DscAdmittanceReturnDto result = this.supplementAlixReturnData(finalCapitalDto,applyNo,sourceMap,shuntId);
+		LOGGER.info("准入规则校验-补充给Alix的返回对象-结束。 订单编号:{}，返回alix数据：{}",applyNo,JsonObjectUtils.objectToJson(result));
+
+		if(CommonConstant.BankName.CMBC.equals(finalCapitalDto.getCapitalCode())){ //民生
+			LOGGER.info("准入规则校验-民生银行附件上传OSB。 订单编号:{}",applyNo);
+			dscKeplerCommonService.applyAttachmentTar(applyNo);
+		}
+
+		return result;
+	}
+
+
+	/**
+	 * 检查订单是否可准入
+	 * @param applyNo 订单编号
+	 * @param applyNo 资方IDl
+	 * @return true/可以准入   false/不可准入
+	 * @author YixinCapital -- wangwenlong
+	 *	       2018年6月7日 下午5:27:08
+	 */
+	private void checkOrderCanShunt(String applyNo,String capitalId){
+		/**
+		 * 1 首先查询该订单是否存在订单数据，即是否在此之前进行过数据同步
+		 * 2 如果入参 capitalId 存在，则需要判断订单是否存在已推荐的资方ID并是否一致，如果
+		 * 	 存在已推荐的资方ID并且不一致，要返回错误信息
+		 * 3 判断订单处于哪个阶段，是否可再次准入
+		 */
+		//1 首先查询该订单是否存在订单数据，即是否在此之前进行过数据同步
+		DscSalesApplyMain applyMain = DscSalesApplyMain.getOneByApplyNo(applyNo);
+		if(applyMain == null){
+			LOGGER.error("准入规则校验-该订单没有数据，请先同步后准入 ,订单编号:{}",applyNo);
+			throw new BzException("该订单没有数据，请先同步后准入");
+		}
+		if(StringUtils.isBlank(applyMain.getProductNo())){
+			LOGGER.error("准入规则校验-该订单没有产品信息，请先同步后准入 ,订单编号:{}",applyNo);
+			throw new BzException("该订单没有产品信息，请先同步后准入");
+		}
+		//2 如果入参 capitalId 存在，则需要判断订单是否存在已推荐的资方ID并是否一致，如果
+		// 存在已推荐的资方ID并且不一致，要返回错误信息
+		if(StringUtils.isNoneBlank(capitalId) && StringUtils.isNoneBlank(applyMain.getCapitalId())
+				&& !capitalId.equals(applyMain.getCapitalId())){ //存在已推荐的资方ID并且不一致，要返回错误信息
+			LOGGER.error("准入规则校验-当前传入的资方不准确 ,订单编号:{}",applyNo);
+			throw new BzException("当前传入的资方不准确");
+		}
+		
+		//3 判断订单处于哪个阶段，是否可再次准入
+		String assetPhase = AssetMainInfo.getAssetPhaseByApplyNo(applyNo);
+		if(AssetPhaseEnum.TRIAL.getPhase().equals(assetPhase)){ //信审阶段
+			LOGGER.error("准入规则校验-该订单已处于信审阶段，不可再次准入 ,订单编号:{}",applyNo);
+			throw new BzException("该订单已处于信审阶段，不可再次准入");
+		} else if(AssetPhaseEnum.PAYMENT_TRIAL.getPhase().equals(assetPhase)){ //请款
+			LOGGER.error("准入规则校验-该订单已处于请款阶段，不可再次准入 ,订单编号:{}",applyNo);
+			throw new BzException("该订单已处于请款阶段，不可再次准入");
+		}
+	}
+	
+	/**
+	 * 是否存在旧数据，存在旧数据数据清洗
+	 * @param applyNo 订单编号
+	 * @author YixinCapital -- wangwenlong
+	 *	       2018年6月7日 下午5:39:59
+	 */
+	private void removeOldShuntData(String applyNo){
+		//========== 删除旧的资方记录表 =================
+		List<DscAccessCapital> capitalList = DscAccessCapital.getListByParms(applyNo,null,false);
+		if(CollectionUtils.isNotEmpty(capitalList)){ //准入资方记录表 存在订单旧信息
+			LOGGER.info("存在旧的资方准入记录，开始数据旧数据");
+			for(DscAccessCapital capital : capitalList){
+				capital.logicRemove();
+			}
+		}
+		//========== 删除旧的订单补充信息表 =================
+		List<DscOrderSupplementInfo> supplementList = DscOrderSupplementInfo.getListByParms(applyNo, false);
+		if(CollectionUtils.isNotEmpty(supplementList)){ //准入资方记录表 存在订单旧信息
+			LOGGER.info("存在旧的订单补充信息记录，开始数据旧数据");
+			for(DscOrderSupplementInfo supplementInfo : supplementList){
+				supplementInfo.logicRemove();
+			}
+		}
+	}
+	
+	/**
+	 * 通过订单编号获取资方列表
+	 * @param applyNo 订单编号
+	 * @return 
+	 * @author YixinCapital -- wangwenlong
+	 *	       2018年6月7日 下午5:41:30
+	 */
+	private List<DscCapitalDto> getCapitalListByApplyNo(String applyNo,Map<String, Object> sourceMap){
+		List<DscCapitalDto> capitalDtoList = Lists.newArrayList();
+		
+		/**
+		 * 通过订单编号查询出产品code,然后再通过产品code查询出资方列表
+		 */
+		DscSalesApplyMain applyMain = (DscSalesApplyMain) sourceMap.get(DscSalesApplyMain.class.getName());
+		String productNo = applyMain.getProductNo(); //产品编号
+		if(StringUtils.isBlank(productNo)){
+			return capitalDtoList;
+		}
+		//通过产品code 获取资方列表
+		capitalDtoList = AssetProductFinancialRel.getCapitalListByProductCode(productNo);
+		LOGGER.info("准入规则校验-通过产品编号获取关联资方，订单编号:{},关联资方:{}",applyNo,JSON.toJSONString(capitalDtoList));
+		return capitalDtoList;
+	}
+	
+	/**
+	 * 准入规则配置
+	 * @param capitalList 待规则匹配的资方集合
+	 * @return 规则通过的资方集合
+	 * @author YixinCapital -- wangwenlong
+	 *	       2018年6月7日 下午7:35:20
+	 */
+	@Override
+	public List<DscCapitalDto> capitalShuntMatch(List<DscCapitalDto> capitalList,String applyNo,Map<String,Object> sourceMap,String shuntId){
+		if(CollectionUtils.isEmpty(capitalList)){
+			return Lists.newArrayList();
+		}
+		/*List<DscCapitalDto> matchCapitalDtoList = Collections.synchronizedList(new ArrayList<>());
+		
+		ThreadPoolExecutor taskExecutor = new ThreadPoolExecutor(1,capitalList.size(), 1000, TimeUnit.MILLISECONDS,new SynchronousQueue<Runnable>());
+		final CountDownLatch latch = new CountDownLatch(taskExecutor.getMaximumPoolSize());
+		for(DscCapitalDto capitalDto:capitalList){
+			taskExecutor.submit(new DscShuntRunnable(matchCapitalDtoList,capitalDto,sourceMap,latch,ruleService));
+		}
+		try{
+			LOGGER.info("准入分流程 等待线程被唤醒！");
+			latch.await();
+		}catch (InterruptedException e){
+			LOGGER.error("准入分流程失败",e);
+		}finally {
+			taskExecutor.shutdown();
+		}*/
+
+		/**
+		 * modify by wangwenlong on 2018-08-15 
+		 * 暂时弃用多线程准入
+		 */
+		List<DscCapitalDto> matchCapitalDtoList = Lists.newArrayList();
+		List<DscRuleDto> ruleDtoList = null;
+		List<BatchMatchResult> batchMatchResultList = Lists.newArrayList();
+		BatchMatchResult matchResult = null;
+		for(DscCapitalDto capitalDto:capitalList){
+			//====== 通过资方ID获取准入规则明细
+			ruleDtoList = DscRule.getListByCapitalId(capitalDto.getCapitalId(), DscRuleTypeEnum.SHUNT.getType());
+			matchResult = ruleService.shuntRuleMatch(ruleDtoList, sourceMap,DscRuleTypeEnum.SHUNT.getType());
+			if(matchResult.isFlag()){ //规则全部匹配
+				matchCapitalDtoList.add(capitalDto);
+			}
+			matchResult.setCapitalId(capitalDto.getCapitalId()); //资方ID
+			matchResult.setCapitalCode(capitalDto.getCapitalCode()); //资方CODE
+			batchMatchResultList.add(matchResult);
+		}
+		
+		//异步记录匹配规则到mongo中，未运维提供查询规则匹配数据 add by wangwenlong
+		asyncTaskManagerService.recordMatchRuleToMongo(batchMatchResultList, applyNo);
+		
+		//异步记录订单准入规则匹配结果 add by wangwenlong on 2018-08-28 预计 2018-08-30 上线
+		asyncTaskManagerService.recordMatchRuleList(batchMatchResultList, shuntId, applyNo);
+		return matchCapitalDtoList;
+	}
+	
+	/**
+	 * 获取优先级高的资方
+	 * @param capitalList 待排序的资金方集合 
+	 * @param applyNo 订单编号
+	 * @author YixinCapital -- wangwenlong
+	 *	       2018年6月7日 下午7:47:46
+	 */
+	private List<DscCapitalDto> capitalListPrior(List<DscCapitalDto> capitalList,String applyNo){
+		/**
+		 * 资金方排序（排序方法当前是空方法），
+		 * 取前十条返回
+		 */
+		try {
+			Collections.sort(capitalList, dscCapitalComparator);
+		} catch (Exception e) {
+			LOGGER.error("准入规则校验-资方优先级排序失败，订单编号:{}",applyNo,e);
+			throw new BzException("资方优先级排序失败");
+		}
+		if(CollectionUtils.isNotEmpty(capitalList) && capitalList.size()> DscContant.CAPITAL_PRIOR_COUNT){
+			
+			return capitalList.subList(0, DscContant.CAPITAL_PRIOR_COUNT-1);
+		} else {
+			return capitalList;
+		}
+	}
+
+    /**
+     * 资方预审-根据入参列表进行顺序预审筛选，如无需预审则认为资方合格，则返回，否则进行预审校验
+     * @param priorCapitalList 待预审的资方集合
+     * @param applyNo 订单编号
+     * @return 通过预审的资方信息
+     * @author YixinCapital -- xjt
+     *	       2018年9月28日 下午8:44:07
+     */
+    private DscCapitalDto afterShuntDeal(List<DscCapitalDto> priorCapitalList, String applyNo, Map<String,Object> sourceMap){
+        if (null == priorCapitalList || priorCapitalList.isEmpty()){
+            return null;
+        }
+        DscSalesApplyMain applyMain = (DscSalesApplyMain)sourceMap.get(DscSalesApplyMain.class.getName());
+        DscSalesApplyCust applyCust = (DscSalesApplyCust)sourceMap.get(DscSalesApplyCust.class.getName());
+        DscSalesApplyCost applyCost = (DscSalesApplyCost) sourceMap.get(DscSalesApplyCost.class.getName());
+		DscSalesApplyCar applyCar = (DscSalesApplyCar) sourceMap.get(DscSalesApplyCar.class.getName());
+        for (DscCapitalDto dscCapitalDto : priorCapitalList) {
+            Boolean isNeedPretrial = DscCapitalConfig.isNeedPretrial(dscCapitalDto.getCapitalId());
+            //判断是否需要预审
+            if(!isNeedPretrial){
+                LOGGER.info("准入规则校验-资方免预审,订单编号:{}",applyNo);
+                return dscCapitalDto;
+            }
+            try {
+                AfterShuntDeal afterShuntDeal = afterShuntDealFactory.getDealClassByFinancialCode(dscCapitalDto.getCapitalCode());
+				LOGGER.info("预审处理类[{}],入参[{}]", afterShuntDeal.getClass().getName(), JSON.toJSONString(dscCapitalDto));
+                // 入参与返回值为同一个对象，防止后续资方个性化处理，用返回值接收继续处理
+                dscCapitalDto = afterShuntDeal
+                        .setApplyMain(applyMain)
+                        .setApplyCust(applyCust)
+                        .setApplyCost(applyCost)
+						.setApplyCar(applyCar)
+                        .deal(dscCapitalDto);
+				LOGGER.info("预审处理返回结果[{}]", JSON.toJSONString(dscCapitalDto));
+                // 检查预审结果
+                if(!dscCapitalDto.getPretrialResult()) {
+                    LOGGER.info("资方预审失败[{}]-[{}],继续下一资方预审处理", applyNo, dscCapitalDto.getPretrialMsg());
+                } else {
+                    LOGGER.info("资方预审处理通过[{}],返回此资方[code:{}]", applyNo, dscCapitalDto.getCapitalCode());
+                    return dscCapitalDto;
+                }
+            } catch (Exception e){
+                LOGGER.error(" 资方预审异常,{}", applyNo, e);
+            }
+        }
+        return null;
+    }
+	
+	/**
+	 * 资方预审
+	 * @param priorCapitalList 待预审的资方集合
+	 * @param applyNo 订单编号
+	 * @return 通过预审的资方信息
+	 * @author YixinCapital -- wangwenlong
+	 *	       2018年6月7日 下午8:44:07
+	 *
+	 * TODO 20180930-此方法被替换为afterShuntDeal方法，待合版稳定后删除
+	 */
+	@Deprecated
+	private DscCapitalDto capitalPretrial(List<DscCapitalDto> priorCapitalList,String applyNo,Map<String,Object> sourceMap){
+		DscSalesApplyMain applyMain = (DscSalesApplyMain)sourceMap.get(DscSalesApplyMain.class.getName());
+		DscSalesApplyCust applyCust = (DscSalesApplyCust)sourceMap.get(DscSalesApplyCust.class.getName());
+		
+		//------- 组装预审信息 ------------
+		PretrialDTO PretrialParamDto = new PretrialDTO();
+		PretrialParamDto.setCompanyCode(applyMain.getRentingCompanyCode()); //发起融资公司编号
+		PretrialParamDto.setChannelCode(applyMain.getDealerChannelCode()); //经销商渠道编号
+		PretrialParamDto.setChannelName(applyMain.getDealerChannelName()); //经销商渠道名称
+		PretrialParamDto.setCustName(applyCust.getAkhxm()); //客户姓名
+		PretrialParamDto.setIdType(applyCust.getAzjlx()); //证件类型
+		PretrialParamDto.setIdNo(applyCust.getAzjhm()); //证件号码
+		PretrialParamDto.setPhoneNo(applyCust.getAsjhm()); //手机号
+		PretrialParamDto.setTacNo(applyMain.getAhkrjjkzh()); //卡号
+		
+		for(DscCapitalDto capitalDto : priorCapitalList){
+			Boolean isNeedPretrial = DscCapitalConfig.isNeedPretrial(capitalDto.getCapitalId());
+			//判断是否需要预审
+			if(!isNeedPretrial){
+				LOGGER.info("准入规则校验-资方免预审,订单编号:{}",applyNo);
+				return capitalDto;
+			}
+			//发起预审
+			try{
+				PretrialParamDto.setCapitalId(capitalDto.getCapitalId()); //资方ID
+				capitalDto.setPretrialParam(PretrialParamDto);
+				DscKeplerDto dscKeplerDto = dscKeplerCommonService.keplerPretrial(applyNo,PretrialParamDto);
+				if(dscKeplerDto != null && DscContant.KeplerCode.SUCCESS.equals(dscKeplerDto.getCode())){
+					capitalDto.setPretrialResult(true); //发起预审成功
+					capitalDto.setPretrialMsg(dscKeplerDto.getMessage());
+					return capitalDto;
+				} else if(dscKeplerDto != null && DscContant.KeplerCode.NO_THROUGH.equals(dscKeplerDto.getCode())){
+					capitalDto.setPretrialResult(false); //发起预审失败
+					capitalDto.setPretrialMsg(dscKeplerDto.getMessage());
+					return capitalDto;
+				} else {
+					LOGGER.info(" 资方预审不成功不失败,{},{}",applyNo,dscKeplerDto.getCode());
+					continue;
+				}
+			}catch (BzException e){
+				LOGGER.error(" 资方预审异常,{},{}",applyNo,e.getMessage());
+			}catch (Exception e){
+				LOGGER.error(" 资方预审异常,{}",applyNo,e);
+			}
+		}
+		return null;
+	}
+
+	/**
+	 * 记录资方信息
+	 * @param priorCapitalList 通过匹配并经过有限排序的资方集合
+	 * @param finalCapitalDto 最终有效的资方
+	 * @param applyNo 订单编号
+	 * @return 
+	 * @author YixinCapital -- wangwenlong
+	 *	       2018年6月7日 下午9:03:42
+	 */
+	private boolean recordCapitalInfo(List<DscCapitalDto> priorCapitalList,DscCapitalDto finalCapitalDto,String applyNo){
+
+		LOGGER.info("------------------:{}",JsonObjectUtils.objectToJson(priorCapitalList));
+		if(CollectionUtils.isNotEmpty(priorCapitalList)){
+			DscAccessCapital accessCapital = null;
+			for(int index = 0;index < priorCapitalList.size();index++){
+				DscCapitalDto capitalDto = priorCapitalList.get(index);
+
+				accessCapital = new DscAccessCapital();
+				accessCapital.setApplyNo(applyNo); //订单编号
+				accessCapital.setCapitalId(capitalDto.getCapitalId()); //资方ID
+				if(finalCapitalDto.getCapitalId().equals(capitalDto.getCapitalId())){
+					accessCapital.setTakeEfect(DscContant.BooleanType.YES); //是否有效
+				} else {
+					accessCapital.setTakeEfect(DscContant.BooleanType.NO); //是否有效
+				}
+				accessCapital.setAccessOrder(String.valueOf(index)); //顺序
+				accessCapital.setCreateTime(new Date()); //创建时间
+				accessCapital.setDeleted(false);
+				accessCapital.setRemark("准入记录资方信息");
+				accessCapital.create();
+			}
+			
+			//记录有效的资方ID 到申请主表中
+			DscSalesApplyMain applyMain = DscSalesApplyMain.getOneByApplyNo(applyNo);
+			if(applyMain != null){
+				applyMain.setCapitalId(finalCapitalDto.getCapitalId()); //有效的资方ID
+				applyMain.update();
+			}
+		}
+		return true;
+	}
+	
+	/**
+	 * 补充给Alix的返回对象
+	 * @param finalCapitalDto
+	 * @return 
+	 * @author YixinCapital -- wangwenlong
+	 *	       2018年6月7日 下午9:08:20
+	 */
+	private DscAdmittanceReturnDto supplementAlixReturnData(DscCapitalDto finalCapitalDto,String applyNo,
+			Map<String, Object> sourceMap,String shuntId){
+		DscAdmittanceReturnDto admittanceReturnDto = new DscAdmittanceReturnDto();
+		admittanceReturnDto.setDscCapitalDto(finalCapitalDto); //最终推荐的资方信息
+		admittanceReturnDto.setLink(DscAlixLinkEnum.CREDITFRONT.getCode()); //信审阶段
+
+		// 20180925-xjt-替换方法：原方法只返回true/false，重构新方法封装需补充的字段集合，并注掉下方setDscSupply逻辑
+        // 20180927-xjt-调整为只有工行才走新逻辑，防止对民生、微众有影响(民生微众暂不需要返回给alix缺失属性列表、缺失文档)
+		// TODO 后期需待民生、微众与alix沟通加入返回字段无误后，进行调整，屏蔽特殊化代码，并检查规则逻辑是否满足(属性校验需JSCompile)
+        if(CommonConstant.BankName.CMBC.equals(finalCapitalDto.getCapitalCode())
+        		|| CommonConstant.BankName.WB_BANK.equals(finalCapitalDto.getCapitalCode())){
+        	
+        	admittanceReturnDto.setNeedSupply(capitalSupplyRuleMatch(finalCapitalDto,applyNo,DscRuleTypeEnum.CREDITFRONT_SHUNT.getType(),sourceMap)); //是否需要补充
+			//根据资金方id获取补充信息
+			DscSupplyDto supplyDto = this.dscKeplerCommonService.keplerSupplyByCapitalId(finalCapitalDto.getCapitalId());
+			admittanceReturnDto.setDscSupply(supplyDto);
+        } else {
+        	this.capitalSupplyRuleMatch(admittanceReturnDto,finalCapitalDto,applyNo,DscRuleTypeEnum.CREDITFRONT_SHUNT.getType(),sourceMap);
+			//是否需要补充
+			if(admittanceReturnDto.getDscSupply() == null){
+				admittanceReturnDto.setNeedSupply(false); 
+			}else{
+				admittanceReturnDto.setNeedSupply(true);
+			}
+			if(CommonConstant.BankName.ICBC_BANK.equals(finalCapitalDto.getCapitalCode())){
+				DscSalesApplyMain dscSalesApplyMain = (DscSalesApplyMain)sourceMap.get(DscSalesApplyMain.class.getName());
+				DscSalesApplyCar dscSalesApplyCar = (DscSalesApplyCar)sourceMap.get(DscSalesApplyCar.class.getName());
+				
+				String bankRate = BankCostRateEnum.getByParams(finalCapitalDto.getCapitalCode(),
+						dscSalesApplyCar.getAcllx(),dscSalesApplyMain.getArzqx()).getBankCostRate();
+				finalCapitalDto.setBankRate(bankRate);
+				LOGGER.info("得到对应的银行成本费率:{},CapitalCode:{},期限:{},新车二手车标识:{}",
+						bankRate,finalCapitalDto.getCapitalCode(),dscSalesApplyMain.getArzqx(),dscSalesApplyCar.getAcllx());
+				admittanceReturnDto.setDscCapitalDto(finalCapitalDto); //得到
+			}
+        }
+
+		admittanceReturnDto.setPretrialResult(finalCapitalDto.getPretrialResult()); //是否通过预审
+		admittanceReturnDto.setPretrialMsg(finalCapitalDto.getPretrialMsg()); //预审返回信息
+
+		DscOrderTrack.updateTrackSuccessResult(shuntId, JSON.toJSONString(finalCapitalDto));
+		return admittanceReturnDto;
+	}
+	
+	
+	/**
+	 * 给Alix的返回对象
+	 * @param refuseTypeEnum 准入拒绝类型
+	 * @param refuseTypeEnum 准入痕迹ID
+	 * @return 
+	 * @author YixinCapital -- wangwenlong
+	 *	       2018年8月27日 下午3:38:02
+	 */
+	private DscAdmittanceReturnDto supplementAlixReturnData(ShuntRefuseTypeEnum refuseTypeEnum,String shuntId){
+		DscAdmittanceReturnDto result = new DscAdmittanceReturnDto();
+		DscCapitalDto dscCapitalDto = new DscCapitalDto();
+		dscCapitalDto.setCapitalCode(CommonConstant.BankName.YX);
+		result.setDscCapitalDto(dscCapitalDto);
+		result.setShuntRefuseType(refuseTypeEnum.getType());
+		
+		DscOrderTrack.updateTrackSuccessResult(shuntId, JSON.toJSONString(result));
+		return result;
+	}
+
+
+
+
+	/**
+	 * 补充规则规则配置
+	 * @param dscCapitalDto  资方
+	 * @author YixinCapital -- wangwenlong
+	 *	       2018年6月7日 下午7:35:20
+	 */
+	@Override
+	public Boolean capitalSupplyRuleMatch(DscCapitalDto dscCapitalDto, String applyNo, String ruleType,Map<String,Object> sourceMap){
+		if(dscCapitalDto==null){
+			return true;
+		}
+		//====== 通过资方ID获取补充规则明细规则明细
+		List<DscRuleDto> ruleDtoList = DscRule.getListByCapitalId(dscCapitalDto.getCapitalId(), ruleType);
+		return ruleService.supplyRuleMatch(ruleDtoList, sourceMap,ruleType);
+	}
+
+	/**
+	 * 校验补充规则，并基于入参admittanceReturnDto放入校验结果(needSupply、fieldList)
+	 * @param dscCapitalDto  资方
+	 * @author YixinCapital -- xjt
+	 *	       2018年9月25日 下午7:35:20
+	 */
+	@Override
+	public void capitalSupplyRuleMatch(DscAdmittanceReturnDto admittanceReturnDto, DscCapitalDto dscCapitalDto, String applyNo, String ruleType, Map<String,Object> sourceMap){
+		if(dscCapitalDto==null){
+			return;
+		}
+		//====== 通过资方ID获取补充规则明细规则明细
+		List<DscRuleDto> ruleDtoList = DscRule.getListByCapitalId(dscCapitalDto.getCapitalId(), ruleType);
+		//====== 校验规则并接收返回值，用以确定是否需要补充属性字段
+		List<DscSupplyFieldsDto> fieldsDtoList = ruleService.supplyRuleMatchByFieldResult(ruleDtoList, sourceMap,ruleType);
+		if (null != fieldsDtoList && !fieldsDtoList.isEmpty()){
+			admittanceReturnDto.setNeedSupply(true);
+			if (null == admittanceReturnDto.getDscSupply()) {
+				admittanceReturnDto.setDscSupply(new DscSupplyDto().setSupplyFields(fieldsDtoList));
+			} else {
+				admittanceReturnDto.getDscSupply().setFieldList(fieldsDtoList);
+			}
+		}
+
+		//====== 校验文档是否完善(仅限于信审阶段校验)
+		InvokeResult<DscSupplyDto> checkAttachmentFile = CommonDomainUtil.checkAttachmentFile(applyNo, BankPhaseEnum.LAST_TRIAL);
+		if (null != checkAttachmentFile && checkAttachmentFile.isHasErrors()){
+			admittanceReturnDto.setNeedSupply(true);
+			if (null == admittanceReturnDto.getDscSupply()) {
+				admittanceReturnDto.setDscSupply(new DscSupplyDto().setSupplyAttachments(((DscSupplyDto)checkAttachmentFile.getData()).getAttList()));
+			} else {
+				admittanceReturnDto.getDscSupply().setAttList(((DscSupplyDto)checkAttachmentFile.getData()).getAttList());
+			}
+		}
+	}
+
+	/**
+	 * 资方规则校验
+	 * @param capitalId 资方ID
+	 * @param applyNo 申请编号
+	 * @param ruleTypeEnum 规则类型
+	 * @param sourceMap 数据来源
+	 * @return 
+	 * @author YixinCapital -- wangwenlong
+	 *	       2018年7月23日 下午9:25:26
+	 */
+	@Override
+	public Boolean capitalRuleMatch(String capitalId, String applyNo, DscRuleTypeEnum ruleTypeEnum,
+			Map<String, Object> sourceMap) {
+		//====== 通过资方ID获取对应规则明细规则明细
+		List<DscRuleDto> ruleDtoList = DscRule.getListByCapitalId(capitalId, ruleTypeEnum.getType());
+		if(CollectionUtils.isEmpty(ruleDtoList)){
+			return true;
+		}
+		BatchMatchResult matchResult = ruleService.shuntRuleMatch(ruleDtoList, sourceMap,ruleTypeEnum.getType());
+		if(matchResult.isFlag()){ //规则全部匹配
+			return true;
+		}
+		return false;
+	}
+
+	/**
+	 * 获取订单数据的来源
+	 * @param applyNo 申请编号
+	 * @return 
+	 * @author YixinCapital -- wangwenlong
+	 *	       2018年7月23日 下午9:27:59
+	 */
+	@Override
+	public Map<String, Object> getOrderDataSource(String applyNo) {
+		Map<String,Object> sourceMap = new HashMap<>(); //属性取值来源
+		//------- 申请信息主表 ----
+		DscSalesApplyMain applyMain = DscSalesApplyMain.getOneByApplyNo(applyNo);
+		sourceMap.put(applyMain.getClass().getName(), applyMain);
+		//-------- 客户信息 ----------
+		DscSalesApplyCust applyCust = DscSalesApplyCust.getOneByMainId(applyMain.getId());
+		sourceMap.put(applyCust.getClass().getName(), applyCust);
+		//-------- 车辆信息 ----------
+		DscSalesApplyCar applyCar = DscSalesApplyCar.getBymainId(applyMain.getId());
+		sourceMap.put(applyCar.getClass().getName(), applyCar);
+		//-------- 融资信息 ----------
+		DscSalesApplyCost applyCost = DscSalesApplyCost.getByMainId(applyMain.getId());
+		sourceMap.put(applyCost.getClass().getName(), applyCost);
+		//-------- 保险信息 ----------
+		DscSalesInsureInfo insureInfo = DscSalesInsureInfo.getByMainId(applyMain.getId());
+		sourceMap.put(insureInfo.getClass().getName(), insureInfo);
+		//-------- 融资项目信息 ----------
+		List<DscSalesApplyFinancing> applyFinancingLis = DscSalesApplyFinancing.getByMainId(applyMain.getId());
+		if(applyFinancingLis!=null && !applyFinancingLis.isEmpty()){
+			DscSalesApplyFinancingInfoDTO applyFinancingInfoDto = DscSalesApplyFinancingInfoAssembler.FinancingList2InfoDto(applyFinancingLis);
+			sourceMap.put(applyFinancingInfoDto.getClass().getName(), applyFinancingInfoDto);
+		}
+		//-------- risk信息 ----------
+		List<DscSalesApplyRisk> riskList = DscSalesApplyRisk.getByMainId(applyMain.getId());
+		if(riskList!=null && !riskList.isEmpty()){
+			DscSalesApplyRiskInfoDTO riskDTO = DscSalesApplyRiskAssembler.FinancingList2InfoDto(riskList);
+			sourceMap.put(DscSalesApplyRiskInfoDTO.class.getName(), riskDTO);
+		}else{
+            sourceMap.put(DscSalesApplyRisk.class.getName(),new DscSalesApplyRisk());
+        }
+        //担保人信息
+		List<DscSalesApplyBondsman> bondsmenList = DscSalesApplyBondsman.getListByParms(applyMain.getId());
+		if(bondsmenList != null  && !bondsmenList.isEmpty()){
+			sourceMap.put(DscSalesApplyBondsman.class.getName(),bondsmenList.get(0));
+		}else{
+			sourceMap.put(DscSalesApplyBondsman.class.getName(),new DscSalesApplyBondsman());
+		}
+		//-------- 合同申请收款信息表 ----------
+		DscSalesApplyPayee applyPayee = DscSalesApplyPayee.getByMainId(applyMain.getId());
+		sourceMap.put(applyPayee.getClass().getName(), applyPayee);
+		return sourceMap;
+	}
+
+
+	/**
+	 * 规则验证接口
+	 * @param applyNo
+	 * @param capitalCode
+	 * @return 
+	 * @author YixinCapital -- wangwenlong
+	 *	       2018年8月2日 下午5:09:05
+	 */
+	@Override
+	public DscRuleVerifyResultDto ruleVerify(String applyNo, String capitalCode) {
+		String capitalId = null;
+		if(StringUtils.isNotBlank(capitalCode)){
+			AssetFinanceInfo assInfo = AssetFinanceInfo.getByCode(capitalCode);
+			if(assInfo==null || StringUtils.isBlank(assInfo.getId())){
+				throw new BzException("规则验证接口校验资方Code错误");
+			}
+			capitalId = assInfo.getId();
+		}
+		LOGGER.info("规则验证接口-属性取值来源开始，订单编号:{}",applyNo);
+		Map<String,Object> sourceMap = this.getOrderDataSource(applyNo); //属性取值来源
+		LOGGER.info("规则验证接口-属性取值来源结束，订单编号:{}",applyNo);
+		List<DscCapitalDto> capitalList = Lists.newArrayList();
+		//如果有资方ID不需要去获取 对应资方 直接校验
+		if(StringUtils.isBlank(capitalId)){ //资方id为空
+			LOGGER.info("规则验证接口-入参资方id为空，获取资方列表-开始。 订单编号:{}",applyNo);
+			List<DscCapitalDto> matchingCapitalList = this.getCapitalListByApplyNo(applyNo,sourceMap);
+			LOGGER.info("规则验证接口-入参资方id为空，获取资方列表-结束。 订单编号:{}，获取到的资方列表：{}",applyNo,JSON.toJSONString(matchingCapitalList));
+			if(CollectionUtils.isEmpty(matchingCapitalList)){ //根据订单获取到的资方列表为空
+				throw new BzException("规则验证接订单获取到的资方列表为空");
+
+			}
+			capitalList.addAll(matchingCapitalList);
+		} else {
+			LOGGER.info("规则验证接口-入参资方id不为空。 订单编号:{}",applyNo);
+			capitalList.add(new DscCapitalDto(capitalId,null,capitalCode));
+		}
+		
+		DscRuleVerifyResultDto reusltDto = new DscRuleVerifyResultDto(applyNo);
+		
+		LOGGER.info("规则验证接口-遍历资方列表准入规则匹配-开始。 订单编号:{}",applyNo);
+		List<DscCapitalDto> matchedCapitalList = this.capitalShuntMatch(capitalList,applyNo,sourceMap,null);
+		LOGGER.info("规则验证接口-遍历资方列表准入规则匹配-结束。 订单编号:{}，待匹配资方个数：{},匹配通过资方个数：{}",applyNo,capitalList.size(),matchedCapitalList.size());
+		if(CollectionUtils.isEmpty(matchedCapitalList)){
+			LOGGER.info("规则验证接口,遍历资方列表准入规则匹配,未获取到匹配的资方，订单编号：{}",applyNo);
+			return reusltDto;
+		}
+
+		//如果资方ID为空时，准入需要记录处理结果
+		LOGGER.info("规则验证接口验-获取优先级高的资方-开始。 订单编号:{}",applyNo);
+		List<DscCapitalDto> priorCapitalList = this.capitalListPrior(matchedCapitalList,applyNo);
+		LOGGER.info("规则验证接口-获取优先级高的资方-结束。 订单编号:{}",applyNo);
+		
+		DscRuleVerifyCapitalDto verifyCapitalDto = null;
+		for(DscCapitalDto capitalDto:priorCapitalList){
+			verifyCapitalDto = new DscRuleVerifyCapitalDto();
+			verifyCapitalDto.setNeedSupply(capitalSupplyRuleMatch(capitalDto,applyNo,DscRuleTypeEnum.CREDITFRONT_SHUNT.getType(),sourceMap));
+			verifyCapitalDto.setDscSupply(this.dscKeplerCommonService.keplerSupplyByCapitalId(capitalDto.getCapitalId()));
+			reusltDto.getCapitalList().add(verifyCapitalDto);
+		}
+		return reusltDto;
+	}
+
+
+	/**
+	 * 规则验证接口
+	 * @param capitalList	资方列表
+	 * @param applyNo		申请单号
+	 * @return				过滤后的资方
+	 * @author YixinCapital -- xjt
+	 *	       2018年10月17日 下午14:09:05
+	 *
+	 */
+	private List<DscCapitalDto> filterCapitalList(List<DscCapitalDto> capitalList, String applyNo) {
+		if (null == capitalList || capitalList.isEmpty()){
+			LOGGER.info("过滤资方-送入资方列表为空,直接返回");
+			return capitalList;
+		}
+		DscSalesApplyCar car = DscSalesApplyCar.getBymainId(DscSalesApplyMain.getByApplyNo(applyNo).getId());
+		if (null == car){
+			LOGGER.info("过滤资方-车辆信息未同步,默认全部资方");
+			return capitalList;
+		}
+		if (StringUtils.isBlank(car.getAyxzryh())){
+			LOGGER.info("过滤资方-提报端未送入意向资方,默认全部资方");
+			return capitalList;
+		}
+		if ("0".equals(car.getAyxzryh())){
+			LOGGER.info("过滤资方-意向资方[0],全部资方不做过滤");
+			return capitalList;
+		}
+		if ("1".equals(car.getAyxzryh())){
+//			LOGGER.info("过滤资方-意向资方[1],工行优先,如当前资方无工行,则返回全部资方");
+//			return capitalList.stream().anyMatch(dscCapitalDto ->
+//					CommonConstant.BankName.ICBC_BANK.equals(dscCapitalDto.getCapitalCode())
+//			) ? capitalList.stream().filter(dscCapitalDto ->
+//					CommonConstant.BankName.ICBC_BANK.equals(dscCapitalDto.getCapitalCode())
+//			).collect(Collectors.toList()) : capitalList;
+			LOGGER.info("过滤资方-意向资方[1],工行优先,如当前资方无工行,则返回全部资方");
+			return capitalList.stream().anyMatch(dscCapitalDto ->
+					CommonConstant.BankName.ICBC_BANK.equals(dscCapitalDto.getCapitalCode())
+			) ? capitalList.stream().sorted((capital1, capital2) -> CommonConstant.BankName.ICBC_BANK.equals(capital1.getCapitalCode()) ? -1 : 1).collect(Collectors.toList()) : capitalList;
+		}
+		if ("2".equals(car.getAyxzryh())){
+			LOGGER.info("过滤资方-意向资方[2],不做工行");
+			return capitalList.stream().filter(dscCapitalDto ->
+					!CommonConstant.BankName.ICBC_BANK.equals(dscCapitalDto.getCapitalCode())
+			).collect(Collectors.toList());
+		}
+		LOGGER.warn("过滤资方-意向资方[{}]异常,全部资方不做过滤", car.getAyxzryh());
+		return capitalList;
+	}
+
+}

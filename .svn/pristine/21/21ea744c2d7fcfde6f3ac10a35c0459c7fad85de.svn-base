@@ -1,0 +1,120 @@
+package com.yixin.kepler.core.service.impl;
+
+import javax.annotation.Resource;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
+
+import com.yixin.common.utils.InvokeResult;
+import com.yixin.dsc.common.DscContant;
+import com.yixin.dsc.entity.order.DscSalesApplyMain;
+import com.yixin.dsc.enumpackage.RequestPreposeEnum;
+import com.yixin.kepler.common.enums.AssetPhaseEnum;
+import com.yixin.kepler.common.enums.AssetStateEnum;
+import com.yixin.kepler.common.enums.BankPhaseEnum;
+import com.yixin.kepler.core.attachment.AttachmentDomain;
+import com.yixin.kepler.core.constant.CommonConstant;
+import com.yixin.kepler.core.domain.AsyncTask;
+import com.yixin.kepler.core.domain.AttachmentUploadFactory;
+import com.yixin.kepler.core.service.PaymentService;
+import com.yixin.kepler.dto.BaseMsgDTO;
+import com.yixin.kepler.dto.OsbAttachmentDTO;
+import com.yixin.kepler.enity.AssetMainInfo;
+import com.yixin.kepler.enity.AssetPaymentTask;
+import com.yixin.kepler.enity.ConstantConfig;
+
+/**
+ * @author sukang
+ * @date 2018-06-08 11:45:54
+ */
+@Service
+public class PaymentServiceImpl implements PaymentService {
+
+    private final Logger logger = LoggerFactory.getLogger(getClass());
+
+    @Resource
+	private AsyncTask asyncTask;
+    
+    @Resource
+	private AttachmentUploadFactory attachmentUploadFactory;
+    
+   
+    /**
+     * 重构请款实现
+     * 		-----【统一标准】 
+     * @param applyNo
+     * @return 
+     * @author YixinCapital -- chen.lin
+     *	       2018年9月21日 下午7:58:47
+     */
+	@Override
+	public BaseMsgDTO paymentRequest(String applyNo) {
+		logger.info("订单号为{},发送请款请求",applyNo);
+		AssetMainInfo assetMainInfo = AssetMainInfo.getByApplyNoPayment(applyNo);
+		//*****************校验请款合法性
+		if (assetMainInfo == null) {
+			return new BaseMsgDTO(CommonConstant.FAILURE,"订单号未经信审");
+		}
+		if (assetMainInfo.getContractSignState() != AssetStateEnum.SUCCESS.getState()) {
+			return new BaseMsgDTO(CommonConstant.FAILURE, "未签署合同");
+		}
+		if (AssetPhaseEnum.PAYMENT_TRIAL.getPhase().equals(assetMainInfo.getAssetPhase())) {
+			Integer state = assetMainInfo.getPaymentState();
+			if (state == AssetStateEnum.SUCCESS.getState()) {
+				return new BaseMsgDTO(CommonConstant.FAILURE, "已请款成功");
+			}else if (state == AssetStateEnum.DOING.getState()) {
+				return new BaseMsgDTO(CommonConstant.FAILURE, "请款申请处理中");
+			}
+		}
+		if(AssetPaymentTask.getByApplyNo(applyNo) != null) {
+			return new BaseMsgDTO(CommonConstant.FAILURE, "订单"+applyNo+"已受理");
+		}
+		
+		DscSalesApplyMain dscSalesApplyMain = DscSalesApplyMain.getByApplyNo(applyNo);
+		
+		//*****************银行请款请求前置
+		//1.请款前校验		2.校验通过，判断流程（正常-实时or新定时，跳转-老定时）
+		BaseMsgDTO preposeMsg = asyncTask.requestPrepose(applyNo, assetMainInfo.getFinancialCode(), RequestPreposeEnum.PAYMENT_TRIAL);
+		if(DscContant.KeplerCode.FAILD.equals(preposeMsg.getCode())){
+			return new BaseMsgDTO(CommonConstant.FAILURE, preposeMsg.getMessage());
+		}
+		
+		/*/*//*****************判断上传osb文件
+		ConstantConfig constantConfig = ConstantConfig.getConstantConfigByNameKey(assetMainInfo.getFinancialCode(), BankPhaseEnum.LAST_TRIAL.getPhase());
+		if(constantConfig != null && constantConfig.getValueString().equals(CommonConstant.ONE)){
+			//入参申请编号,资方id,阶段
+			OsbAttachmentDTO attachmentDTO = new OsbAttachmentDTO();
+			attachmentDTO.setBzId(applyNo);
+			attachmentDTO.setBzType(BankPhaseEnum.LAST_TRIAL.getPhase());//payment
+			AttachmentDomain attachmentDomain = attachmentUploadFactory.getAttachmentDomain(attachmentDTO);
+			logger.info("订单号{}，申请文件上传任务，处理类为{}", applyNo, attachmentDomain.getClass().getName());
+			attachmentDomain.doIt(attachmentDTO);
+		}*/
+		
+		//*****************向银行发起请款请求
+		if(CommonConstant.PreposeResultCode.NORMAL.equals(preposeMsg.getCode())){
+			//正常-实时or新定时
+			InvokeResult<BaseMsgDTO> result = asyncTask.requestBank(applyNo, assetMainInfo.getFinancialCode(), BankPhaseEnum.PAYMENT);
+			return (BaseMsgDTO) result.getData();
+		}else{
+			//跳转-老定时
+			AssetPaymentTask assetPaymentTask = new AssetPaymentTask();
+			assetPaymentTask.setApplyNo(applyNo);
+			assetPaymentTask.setExecState(0);
+			assetPaymentTask.setExecTimes(0);
+			assetPaymentTask.setIsEnd(false);
+			assetPaymentTask.setIsSuccess(false);
+			assetPaymentTask.setAssetCode(dscSalesApplyMain.getCapitalId());
+			assetPaymentTask.create();
+			return new BaseMsgDTO(CommonConstant.SUCCESS, "请款受理成功");
+		}		
+	}
+	
+
+    @Override
+    public boolean isExitByApplyNo(String applyNo) {
+        return AssetMainInfo.isExitByApplyNo(applyNo);
+    }
+
+}

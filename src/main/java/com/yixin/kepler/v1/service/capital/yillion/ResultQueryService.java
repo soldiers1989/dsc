@@ -1,0 +1,349 @@
+package com.yixin.kepler.v1.service.capital.yillion;
+
+import com.alibaba.fastjson.JSON;
+import com.alibaba.fastjson.TypeReference;
+import com.yixin.common.system.ioc.SpringContextUtil;
+import com.yixin.dsc.dto.DscFlowResultForAlixDto;
+import com.yixin.dsc.enumpackage.DscAlixLinkEnum;
+import com.yixin.dsc.util.DateUtil;
+import com.yixin.dsc.util.PropertiesManager;
+import com.yixin.dsc.util.StrUtil;
+import com.yixin.kepler.common.RestTemplateUtil;
+import com.yixin.kepler.common.UrlConstant;
+import com.yixin.kepler.common.enums.AssetStateEnum;
+import com.yixin.kepler.common.enums.BankPhaseEnum;
+import com.yixin.kepler.core.constant.CommonConstant;
+import com.yixin.kepler.core.listener.SettleOrderEvent;
+import com.yixin.kepler.core.service.BankResultService;
+import com.yixin.kepler.dto.BaseMsgDTO;
+import com.yixin.kepler.enity.AssetBankTran;
+import com.yixin.kepler.enity.AssetMainInfo;
+import com.yixin.kepler.enity.AssetResultTask;
+import com.yixin.kepler.v1.common.constants.YILLIONConstant;
+import com.yixin.kepler.v1.common.enumpackage.YILLIONUrlEnum;
+import com.yixin.kepler.v1.datapackage.dto.yillion.YILLIONLastTrailRespDTO;
+import com.yixin.kepler.v1.datapackage.dto.yillion.YILLIONPaymentRespDTO;
+import com.yixin.kepler.v1.datapackage.dto.yillion.YILLIONQueryDTO;
+import com.yixin.kepler.v1.datapackage.dto.yillion.YILLIONRespDTO;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
+
+import javax.annotation.Resource;
+import java.math.BigDecimal;
+
+/**
+ * @description:
+ * @date: 2018-11-02 00:49
+ */
+@Service("YILLIONResultQueryService")
+public class ResultQueryService implements BankResultService {
+
+    private final Logger logger = LoggerFactory.getLogger(getClass());
+
+    @Resource
+    private PropertiesManager propertiesManager;
+
+    @Override
+    public BaseMsgDTO selectResult(AssetResultTask assetResultTask) {
+
+        String applyNo = assetResultTask.getApplyNo();
+        String phase = assetResultTask.getBzId();
+        String tranNo = assetResultTask.getTranNo();
+
+        AssetMainInfo assetMainInfo = AssetMainInfo.getByApplyNo(applyNo);
+        String assetMainId = assetMainInfo.getId();
+
+        String venusApplyNo = assetMainInfo.getVenusApplyNo();
+
+        //发起查询
+        String queryUrl = getQueryUrl(phase);
+        if (queryUrl == null) {
+            return BaseMsgDTO.failureData("未知的阶段");
+        }
+
+        String orderNo = YILLIONConstant.ORDER_NO_PREFIX + venusApplyNo;
+
+        YILLIONQueryDTO queryParam = new YILLIONQueryDTO();
+        queryParam.setOrder_no(orderNo);
+
+        String result = RestTemplateUtil.sendRequest(queryUrl, queryParam, CommonConstant.BankName.YILLION_BANK);
+
+        //记录交易记录
+        recordTranInfo(applyNo, assetMainId, queryParam, queryUrl, phase, tranNo, result);
+
+        //分析查询结果
+        if (BankPhaseEnum.LAST_TRIAL.getPhase().equals(phase)) {
+            return analyseLastTrialResult(assetMainInfo, result);
+        } else if (BankPhaseEnum.PAYMENT.getPhase().equals(phase)) {
+            return analysePaymentResult(assetMainInfo, result);
+        } else {
+            return BaseMsgDTO.failureData("未知的阶段");
+        }
+    }
+
+
+    /**
+     * 分析请款结果
+     *
+     * @param assetMainInfo
+     * @param result
+     * @return
+     */
+    private BaseMsgDTO analysePaymentResult(AssetMainInfo assetMainInfo, String result) {
+
+        if (StrUtil.isEmpty(result)) {
+            return BaseMsgDTO.processData("未查询到请款结果");
+        }
+
+        String applyNo = assetMainInfo.getApplyNo();
+
+        YILLIONRespDTO<YILLIONPaymentRespDTO> paymentResp = JSON.parseObject(result, new TypeReference<YILLIONRespDTO<YILLIONPaymentRespDTO>>() {
+        });
+
+        String respCode = paymentResp.getRespcode();
+        String respMsg = paymentResp.getRespmsg();
+
+        //查询调用失败可以发起重试
+        if ("0001".equals(respCode)) {
+            return BaseMsgDTO.processData("未查询到请款结果");
+        }
+
+        //特殊原因不成功的情况
+        if (!"0000".equals(respCode)) {
+            //todo 导标退件
+            return BaseMsgDTO.failureData(respMsg);
+        }
+
+        YILLIONPaymentRespDTO paymentResult = paymentResp.getData();
+        String loanStatus = paymentResult.getLoanstatus();
+
+        //借据号
+        String billNo = paymentResult.getBillno();
+        assetMainInfo.setCmbcLoanNo(billNo);
+        //合同编号
+        String contractNo = paymentResult.getContrno();
+        assetMainInfo.setBankContractNo(contractNo);
+        //资方放款金额
+        BigDecimal loanAmount = paymentResult.getLoanamt();
+        assetMainInfo.setBankLoanAmount(loanAmount);
+        //资方放款时间
+        String loanTime = paymentResult.getPushtime();
+        if (!StrUtil.isEmpty(loanTime)) {
+            assetMainInfo.setBankLoanTime(DateUtil.StringToDate(loanTime, "yyyy-MM-dd"));
+        }
+
+        if ("0".equals(loanStatus)) {
+            //请款成功
+            paymentResult(assetMainInfo, true, "请款通过");
+            noticeSettlePaymentSuccess(applyNo);
+            return BaseMsgDTO.successData("审批通过");
+        } else if ("1".equals(loanStatus) || "3".equals(loanStatus)) {
+            //请款失败
+            return BaseMsgDTO.failureData(respMsg);
+        } else if ("4".equals(loanStatus)) {
+            return BaseMsgDTO.processData("请款处理中");
+        } else {
+            //todo 未知状态，卡单，导标退件
+            return BaseMsgDTO.failureData(respMsg);
+        }
+    }
+
+
+    /**
+     * 分析信审结果
+     *
+     * @param assetMainInfo
+     * @param result
+     * @return
+     */
+    private BaseMsgDTO analyseLastTrialResult(AssetMainInfo assetMainInfo, String result) {
+        if (StrUtil.isEmpty(result)) {
+            return BaseMsgDTO.processData("未查询到信审结果");
+        }
+
+        String applyNo = assetMainInfo.getApplyNo();
+
+        YILLIONRespDTO<YILLIONLastTrailRespDTO> paymentResp = JSON.parseObject(result, new TypeReference<YILLIONRespDTO<YILLIONLastTrailRespDTO>>() {
+        });
+
+        String respCode = paymentResp.getRespcode();
+        String respMsg = paymentResp.getRespmsg();
+
+        //查询调用失败可以发起重试
+        if ("0001".equals(respCode)) {
+            return BaseMsgDTO.processData("未查询到信审结果");
+        }
+
+        //特殊异常、邮件预警返回失败
+        if ("1001".equals(respCode) || "1002".equals(respCode) || "1004".equals(respCode) || "1005".equals(respCode)) {
+            //todo 邮件预警
+            return BaseMsgDTO.failureData(respMsg);
+        }
+
+        YILLIONLastTrailRespDTO lastTrialResult = paymentResp.getData();
+
+        //合同编号
+        assetMainInfo.setBankContractNo(lastTrialResult.getContrno());
+        //资方审批时间
+        String auditTime = lastTrialResult.getApproval_time();
+        if (!StrUtil.isEmpty(auditTime)) {
+            assetMainInfo.setBankAuditTime(DateUtil.StringToDate(auditTime, "yyyy-MM-dd"));
+        }
+
+        String status = lastTrialResult.getStatus();
+
+        if ("0".equals(status)) {
+            //信审通过
+            creditAuditResult(assetMainInfo, true, "审批通过");
+            return BaseMsgDTO.successData("审批通过");
+        } else if ("1".equals(status) || "2".equals(status)) {
+            //数据校验失败
+            creditAuditResult(assetMainInfo, false, respMsg);
+            return BaseMsgDTO.successData(respMsg);
+        } else if ("3".equals(status)) {
+            //鉴权失败
+            //todo 待确认
+            creditAuditResult(assetMainInfo, false, respMsg);
+            return BaseMsgDTO.successData(respMsg);
+        } else if ("4".equals(status)) {
+            return BaseMsgDTO.processData("信审处理中");
+        } else {
+            //未知状态，邮件预警返回失败
+            //todo 邮件预警
+            return BaseMsgDTO.failureData(respMsg);
+        }
+    }
+
+
+    /**
+     * 通知信审结果给alix
+     *
+     * @param assetMainInfo
+     * @param isSuccess
+     * @param msg
+     * @return
+     */
+    private void creditAuditResult(AssetMainInfo assetMainInfo, Boolean isSuccess, String msg) {
+        String applyNo = assetMainInfo.getApplyNo();
+
+        if (isSuccess) {
+            assetMainInfo.setLastState(AssetStateEnum.SUCCESS.getState());
+            assetMainInfo.setContractSignState(AssetStateEnum.SUCCESS.getState());
+        } else {
+            assetMainInfo.setLastState(AssetStateEnum.FAILD.getState());
+        }
+
+
+        assetMainInfo.update();
+
+        DscFlowResultForAlixDto dscFlowResultForAlixDto = DscFlowResultForAlixDto.createForAliDto(applyNo, isSuccess, msg, DscAlixLinkEnum.CREDITFRONT);
+
+        publishEvent(dscFlowResultForAlixDto);
+    }
+
+
+    /**
+     * 通知请款结果给alix
+     *
+     * @param isSuccess
+     * @param msg
+     * @return
+     */
+    private void paymentResult(AssetMainInfo assetMainInfo, Boolean isSuccess, String msg) {
+
+        String applyNo = assetMainInfo.getApplyNo();
+
+        if (isSuccess) {
+            assetMainInfo.setPaymentState(AssetStateEnum.SUCCESS.getState());
+        } else {
+            assetMainInfo.setPaymentState(AssetStateEnum.FAILD.getState());
+        }
+
+        assetMainInfo.update();
+
+        DscFlowResultForAlixDto dscFlowResultForAlixDto = DscFlowResultForAlixDto.createForAliDto(applyNo, isSuccess, msg, DscAlixLinkEnum.REQUEST_FUNDS);
+
+        publishEvent(dscFlowResultForAlixDto);
+    }
+
+
+    /**
+     * 请款通过通知结算数据
+     *
+     * @param applyNo
+     */
+    private void noticeSettlePaymentSuccess(String applyNo) {
+        SpringContextUtil.getApplicationContext().publishEvent(new SettleOrderEvent(applyNo));
+    }
+
+    /**
+     * 添加交易记录
+     *
+     * @param applyNo
+     * @param assetMainId
+     * @param queryParam
+     * @param queryUrl
+     * @param phase
+     * @param tranNo
+     * @param result
+     */
+    private void recordTranInfo(String applyNo, String assetMainId, YILLIONQueryDTO queryParam, String queryUrl, String phase, String tranNo, String result) {
+        AssetBankTran assetBankTran = new AssetBankTran();
+        assetBankTran.setReqBody(JSON.toJSONString(queryParam));
+        assetBankTran.setApplyNo(applyNo);
+        assetBankTran.setAssetId(assetMainId);
+        assetBankTran.setReqUrl(queryUrl);
+
+        if (BankPhaseEnum.LAST_TRIAL.getPhase().equals(phase)) {
+            assetBankTran.setPhase(BankPhaseEnum.LAST_TRIAL.getPhase());
+            assetBankTran.setApiCode(YILLIONUrlEnum.ENTRY_RESULT.getUrl());
+        } else if (BankPhaseEnum.PAYMENT.getPhase().equals(phase)) {
+            assetBankTran.setPhase(BankPhaseEnum.PAYMENT.getPhase());
+            assetBankTran.setApiCode(YILLIONUrlEnum.LOAN_RESULT.getUrl());
+        }
+        assetBankTran.setSender(CommonConstant.SenderType.YIXIN);
+        assetBankTran.setTranNo(tranNo);
+        assetBankTran.setBankOrderNo(queryParam.getOrder_no());
+        assetBankTran.setRepBody(result);
+
+        if (StrUtil.isEmpty(result)) {
+            assetBankTran.create();
+            return;
+        }
+
+        YILLIONRespDTO respInfo = JSON.parseObject(result, YILLIONRespDTO.class);
+        if (respInfo == null) {
+            assetBankTran.update();
+            return;
+        }
+
+        String respCode = respInfo.getRespcode();
+        String respMsg = respInfo.getRespmsg();
+        //错误码
+        assetBankTran.setApprovalCode(respCode);
+        //错误描述
+        assetBankTran.setApprovalDesc(respMsg);
+        assetBankTran.update();
+    }
+
+
+    /**
+     * 获取查询接口
+     *
+     * @param phase
+     * @return
+     */
+    private String getQueryUrl(String phase) {
+
+        if (BankPhaseEnum.LAST_TRIAL.getPhase().equals(phase)) {
+            return propertiesManager.getOsbEnvironment() + UrlConstant.OsbSystemUrl.yillionInterface + YILLIONUrlEnum.ENTRY_RESULT.getUrl();
+        } else if (BankPhaseEnum.PAYMENT.getPhase().equals(phase)) {
+            return propertiesManager.getOsbEnvironment() + UrlConstant.OsbSystemUrl.yillionInterface + YILLIONUrlEnum.LOAN_RESULT.getUrl();
+        } else {
+            return null;
+        }
+    }
+
+
+}

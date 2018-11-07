@@ -1,0 +1,6 @@
+shiroFilter:
+      filterChainDefinitionMap:
+          /**: authc
+          /*.*: authcs
+          /*: authc
+          /: authc

@@ -1,0 +1,103 @@
+package com.yixin.web.runnable;
+
+import com.yixin.common.system.ioc.SpringContextUtil;
+import com.yixin.dsc.util.DateUtil;
+import com.yixin.dsc.util.StrUtil;
+import com.yixin.web.common.constant.NoticeConst;
+import com.yixin.web.service.message.EmailSendService;
+import com.yixin.web.service.monitor.NoticeRuleService;
+import org.assertj.core.util.Lists;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.net.InetAddress;
+import java.util.Date;
+import java.util.List;
+
+/**
+ * 业务异常通知 task
+ *
+ * @description:
+ * @date: 2018-10-08 16:50
+ */
+public class BzErrorNoticeRunnable implements Runnable {
+    private Logger logger = LoggerFactory.getLogger(getClass());
+
+
+    private EmailSendService emailSendService;
+
+    private NoticeRuleService noticeRuleService;
+
+    /**
+     * 收件人
+     */
+    private String mailTo;
+    /**
+     * 接口名称
+     */
+    private String interfaceName;
+    /**
+     * 业务id
+     */
+    private String bzId;
+    /**
+     * error消息
+     */
+    private String message;
+    /**
+     * 异常
+     */
+    private Throwable e;
+
+    public BzErrorNoticeRunnable(String mailTo, String interfaceName, String bzId, String message, Throwable e) {
+        this.mailTo = mailTo;
+        this.interfaceName = interfaceName;
+        this.bzId = bzId;
+        this.message = message;
+        this.e = e;
+    }
+
+    @Override
+    public void run() {
+
+        try {
+            //初始化
+            init();
+
+            String noticeId = interfaceName;
+            if (StrUtil.isEmpty(noticeId)) {
+                noticeId = message;
+            }
+            //判断是否需要再发
+            Boolean needNotice = noticeRuleService.judgeNeedNotice(noticeId + "_bz_error", message);
+            logger.info("bz error notice,judge need notice, notice id:{}, result:{}", noticeId, needNotice);
+            if (needNotice != null && !needNotice) {
+                logger.warn("bz error notice, need not notice, notice id :{}", noticeId);
+                return;
+            }
+
+            String serverHost = InetAddress.getLocalHost().getHostAddress();
+            List<String> emailValues = Lists.newArrayList();
+            emailValues.add(serverHost);
+            emailValues.add(interfaceName);
+            emailValues.add(bzId);
+            emailValues.add(DateUtil.dateToString(new Date(), DateUtil.DEFAULT_TIMESTAMP_FORMAT));
+            emailValues.add(message);
+            emailValues.add(StrUtil.getStackTrace(e));
+
+            //发送邮件
+            emailSendService.sendEmail(mailTo, NoticeConst.BZ_ERROR_SUBJECT, NoticeConst.BZ_ERROR_TEMPLATE, emailValues.toArray());
+
+        } catch (Exception e) {
+            logger.error("bz error notice error");
+        }
+
+    }
+
+    private void init() {
+        emailSendService = SpringContextUtil.getBean(EmailSendService.class);
+        noticeRuleService = SpringContextUtil.getBean(NoticeRuleService.class);
+    }
+
+
+}

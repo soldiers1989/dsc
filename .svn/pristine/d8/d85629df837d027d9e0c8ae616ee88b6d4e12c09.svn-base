@@ -1,0 +1,304 @@
+package com.yixin.kepler.v1.service.capital.icbc;
+
+import java.math.BigDecimal;
+import java.util.Map;
+
+import javax.annotation.Resource;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.stereotype.Service;
+
+import com.yixin.common.exception.BzException;
+import com.yixin.dsc.entity.order.DscSalesApplyCar;
+import com.yixin.dsc.entity.order.DscSalesApplyCost;
+import com.yixin.dsc.entity.order.DscSalesApplyCust;
+import com.yixin.dsc.entity.order.DscSalesApplyFinancing;
+import com.yixin.dsc.entity.order.DscSalesApplyMain;
+import com.yixin.dsc.entity.order.DscSalesApplyPayee;
+import com.yixin.dsc.util.PropertiesManager;
+import com.yixin.dsc.v1.service.capital.icbc.DscICBCCommonService;
+import com.yixin.kepler.core.constant.CommonConstant;
+import com.yixin.kepler.core.domain.SysDIcMapped;
+import com.yixin.kepler.enity.AssetMainInfo;
+import com.yixin.kepler.v1.common.constants.IcbcConstant;
+import com.yixin.kepler.v1.common.enumpackage.BankPhaseEnum;
+import com.yixin.kepler.v1.datapackage.dto.icbc.ICBCRequestFundsDTO;
+import com.yixin.kepler.v1.utils.JacksonUtils;
+
+/**
+ * 请款策略类--工商银行
+ * Package : com.yixin.kapler_v1.service.capital.icbc
+ * 
+ * @author YixinCapital -- chen.lin
+ *		   2018年9月11日 上午9:44:42
+ *
+ */
+@Service("ICBCPaymentRequestStrategy")
+public class PaymentRequestStrategy extends CommonRequest4Icbc<ICBCRequestFundsDTO> {
+
+	private static final Logger logger = LoggerFactory.getLogger(PaymentRequestStrategy.class);
+
+	@Resource
+	private DscICBCCommonService commonService;
+
+	@Resource
+	private PropertiesManager propertiesManager;
+
+	@Resource
+	private MongoTemplate mongoTemplate;
+
+	@Resource
+	private SysDIcMapped sysDIcMapped;
+
+	
+	@Override
+	protected void getData() throws BzException {
+		logger.info("工商银行申请请款数据组装开始，applyNo:{}", this.inputDto.get());
+		final String applyNo = (String) this.inputDto.get();
+		//获取dsc申请主信息查询
+		DscSalesApplyMain main = DscSalesApplyMain.getByApplyNo(applyNo);
+		if (main == null) {
+        	logger.error("申请编号错误，dsc申请主信息为空，applyNo={}", applyNo);
+        	throw new BzException("申请编号错误，dsc申请主信息为空");
+		}
+		//获取dsc合同申请客户信息查询
+		DscSalesApplyCust cust = DscSalesApplyCust.getApplyCostByMianId(main.getId());
+		if (cust == null) {
+        	logger.error("申请编号错误，dsc合同申请客户信息为空，applyNo={}", applyNo);
+        	throw new BzException("申请编号错误，dsc合同申请客户信息为空");
+		}
+		final ICBCRequestFundsDTO fundsDTO = new ICBCRequestFundsDTO();//组装data
+        this.dataThreadLocal.get().setData(fundsDTO);//组装申请的DTO
+        fundsDTO.setOrderno(this.ordernoLocal.get());//业务订单号 必输
+        fundsDTO.setUrgentflag(IcbcConstant.ICBC_URGENTFLAG_NORMAL);//紧急标识  必输默认-0-普通
+        fundsDTO.setDfmode(codeConvert("dfmode",main.getDfmode()));//抵放模式 必输
+        fundsDTO.setTxflag("1");//补息标识 必输
+        fundsDTO.setTxplan(main.getProductNo());//补息方案 必输
+    	//补息金额(有条件判断)
+		/*if(codeConvert("txflag",main.getTxflag()).equals(IcbcConstant.NEED_BX)){
+			fundsDTO.setTxamt(main.getTxamt().toString());//补息金额 必输
+		}*/
+		//获取dsc申请车辆信息
+        DscSalesApplyCar applyCar = DscSalesApplyCar.getBymainId(main.getId());
+        if(applyCar == null){
+        	logger.error("申请编号错误，dsc申请车辆信息为空，applyNo={}", applyNo);
+        	throw new BzException("申请编号错误，dsc申请车辆信息为空");
+        }
+        //合同申请收款信息
+		DscSalesApplyPayee dscSalesApplyPayee= DscSalesApplyPayee.getByMainId(main.getId());
+		if(dscSalesApplyPayee == null){
+			logger.error("申请编号错误，dsc合同申请收款信息为空，applyNo={}", applyNo);
+        	throw new BzException("申请编号错误，dsc合同申请收款信息为空");
+		}
+        assembleCar(fundsDTO, applyCar, dscSalesApplyPayee);//车辆信息转换
+		//获取dsc合同申请费用信息
+		DscSalesApplyCost applyCost = DscSalesApplyCost.getByMainId(main.getId());
+		if(applyCost == null){
+        	logger.error("申请编号错误，dsc合同申请费用信息为空，applyNo={}", applyNo);
+        	throw new BzException("申请编号错误，dsc合同申请费用信息为空");
+		}
+		//获取dsc融资信息
+		Map<String, DscSalesApplyFinancing> itemMap  = DscSalesApplyFinancing.get(main.getId());
+		assembleAmt(fundsDTO, itemMap, applyCost);//金额信息转换
+		fundsDTO.setPlanterm(main.getArzqx());// 分期期数
+		logger.info("工商银行申请请款数据组装完成，data:{}", JacksonUtils.fromObjectToJson(fundsDTO));
+	}
+	
+	
+	
+	@Override
+	protected void setTxtCode() {
+		logger.info("[工商银行]设置请款交易码值applyNo：{}", this.inputDto.get());
+		//获取该订单的当前阶段
+		AssetMainInfo assetMainInfo = AssetMainInfo.getByApplyNo(this.inputDto.get().toString());
+		if(assetMainInfo == null){
+			logger.info("申请单号为{}，订单还未发起信审", this.inputDto.get().toString());
+			throw new BzException("订单还未发起信审");
+		}else{
+			//判断是是否是驳回
+			if(assetMainInfo.getAssetPhase().equals(BankPhaseEnum.PAYMENT.getPhase())){//请款
+				this.dataThreadLocal.get().getComm().setTrxcode(IcbcConstant.TRXCODE_40101);
+			} else {
+				this.dataThreadLocal.get().getComm().setTrxcode(IcbcConstant.TRXCODE_40181);//请款驳回
+			}
+		}
+		logger.info("[工商银行]信审设置交易码值applyNo：{}，trxCode：{}", this.inputDto.get(), this.dataThreadLocal.get().getComm().getTrxcode());
+	}
+		
+	
+	/**
+	 * 金额信息转换（是为必传）
+	 * @param fundsDTO
+	 * @param carDTO 
+	 * @author YixinCapital -- chen.lin
+	 *	       2018年9月11日 下午6:39:12
+	 */
+	private void assembleAmt(ICBCRequestFundsDTO fundsDTO, Map<String, DscSalesApplyFinancing> itemMap, DscSalesApplyCost applyCost){
+		// 贷款金额（车辆分期金额）
+ 		BigDecimal loanAmt = getFincanceItemAmt(CommonConstant.FinanceType.F010, itemMap);
+ 		// 易鑫服务费(易鑫手续费)
+ 		BigDecimal yxServiceAmt = getFincanceItemAmt(CommonConstant.FinanceType.F013, itemMap);
+ 		// 账户管理费
+ 		BigDecimal accountmgfee = getFincanceItemAmt(CommonConstant.FinanceType.F011, itemMap);
+ 		// gps融资
+ 		BigDecimal gpsfee = getFincanceItemAmt(CommonConstant.FinanceType.F060, itemMap);
+ 		// 精品加装费融资项
+ 		BigDecimal decoratefee = getFincanceItemAmt(CommonConstant.FinanceType.F012, itemMap);
+ 		// 购置税融资额
+ 		BigDecimal purchasetax = getFincanceItemAmt(CommonConstant.FinanceType.F050, itemMap);
+ 		// 责信宝
+ 		BigDecimal zxbinsurance = getFincanceItemAmt(CommonConstant.FinanceType.F014, itemMap);
+ 		// 延保融资项
+ 		BigDecimal exInsurance = getFincanceItemAmt(CommonConstant.FinanceType.F030, itemMap);
+ 		// 保险融资 = 各个保险项目的总额
+ 		BigDecimal insurance = getInsurance(itemMap);
+ 		// 其他融资项（担保费）
+ 		BigDecimal otherfee = getFincanceItemAmt(CommonConstant.FinanceType.F117, itemMap);
+ 		// 服务费(服务费包的概念)
+ 		BigDecimal servamt = defaultZero(yxServiceAmt)//易鑫服务费(易鑫手续费)
+			 				.add(defaultZero(accountmgfee))//+账户管理费
+			 				.add(defaultZero(gpsfee))//+gps融资
+			 				.add(defaultZero(decoratefee))//+精品加装费融
+			 				.add(defaultZero(purchasetax))//+购置税融资额
+			 				.add(defaultZero(zxbinsurance)//+责信宝
+			 				.add(defaultZero(exInsurance))//+延保融资项
+			 				.add(defaultZero(insurance))//+各项保险融资
+			 				.add(defaultZero(otherfee)));//+其他融资项（担保费）
+ 		
+ 		logger.info("[工行请款]易鑫服务费融资额(易鑫手续费)：{}", yxServiceAmt);
+ 		logger.info("[工行请款]账户管理费融资额：{}", accountmgfee);
+ 		logger.info("[工行请款]GPS融资额：{}", gpsfee);
+ 		logger.info("[工行请款]精品加装融资额：{}", decoratefee);
+ 		logger.info("[工行请款]购置税融资额：{}", purchasetax);
+ 		logger.info("[工行请款]责信保融资额：{}", zxbinsurance);
+ 		logger.info("[工行请款]延保融资额：{}", exInsurance);
+ 		logger.info("[工行请款]保险融资额：{}",insurance);
+ 		logger.info("[工行请款]其他融资额：{}", otherfee);
+ 		// 客户融资总额
+ 		BigDecimal allamt = applyCost.getFrze();
+ 		logger.info("[工行请款]服务费(总和)：{}", servamt);
+ 		logger.info("[工行请款]贷款金额（车辆分期部分）：{}", loanAmt);
+ 		logger.info("[工行请款]总金额(客户融资总额)：{}", allamt);
+ 		if(allamt != defaultZero(loanAmt).add(defaultZero(servamt))){
+        	logger.error("申请编号错误，贷款金额+服务费!=客户融资总额，mainId={}", applyCost.getMainId());
+        	throw new BzException("申请编号错误，贷款金额+服务费!=客户融资总额");
+ 		}
+ 		
+		// 贷款金额（车辆分期金额）-是
+ 		fundsDTO.setLoanamt(loanAmt.toString());
+ 		// 服务费(服务费包的概念) -是
+ 		fundsDTO.setServamt(defaultZero(servamt).toString());
+ 		// 总金额-客户融资总额(贷款金额+服务费) -是
+ 		fundsDTO.setAllamt(allamt.toString());
+ 		// 易鑫服务费(易鑫手续费) -是 
+ 		fundsDTO.setYxservamt(defaultZero(yxServiceAmt).toString());
+ 		// 账户管理费 -是 
+ 		fundsDTO.setAccountmgfee(defaultZero(accountmgfee).toString());
+ 		// 其他融资项（担保费）
+ 		fundsDTO.setOtherfee(defaultZero(otherfee).toString());
+ 		// 首付金额 -是
+ 		fundsDTO.setOwnpayamt(applyCost.getFsfje().toString());
+ 		// 贷款成数
+ 		fundsDTO.setLoancen(new BigDecimal("100.00").subtract(applyCost.getFsfbl()).toString());
+	}
+	
+	
+	/**
+	 * 车辆信息转换（是为必传）
+	 * @param fundsDTO
+	 * @param carDTO 
+	 * @author YixinCapital -- chen.lin
+	 *	       2018年9月11日 下午6:39:12
+	 */
+	private void assembleCar(ICBCRequestFundsDTO fundsDTO, DscSalesApplyCar carDTO, DscSalesApplyPayee applyPayee) {
+		fundsDTO.setProducer(carDTO.getAzcs());// 生产厂商
+		fundsDTO.setCarbrand(carDTO.getAppName());// 汽车品牌
+		fundsDTO.setModel(carDTO.getAcxName());// 款式规格
+		fundsDTO.setCarprice(carDTO.getFxsj().toString());// 车辆价格
+		fundsDTO.setVin(carDTO.getAcjh());// 车架号 -是
+		fundsDTO.setEngineno(carDTO.getAfdjh());// 发动机号 -是
+		fundsDTO.setDealer(applyPayee.getAsqdmmc());//汽车厂商经销商名称（全称）
+		fundsDTO.setBuydate(carDTO.getBuyCarTime().toString());//购车年月
+		//fundsDTO.setLicplatenum("");//车牌号码  TODO
+	}
+		
+	
+	/**
+	 * 保险融资 = 各个保险项目的总额 = 交强险第一年 + 商业险第一年 + 车船税第一年
+	 * @param itemMap
+	 * @return 
+	 * @author YixinCapital -- chen.lin
+	 *	       2018年9月11日 下午7:41:40
+	 */
+	public BigDecimal getInsurance(Map<String, DscSalesApplyFinancing> itemMap) {
+		// 交强险第一年
+		BigDecimal jqxsn = getFincanceItemAmt(CommonConstant.FinanceType.F091, itemMap);
+		// 商业险第一年
+		BigDecimal syxsn = getFincanceItemAmt(CommonConstant.FinanceType.F101, itemMap);
+		// 车船税第一年
+		BigDecimal ccssn = getFincanceItemAmt(CommonConstant.FinanceType.F121, itemMap);
+		// 盗抢责任险融资项
+		BigDecimal theft = getFincanceItemAmt(CommonConstant.FinanceType.F111, itemMap);
+		logger.info("[工行请款]获取到商业险第一年融资金额syxsn：{}", syxsn);
+		logger.info("[工行请款]获取到交强险第一年融资金额jqxsn：{}", jqxsn);
+		logger.info("[工行请款]获取到车船税第一年融资金额sccssn：{}", ccssn);
+		logger.info("[工行请款]获取盗抢责任险融资项金额theft：{}", theft);
+		BigDecimal insuranceAmt = null;
+		insuranceAmt = defaultZero(jqxsn).add(defaultZero(syxsn)).add(defaultZero(ccssn)).add(defaultZero(theft));
+		logger.info("[工行信审]获取到保险融资金额insuranceAmt：{}", insuranceAmt);
+		return insuranceAmt;
+	}
+	
+	
+	/**
+	 * 从map中获取到对用的融资项目金额
+	 * @param itemCode 融资项目编码
+	 * @param itemMap 融资项目map
+	 * @return
+	 */
+	public BigDecimal getFincanceItemAmt(String itemCode, Map<String, DscSalesApplyFinancing> itemMap) {
+		logger.info("[工行请款]根据融资项目编号获取对应的融资金额 itemCode:{}", itemCode);
+		DscSalesApplyFinancing financeItem = itemMap.get(itemCode);
+		logger.info("[工行请款]查询到的融资项目信息 itemCode:{}，item：{}", itemCode, JacksonUtils.fromObjectToJson(financeItem));
+		BigDecimal financeTotalAmt = null;
+		if (null != financeItem) {
+			financeTotalAmt = financeItem.getFkhrzje();
+		}
+		logger.info("[工行请款]根据申请编号获取指定融资项目的融资额，itemCode：{}，totalAmt：{}", itemCode, financeTotalAmt == null ? "" : financeTotalAmt);
+		return financeTotalAmt;
+	}
+	
+	
+	/**
+	 * 金额格式转换
+	 * @param val
+	 * @return BigDecimal
+	 */
+	public BigDecimal defaultZero(BigDecimal val) {
+		if (val == null) {
+			return new BigDecimal(0).setScale(2);
+		} else {
+			return val;
+		}
+	}
+	
+	
+	/**
+	 * 从redis获取到字典映射数据
+	 * @param code
+	 * @param value
+	 * @return 
+	 * @author YixinCapital -- chen.lin
+	 *	       2018年9月17日 下午8:53:48
+	 */
+	private String codeConvert(String code, String value){
+		return sysDIcMapped.getMappingValue(code, value, CommonConstant.BankName.ICBC_BANK);
+	}
+	
+	
+	@Override
+	protected void assembler() throws BzException {
+	}
+}

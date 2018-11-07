@@ -1,0 +1,730 @@
+2018-11-02 14:39:00.448 2623 [main] INFO  com.yixin.dsc.FileUploadTest - Starting FileUploadTest on 4M5L1G2-222 with PID 12640 (started by sukang in E:\work-code\dsc) 
+2018-11-02 14:39:00.572 2747 [main] INFO  com.yixin.dsc.FileUploadTest - No active profile set, falling back to default profiles: default 
+2018-11-02 14:50:41.869 1745 [main] INFO  com.yixin.dsc.FileUploadTest - Starting FileUploadTest on 4M5L1G2-222 with PID 15192 (started by sukang in E:\work-code\dsc) 
+2018-11-02 14:50:41.875 1751 [main] INFO  com.yixin.dsc.FileUploadTest - No active profile set, falling back to default profiles: default 
+2018-11-02 14:50:48.765 8641 [main] INFO  o.h.jpa.internal.util.LogHelper - HHH000204: Processing PersistenceUnitInfo [
+	name: default
+	...] 
+2018-11-02 14:50:48.934 8810 [main] INFO  org.hibernate.Version - HHH000412: Hibernate Core {5.2.16.Final} 
+2018-11-02 14:50:48.936 8812 [main] INFO  org.hibernate.cfg.Environment - HHH000206: hibernate.properties not found 
+2018-11-02 14:50:49.038 8914 [main] INFO  o.h.annotations.common.Version - HCANN000001: Hibernate Commons Annotations {5.0.1.Final} 
+2018-11-02 14:50:49.383 9259 [main] INFO  org.hibernate.dialect.Dialect - HHH000400: Using dialect: org.hibernate.dialect.MySQL5Dialect 
+2018-11-02 14:50:49.991 9867 [main] WARN  org.hibernate.id.UUIDHexGenerator - HHH000409: Using org.hibernate.id.UUIDHexGenerator which does not generate IETF RFC 4122 compliant UUID values; consider using org.hibernate.id.UUIDGenerator instead 
+2018-11-02 14:50:52.434 12310 [main] INFO  org.mongodb.driver.cluster - Cluster created with settings {hosts=[192.168.145.164:27017], mode=SINGLE, requiredClusterType=UNKNOWN, serverSelectionTimeout='30000 ms', maxWaitQueueSize=500} 
+2018-11-02 14:50:53.047 12923 [main] INFO  c.y.kepler.common.RedisClientUtil - Init Redis Service : Centos6701:6380 
+2018-11-02 14:50:53.157 13033 [main] INFO  c.y.kepler.common.RedisClientUtil - Init Redis Service success! 
+2018-11-02 14:50:54.113 13989 [cluster-ClusterId{value='5bdbf3cc23ae393b58517aaa', description='null'}-192.168.145.164:27017] INFO  org.mongodb.driver.connection - Opened connection [connectionId{localValue:1, serverValue:530444}] to 192.168.145.164:27017 
+2018-11-02 14:50:54.193 14069 [cluster-ClusterId{value='5bdbf3cc23ae393b58517aaa', description='null'}-192.168.145.164:27017] INFO  org.mongodb.driver.cluster - Monitor thread successfully connected to server with description ServerDescription{address=192.168.145.164:27017, type=REPLICA_SET_PRIMARY, state=CONNECTED, ok=true, version=ServerVersion{versionList=[3, 4, 2]}, minWireVersion=0, maxWireVersion=5, maxDocumentSize=16777216, logicalSessionTimeoutMinutes=null, roundTripTimeNanos=13064084, setName='dsj_dbtest01', canonicalAddress=192.168.145.164:27017, hosts=[192.168.145.164:27018, 192.168.145.164:27019, 192.168.145.164:27017], passives=[], arbiters=[], primary='192.168.145.164:27017', tagSet=TagSet{[]}, electionId=7fffffff000000000000019e, setVersion=1, lastWriteDate=Fri Nov 02 14:50:51 CST 2018, lastUpdateTimeNanos=8226334125634401} 
+2018-11-02 14:50:56.033 15909 [main] INFO  c.y.k.core.config.RabbitmqConfig - 初始化connectionFactory,address:192.168.145.161:5672,username:guest,password:guest,virtual-host:yx_osb_mq 
+2018-11-02 14:50:56.050 15926 [main] INFO  c.y.k.core.config.RabbitmqConfig -  osbFileMessageListener inside listener 
+2018-11-02 14:50:56.176 16052 [main] INFO  c.y.k.core.config.RabbitmqConfig - 初始化alixConnectionFactory,address:192.168.145.171,alixPort:5672,username:guest,password:guest,virtual-host:yx_mq 
+2018-11-02 14:50:56.191 16067 [main] INFO  c.y.k.core.config.RabbitmqConfig -  alixListenerContainer inside listener 
+2018-11-02 14:50:56.234 16110 [main] INFO  c.y.k.core.config.RabbitmqConfig - 初始化compressConnectionFactory，address:192.168.144.23:5672，username:rabbitadm，password:admin，v-host:compressor-vh 
+2018-11-02 14:50:56.262 16138 [main] INFO  c.y.k.core.config.RabbitmqConfig - compressMessageListener inside listener 
+2018-11-02 14:50:56.762 16638 [main] INFO  c.y.k.c.j.KeplerJobSchedulerRabbit - 调度任务配置信息：192.168.145.161:5672,192.168.145.162:5672,192.168.145.163:5672 
+2018-11-02 14:50:56.762 16638 [main] INFO  c.y.k.c.j.KeplerJobSchedulerRabbit - 开始配置定时调度中心连接客户端 
+2018-11-02 14:50:57.859 17735 [main] INFO  io.lettuce.core.EpollProvider - Starting without optional epoll library 
+2018-11-02 14:50:57.863 17739 [main] INFO  io.lettuce.core.KqueueProvider - Starting without optional kqueue library 
+2018-11-02 14:51:01.868 21744 [main] WARN  o.s.w.c.s.GenericWebApplicationContext - Exception encountered during context initialization - cancelling refresh attempt: org.springframework.beans.factory.BeanCreationException: Error creating bean with name 'enableRedisKeyspaceNotificationsInitializer' defined in org.springframework.session.data.redis.config.annotation.web.http.RedisHttpSessionConfiguration: Invocation of init method failed; nested exception is io.lettuce.core.RedisException: Cannot retrieve initial cluster partitions from initial URIs [RedisURI [host='Centos6701', port=6380]] 
+2018-11-02 14:51:03.002 22878 [main] INFO  c.y.c.s.util.SpringContainerManager - SpringContainer stoping... 
+2018-11-02 14:51:03.007 22883 [main] WARN  o.s.b.f.s.DisposableBeanAdapter - Invocation of destroy method failed on bean with name 'springContainerManager': java.lang.ExceptionInInitializerError 
+2018-11-02 14:51:03.085 22961 [main] ERROR o.s.boot.SpringApplication - Application run failed 
+org.springframework.beans.factory.BeanCreationException: Error creating bean with name 'enableRedisKeyspaceNotificationsInitializer' defined in org.springframework.session.data.redis.config.annotation.web.http.RedisHttpSessionConfiguration: Invocation of init method failed; nested exception is io.lettuce.core.RedisException: Cannot retrieve initial cluster partitions from initial URIs [RedisURI [host='Centos6701', port=6380]]
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.initializeBean(AbstractAutowireCapableBeanFactory.java:1702)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.doCreateBean(AbstractAutowireCapableBeanFactory.java:579)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.createBean(AbstractAutowireCapableBeanFactory.java:501)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.lambda$doGetBean$0(AbstractBeanFactory.java:317)
+	at org.springframework.beans.factory.support.DefaultSingletonBeanRegistry.getSingleton(DefaultSingletonBeanRegistry.java:228)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.doGetBean(AbstractBeanFactory.java:315)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.getBean(AbstractBeanFactory.java:199)
+	at org.springframework.beans.factory.support.DefaultListableBeanFactory.preInstantiateSingletons(DefaultListableBeanFactory.java:760)
+	at org.springframework.context.support.AbstractApplicationContext.finishBeanFactoryInitialization(AbstractApplicationContext.java:869)
+	at org.springframework.context.support.AbstractApplicationContext.refresh(AbstractApplicationContext.java:550)
+	at org.springframework.boot.SpringApplication.refresh(SpringApplication.java:759)
+	at org.springframework.boot.SpringApplication.refreshContext(SpringApplication.java:395)
+	at org.springframework.boot.SpringApplication.run(SpringApplication.java:327)
+	at org.springframework.boot.test.context.SpringBootContextLoader.loadContext(SpringBootContextLoader.java:138)
+	at org.springframework.test.context.cache.DefaultCacheAwareContextLoaderDelegate.loadContextInternal(DefaultCacheAwareContextLoaderDelegate.java:99)
+	at org.springframework.test.context.cache.DefaultCacheAwareContextLoaderDelegate.loadContext(DefaultCacheAwareContextLoaderDelegate.java:117)
+	at org.springframework.test.context.support.DefaultTestContext.getApplicationContext(DefaultTestContext.java:108)
+	at org.springframework.test.context.web.ServletTestExecutionListener.setUpRequestContextIfNecessary(ServletTestExecutionListener.java:190)
+	at org.springframework.test.context.web.ServletTestExecutionListener.prepareTestInstance(ServletTestExecutionListener.java:132)
+	at org.springframework.test.context.TestContextManager.prepareTestInstance(TestContextManager.java:246)
+	at org.springframework.test.context.junit4.SpringJUnit4ClassRunner.createTest(SpringJUnit4ClassRunner.java:227)
+	at org.springframework.test.context.junit4.SpringJUnit4ClassRunner$1.runReflectiveCall(SpringJUnit4ClassRunner.java:289)
+	at org.junit.internal.runners.model.ReflectiveCallable.run(ReflectiveCallable.java:12)
+	at org.springframework.test.context.junit4.SpringJUnit4ClassRunner.methodBlock(SpringJUnit4ClassRunner.java:291)
+	at org.springframework.test.context.junit4.SpringJUnit4ClassRunner.runChild(SpringJUnit4ClassRunner.java:246)
+	at org.springframework.test.context.junit4.SpringJUnit4ClassRunner.runChild(SpringJUnit4ClassRunner.java:97)
+	at org.junit.runners.ParentRunner$3.run(ParentRunner.java:290)
+	at org.junit.runners.ParentRunner$1.schedule(ParentRunner.java:71)
+	at org.junit.runners.ParentRunner.runChildren(ParentRunner.java:288)
+	at org.junit.runners.ParentRunner.access$000(ParentRunner.java:58)
+	at org.junit.runners.ParentRunner$2.evaluate(ParentRunner.java:268)
+	at org.springframework.test.context.junit4.statements.RunBeforeTestClassCallbacks.evaluate(RunBeforeTestClassCallbacks.java:61)
+	at org.springframework.test.context.junit4.statements.RunAfterTestClassCallbacks.evaluate(RunAfterTestClassCallbacks.java:70)
+	at org.junit.runners.ParentRunner.run(ParentRunner.java:363)
+	at org.springframework.test.context.junit4.SpringJUnit4ClassRunner.run(SpringJUnit4ClassRunner.java:190)
+	at org.junit.runner.JUnitCore.run(JUnitCore.java:137)
+	at com.intellij.junit4.JUnit4IdeaTestRunner.startRunnerWithArgs(JUnit4IdeaTestRunner.java:68)
+	at com.intellij.rt.execution.junit.IdeaTestRunner$Repeater.startRunnerWithArgs(IdeaTestRunner.java:51)
+	at com.intellij.rt.execution.junit.JUnitStarter.prepareStreamsAndStart(JUnitStarter.java:237)
+	at com.intellij.rt.execution.junit.JUnitStarter.main(JUnitStarter.java:70)
+	at sun.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at sun.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:62)
+	at sun.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.lang.reflect.Method.invoke(Method.java:498)
+	at com.intellij.rt.execution.application.AppMain.main(AppMain.java:147)
+Caused by: io.lettuce.core.RedisException: Cannot retrieve initial cluster partitions from initial URIs [RedisURI [host='Centos6701', port=6380]]
+	at io.lettuce.core.cluster.RedisClusterClient.loadPartitions(RedisClusterClient.java:790)
+	at io.lettuce.core.cluster.RedisClusterClient.initializePartitions(RedisClusterClient.java:761)
+	at io.lettuce.core.cluster.RedisClusterClient.getPartitions(RedisClusterClient.java:771)
+	at org.springframework.data.redis.connection.lettuce.LettuceClusterTopologyProvider.getTopology(LettuceClusterTopologyProvider.java:53)
+	at org.springframework.data.redis.connection.ClusterCommandExecutor.getClusterTopology(ClusterCommandExecutor.java:331)
+	at org.springframework.data.redis.connection.ClusterCommandExecutor.executeCommandOnAllNodes(ClusterCommandExecutor.java:182)
+	at org.springframework.data.redis.connection.lettuce.LettuceClusterServerCommands.executeCommandOnAllNodes(LettuceClusterServerCommands.java:383)
+	at org.springframework.data.redis.connection.lettuce.LettuceClusterServerCommands.getConfig(LettuceClusterServerCommands.java:239)
+	at org.springframework.data.redis.connection.DefaultedRedisConnection.getConfig(DefaultedRedisConnection.java:1119)
+	at org.springframework.session.data.redis.config.ConfigureNotifyKeyspaceEventsAction.getNotifyOptions(ConfigureNotifyKeyspaceEventsAction.java:76)
+	at org.springframework.session.data.redis.config.ConfigureNotifyKeyspaceEventsAction.configure(ConfigureNotifyKeyspaceEventsAction.java:57)
+	at org.springframework.session.data.redis.config.annotation.web.http.RedisHttpSessionConfiguration$EnableRedisKeyspaceNotificationsInitializer.afterPropertiesSet(RedisHttpSessionConfiguration.java:286)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.invokeInitMethods(AbstractAutowireCapableBeanFactory.java:1761)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.initializeBean(AbstractAutowireCapableBeanFactory.java:1698)
+	... 44 common frames omitted
+2018-11-02 14:51:03.096 22972 [main] ERROR o.s.test.context.TestContextManager - Caught exception while allowing TestExecutionListener [org.springframework.test.context.web.ServletTestExecutionListener@31d8352e] to prepare test instance [com.yixin.dsc.FileUploadTest@1d82d35c] 
+java.lang.IllegalStateException: Failed to load ApplicationContext
+	at org.springframework.test.context.cache.DefaultCacheAwareContextLoaderDelegate.loadContext(DefaultCacheAwareContextLoaderDelegate.java:125)
+	at org.springframework.test.context.support.DefaultTestContext.getApplicationContext(DefaultTestContext.java:108)
+	at org.springframework.test.context.web.ServletTestExecutionListener.setUpRequestContextIfNecessary(ServletTestExecutionListener.java:190)
+	at org.springframework.test.context.web.ServletTestExecutionListener.prepareTestInstance(ServletTestExecutionListener.java:132)
+	at org.springframework.test.context.TestContextManager.prepareTestInstance(TestContextManager.java:246)
+	at org.springframework.test.context.junit4.SpringJUnit4ClassRunner.createTest(SpringJUnit4ClassRunner.java:227)
+	at org.springframework.test.context.junit4.SpringJUnit4ClassRunner$1.runReflectiveCall(SpringJUnit4ClassRunner.java:289)
+	at org.junit.internal.runners.model.ReflectiveCallable.run(ReflectiveCallable.java:12)
+	at org.springframework.test.context.junit4.SpringJUnit4ClassRunner.methodBlock(SpringJUnit4ClassRunner.java:291)
+	at org.springframework.test.context.junit4.SpringJUnit4ClassRunner.runChild(SpringJUnit4ClassRunner.java:246)
+	at org.springframework.test.context.junit4.SpringJUnit4ClassRunner.runChild(SpringJUnit4ClassRunner.java:97)
+	at org.junit.runners.ParentRunner$3.run(ParentRunner.java:290)
+	at org.junit.runners.ParentRunner$1.schedule(ParentRunner.java:71)
+	at org.junit.runners.ParentRunner.runChildren(ParentRunner.java:288)
+	at org.junit.runners.ParentRunner.access$000(ParentRunner.java:58)
+	at org.junit.runners.ParentRunner$2.evaluate(ParentRunner.java:268)
+	at org.springframework.test.context.junit4.statements.RunBeforeTestClassCallbacks.evaluate(RunBeforeTestClassCallbacks.java:61)
+	at org.springframework.test.context.junit4.statements.RunAfterTestClassCallbacks.evaluate(RunAfterTestClassCallbacks.java:70)
+	at org.junit.runners.ParentRunner.run(ParentRunner.java:363)
+	at org.springframework.test.context.junit4.SpringJUnit4ClassRunner.run(SpringJUnit4ClassRunner.java:190)
+	at org.junit.runner.JUnitCore.run(JUnitCore.java:137)
+	at com.intellij.junit4.JUnit4IdeaTestRunner.startRunnerWithArgs(JUnit4IdeaTestRunner.java:68)
+	at com.intellij.rt.execution.junit.IdeaTestRunner$Repeater.startRunnerWithArgs(IdeaTestRunner.java:51)
+	at com.intellij.rt.execution.junit.JUnitStarter.prepareStreamsAndStart(JUnitStarter.java:237)
+	at com.intellij.rt.execution.junit.JUnitStarter.main(JUnitStarter.java:70)
+	at sun.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at sun.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:62)
+	at sun.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.lang.reflect.Method.invoke(Method.java:498)
+	at com.intellij.rt.execution.application.AppMain.main(AppMain.java:147)
+Caused by: org.springframework.beans.factory.BeanCreationException: Error creating bean with name 'enableRedisKeyspaceNotificationsInitializer' defined in org.springframework.session.data.redis.config.annotation.web.http.RedisHttpSessionConfiguration: Invocation of init method failed; nested exception is io.lettuce.core.RedisException: Cannot retrieve initial cluster partitions from initial URIs [RedisURI [host='Centos6701', port=6380]]
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.initializeBean(AbstractAutowireCapableBeanFactory.java:1702)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.doCreateBean(AbstractAutowireCapableBeanFactory.java:579)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.createBean(AbstractAutowireCapableBeanFactory.java:501)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.lambda$doGetBean$0(AbstractBeanFactory.java:317)
+	at org.springframework.beans.factory.support.DefaultSingletonBeanRegistry.getSingleton(DefaultSingletonBeanRegistry.java:228)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.doGetBean(AbstractBeanFactory.java:315)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.getBean(AbstractBeanFactory.java:199)
+	at org.springframework.beans.factory.support.DefaultListableBeanFactory.preInstantiateSingletons(DefaultListableBeanFactory.java:760)
+	at org.springframework.context.support.AbstractApplicationContext.finishBeanFactoryInitialization(AbstractApplicationContext.java:869)
+	at org.springframework.context.support.AbstractApplicationContext.refresh(AbstractApplicationContext.java:550)
+	at org.springframework.boot.SpringApplication.refresh(SpringApplication.java:759)
+	at org.springframework.boot.SpringApplication.refreshContext(SpringApplication.java:395)
+	at org.springframework.boot.SpringApplication.run(SpringApplication.java:327)
+	at org.springframework.boot.test.context.SpringBootContextLoader.loadContext(SpringBootContextLoader.java:138)
+	at org.springframework.test.context.cache.DefaultCacheAwareContextLoaderDelegate.loadContextInternal(DefaultCacheAwareContextLoaderDelegate.java:99)
+	at org.springframework.test.context.cache.DefaultCacheAwareContextLoaderDelegate.loadContext(DefaultCacheAwareContextLoaderDelegate.java:117)
+	... 29 common frames omitted
+Caused by: io.lettuce.core.RedisException: Cannot retrieve initial cluster partitions from initial URIs [RedisURI [host='Centos6701', port=6380]]
+	at io.lettuce.core.cluster.RedisClusterClient.loadPartitions(RedisClusterClient.java:790)
+	at io.lettuce.core.cluster.RedisClusterClient.initializePartitions(RedisClusterClient.java:761)
+	at io.lettuce.core.cluster.RedisClusterClient.getPartitions(RedisClusterClient.java:771)
+	at org.springframework.data.redis.connection.lettuce.LettuceClusterTopologyProvider.getTopology(LettuceClusterTopologyProvider.java:53)
+	at org.springframework.data.redis.connection.ClusterCommandExecutor.getClusterTopology(ClusterCommandExecutor.java:331)
+	at org.springframework.data.redis.connection.ClusterCommandExecutor.executeCommandOnAllNodes(ClusterCommandExecutor.java:182)
+	at org.springframework.data.redis.connection.lettuce.LettuceClusterServerCommands.executeCommandOnAllNodes(LettuceClusterServerCommands.java:383)
+	at org.springframework.data.redis.connection.lettuce.LettuceClusterServerCommands.getConfig(LettuceClusterServerCommands.java:239)
+	at org.springframework.data.redis.connection.DefaultedRedisConnection.getConfig(DefaultedRedisConnection.java:1119)
+	at org.springframework.session.data.redis.config.ConfigureNotifyKeyspaceEventsAction.getNotifyOptions(ConfigureNotifyKeyspaceEventsAction.java:76)
+	at org.springframework.session.data.redis.config.ConfigureNotifyKeyspaceEventsAction.configure(ConfigureNotifyKeyspaceEventsAction.java:57)
+	at org.springframework.session.data.redis.config.annotation.web.http.RedisHttpSessionConfiguration$EnableRedisKeyspaceNotificationsInitializer.afterPropertiesSet(RedisHttpSessionConfiguration.java:286)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.invokeInitMethods(AbstractAutowireCapableBeanFactory.java:1761)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.initializeBean(AbstractAutowireCapableBeanFactory.java:1698)
+	... 44 common frames omitted
+2018-11-02 14:52:05.092 1045 [main] INFO  com.yixin.dsc.FileUploadTest - Starting FileUploadTest on 4M5L1G2-222 with PID 2944 (started by sukang in E:\work-code\dsc) 
+2018-11-02 14:52:05.096 1049 [main] INFO  com.yixin.dsc.FileUploadTest - No active profile set, falling back to default profiles: default 
+2018-11-02 14:52:11.765 7718 [main] INFO  o.h.jpa.internal.util.LogHelper - HHH000204: Processing PersistenceUnitInfo [
+	name: default
+	...] 
+2018-11-02 14:52:11.949 7902 [main] INFO  org.hibernate.Version - HHH000412: Hibernate Core {5.2.16.Final} 
+2018-11-02 14:52:11.953 7906 [main] INFO  org.hibernate.cfg.Environment - HHH000206: hibernate.properties not found 
+2018-11-02 14:52:12.024 7977 [main] INFO  o.h.annotations.common.Version - HCANN000001: Hibernate Commons Annotations {5.0.1.Final} 
+2018-11-02 14:52:12.233 8186 [main] INFO  org.hibernate.dialect.Dialect - HHH000400: Using dialect: org.hibernate.dialect.MySQL5Dialect 
+2018-11-02 14:52:12.874 8827 [main] WARN  org.hibernate.id.UUIDHexGenerator - HHH000409: Using org.hibernate.id.UUIDHexGenerator which does not generate IETF RFC 4122 compliant UUID values; consider using org.hibernate.id.UUIDGenerator instead 
+2018-11-02 14:52:14.752 10705 [main] INFO  org.mongodb.driver.cluster - Cluster created with settings {hosts=[192.168.145.164:27017], mode=SINGLE, requiredClusterType=UNKNOWN, serverSelectionTimeout='30000 ms', maxWaitQueueSize=500} 
+2018-11-02 14:52:15.260 11213 [main] INFO  c.y.kepler.common.RedisClientUtil - Init Redis Service : Centos6701:6380 
+2018-11-02 14:52:15.330 11283 [main] INFO  c.y.kepler.common.RedisClientUtil - Init Redis Service success! 
+2018-11-02 14:52:15.975 11928 [cluster-ClusterId{value='5bdbf41e23ae390b80125e5a', description='null'}-192.168.145.164:27017] INFO  org.mongodb.driver.connection - Opened connection [connectionId{localValue:1, serverValue:530445}] to 192.168.145.164:27017 
+2018-11-02 14:52:15.994 11947 [cluster-ClusterId{value='5bdbf41e23ae390b80125e5a', description='null'}-192.168.145.164:27017] INFO  org.mongodb.driver.cluster - Monitor thread successfully connected to server with description ServerDescription{address=192.168.145.164:27017, type=REPLICA_SET_PRIMARY, state=CONNECTED, ok=true, version=ServerVersion{versionList=[3, 4, 2]}, minWireVersion=0, maxWireVersion=5, maxDocumentSize=16777216, logicalSessionTimeoutMinutes=null, roundTripTimeNanos=15658988, setName='dsj_dbtest01', canonicalAddress=192.168.145.164:27017, hosts=[192.168.145.164:27018, 192.168.145.164:27019, 192.168.145.164:27017], passives=[], arbiters=[], primary='192.168.145.164:27017', tagSet=TagSet{[]}, electionId=7fffffff000000000000019e, setVersion=1, lastWriteDate=Fri Nov 02 14:52:06 CST 2018, lastUpdateTimeNanos=8226415926266854} 
+2018-11-02 14:52:17.883 13836 [main] INFO  c.y.k.core.config.RabbitmqConfig - 初始化connectionFactory,address:192.168.145.161:5672,username:guest,password:guest,virtual-host:yx_osb_mq 
+2018-11-02 14:52:18.005 13958 [main] INFO  c.y.k.core.config.RabbitmqConfig -  osbFileMessageListener inside listener 
+2018-11-02 14:52:18.115 14068 [main] INFO  c.y.k.core.config.RabbitmqConfig - 初始化alixConnectionFactory,address:192.168.145.171,alixPort:5672,username:guest,password:guest,virtual-host:yx_mq 
+2018-11-02 14:52:18.126 14079 [main] INFO  c.y.k.core.config.RabbitmqConfig -  alixListenerContainer inside listener 
+2018-11-02 14:52:18.163 14116 [main] INFO  c.y.k.core.config.RabbitmqConfig - 初始化compressConnectionFactory，address:192.168.144.23:5672，username:rabbitadm，password:admin，v-host:compressor-vh 
+2018-11-02 14:52:18.180 14133 [main] INFO  c.y.k.core.config.RabbitmqConfig - compressMessageListener inside listener 
+2018-11-02 14:52:18.427 14380 [main] INFO  c.y.k.c.j.KeplerJobSchedulerRabbit - 调度任务配置信息：192.168.145.161:5672,192.168.145.162:5672,192.168.145.163:5672 
+2018-11-02 14:52:18.428 14381 [main] INFO  c.y.k.c.j.KeplerJobSchedulerRabbit - 开始配置定时调度中心连接客户端 
+2018-11-02 14:52:21.380 17333 [main] WARN  o.s.b.a.o.j.JpaBaseConfiguration$JpaWebConfiguration$JpaWebMvcConfiguration - spring.jpa.open-in-view is enabled by default. Therefore, database queries may be performed during view rendering. Explicitly configure spring.jpa.open-in-view to disable this warning 
+2018-11-02 14:52:24.633 20586 [main] WARN  o.s.b.s.r.RedisStarterDeprecationWarningAutoConfiguration - spring-boot-starter-redis is deprecated as of Spring Boot 1.4, please migrate to spring-boot-starter-data-redis 
+2018-11-02 14:52:24.658 20611 [main] INFO  o.s.b.a.e.web.EndpointLinksResolver - Exposing 2 endpoint(s) beneath base path '/actuator' 
+2018-11-02 14:52:24.674 20627 [main] INFO  o.s.b.a.e.w.s.WebMvcEndpointHandlerMapping - Mapped "{[/actuator/health],methods=[GET],produces=[application/vnd.spring-boot.actuator.v2+json || application/json]}" onto public java.lang.Object org.springframework.boot.actuate.endpoint.web.servlet.AbstractWebMvcEndpointHandlerMapping$OperationHandler.handle(javax.servlet.http.HttpServletRequest,java.util.Map<java.lang.String, java.lang.String>) 
+2018-11-02 14:52:24.675 20628 [main] INFO  o.s.b.a.e.w.s.WebMvcEndpointHandlerMapping - Mapped "{[/actuator/info],methods=[GET],produces=[application/vnd.spring-boot.actuator.v2+json || application/json]}" onto public java.lang.Object org.springframework.boot.actuate.endpoint.web.servlet.AbstractWebMvcEndpointHandlerMapping$OperationHandler.handle(javax.servlet.http.HttpServletRequest,java.util.Map<java.lang.String, java.lang.String>) 
+2018-11-02 14:52:24.676 20629 [main] INFO  o.s.b.a.e.w.s.WebMvcEndpointHandlerMapping - Mapped "{[/actuator],methods=[GET],produces=[application/vnd.spring-boot.actuator.v2+json || application/json]}" onto protected java.util.Map<java.lang.String, java.util.Map<java.lang.String, org.springframework.boot.actuate.endpoint.web.Link>> org.springframework.boot.actuate.endpoint.web.servlet.WebMvcEndpointHandlerMapping.links(javax.servlet.http.HttpServletRequest,javax.servlet.http.HttpServletResponse) 
+2018-11-02 14:52:25.550 21503 [osbFileListenerContainer-2] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq connection created 
+2018-11-02 14:52:25.568 21521 [osbFileListenerContainer-2] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq created 
+2018-11-02 14:52:25.568 21521 [osbFileListenerContainer-1] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq created 
+2018-11-02 14:52:25.686 21639 [alixListenerContainer-1] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq connection created 
+2018-11-02 14:52:25.712 21665 [alixListenerContainer-1] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq created 
+2018-11-02 14:52:25.743 21696 [alixListenerContainer-2] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq created 
+2018-11-02 14:52:26.021 21974 [compressMQListenerContainer-1] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq connection created 
+2018-11-02 14:52:26.027 21980 [compressMQListenerContainer-1] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq created 
+2018-11-02 14:52:26.028 21981 [compressMQListenerContainer-2] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq created 
+2018-11-02 14:52:26.130 22083 [main] INFO  com.yixin.dsc.FileUploadTest - Started FileUploadTest in 21.34 seconds (JVM running for 22.871) 
+2018-11-02 14:52:26.134 22087 [pool-1-thread-2] INFO  c.y.c.system.job.JobSchedulerRabbit - init rabbitMQ JobScheduler begin!!! 
+2018-11-02 14:52:26.137 22090 [main] INFO  c.y.k.component.DscBeforeRunner - 开始加载缓存数据 
+2018-11-02 14:52:26.697 22650 [main] INFO  o.h.h.i.QueryTranslatorFactoryInitiator - HHH000397: Using ASTQueryTranslatorFactory 
+2018-11-02 14:52:27.123 23076 [pool-1-thread-2] INFO  c.y.c.system.job.JobSchedulerRabbit - init rabbitMQ JobScheduler success!!! 
+2018-11-02 14:52:27.234 23187 [main] INFO  c.y.k.component.DscBeforeRunner - 数据加载完毕，耗时：1096ms 
+2018-11-02 14:52:27.641 23594 [osbFileListenerContainer-2] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq closeed 
+2018-11-02 14:52:27.641 23594 [osbFileListenerContainer-1] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq closeed 
+2018-11-02 14:52:27.792 23745 [alixListenerContainer-1] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq closeed 
+2018-11-02 14:52:27.792 23745 [alixListenerContainer-2] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq closeed 
+2018-11-02 14:52:28.115 24068 [compressMQListenerContainer-2] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq closeed 
+2018-11-02 14:52:28.115 24068 [compressMQListenerContainer-1] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq closeed 
+2018-11-02 14:52:28.231 24184 [Thread-5] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq connection close 
+2018-11-02 14:52:28.243 24196 [Thread-5] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq connection close 
+2018-11-02 14:52:28.253 24206 [Thread-5] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq connection close 
+2018-11-02 14:52:28.254 24207 [Thread-5] INFO  c.y.c.s.util.SpringContainerManager - SpringContainer stoping... 
+2018-11-02 14:52:28.259 24212 [Thread-5] WARN  o.s.b.f.s.DisposableBeanAdapter - Invocation of destroy method failed on bean with name 'springContainerManager': java.lang.ExceptionInInitializerError 
+2018-11-02 14:53:41.007 1090 [main] INFO  com.yixin.dsc.FileUploadTest - Starting FileUploadTest on 4M5L1G2-222 with PID 20536 (started by sukang in E:\work-code\dsc) 
+2018-11-02 14:53:41.011 1094 [main] INFO  com.yixin.dsc.FileUploadTest - No active profile set, falling back to default profiles: default 
+2018-11-02 14:53:51.527 11610 [main] INFO  o.h.jpa.internal.util.LogHelper - HHH000204: Processing PersistenceUnitInfo [
+	name: default
+	...] 
+2018-11-02 14:53:51.628 11711 [main] INFO  org.hibernate.Version - HHH000412: Hibernate Core {5.2.16.Final} 
+2018-11-02 14:53:51.633 11716 [main] INFO  org.hibernate.cfg.Environment - HHH000206: hibernate.properties not found 
+2018-11-02 14:53:51.681 11764 [main] INFO  o.h.annotations.common.Version - HCANN000001: Hibernate Commons Annotations {5.0.1.Final} 
+2018-11-02 14:53:51.867 11950 [main] INFO  org.hibernate.dialect.Dialect - HHH000400: Using dialect: org.hibernate.dialect.MySQL5Dialect 
+2018-11-02 14:53:52.445 12528 [main] WARN  org.hibernate.id.UUIDHexGenerator - HHH000409: Using org.hibernate.id.UUIDHexGenerator which does not generate IETF RFC 4122 compliant UUID values; consider using org.hibernate.id.UUIDGenerator instead 
+2018-11-02 14:53:54.261 14344 [main] INFO  org.mongodb.driver.cluster - Cluster created with settings {hosts=[192.168.145.164:27017], mode=SINGLE, requiredClusterType=UNKNOWN, serverSelectionTimeout='30000 ms', maxWaitQueueSize=500} 
+2018-11-02 14:53:54.852 14935 [cluster-ClusterId{value='5bdbf48223ae395038ad5359', description='null'}-192.168.145.164:27017] INFO  org.mongodb.driver.connection - Opened connection [connectionId{localValue:1, serverValue:530446}] to 192.168.145.164:27017 
+2018-11-02 14:53:54.863 14946 [cluster-ClusterId{value='5bdbf48223ae395038ad5359', description='null'}-192.168.145.164:27017] INFO  org.mongodb.driver.cluster - Monitor thread successfully connected to server with description ServerDescription{address=192.168.145.164:27017, type=REPLICA_SET_PRIMARY, state=CONNECTED, ok=true, version=ServerVersion{versionList=[3, 4, 2]}, minWireVersion=0, maxWireVersion=5, maxDocumentSize=16777216, logicalSessionTimeoutMinutes=null, roundTripTimeNanos=9212456, setName='dsj_dbtest01', canonicalAddress=192.168.145.164:27017, hosts=[192.168.145.164:27018, 192.168.145.164:27019, 192.168.145.164:27017], passives=[], arbiters=[], primary='192.168.145.164:27017', tagSet=TagSet{[]}, electionId=7fffffff000000000000019e, setVersion=1, lastWriteDate=Fri Nov 02 14:53:53 CST 2018, lastUpdateTimeNanos=8226514794163705} 
+2018-11-02 14:53:54.968 15051 [main] INFO  c.y.kepler.common.RedisClientUtil - Init Redis Service : Centos6701:6380 
+2018-11-02 14:53:55.036 15119 [main] INFO  c.y.kepler.common.RedisClientUtil - Init Redis Service success! 
+2018-11-02 14:53:57.344 17427 [main] INFO  c.y.k.core.config.RabbitmqConfig - 初始化connectionFactory,address:192.168.145.161:5672,username:guest,password:guest,virtual-host:yx_osb_mq 
+2018-11-02 14:53:57.360 17443 [main] INFO  c.y.k.core.config.RabbitmqConfig -  osbFileMessageListener inside listener 
+2018-11-02 14:53:57.470 17553 [main] INFO  c.y.k.core.config.RabbitmqConfig - 初始化alixConnectionFactory,address:192.168.145.171,alixPort:5672,username:guest,password:guest,virtual-host:yx_mq 
+2018-11-02 14:53:57.484 17567 [main] INFO  c.y.k.core.config.RabbitmqConfig -  alixListenerContainer inside listener 
+2018-11-02 14:53:57.524 17607 [main] INFO  c.y.k.core.config.RabbitmqConfig - 初始化compressConnectionFactory，address:192.168.144.23:5672，username:rabbitadm，password:admin，v-host:compressor-vh 
+2018-11-02 14:53:57.540 17623 [main] INFO  c.y.k.core.config.RabbitmqConfig - compressMessageListener inside listener 
+2018-11-02 14:53:57.794 17877 [main] INFO  c.y.k.c.j.KeplerJobSchedulerRabbit - 调度任务配置信息：192.168.145.161:5672,192.168.145.162:5672,192.168.145.163:5672 
+2018-11-02 14:53:57.794 17877 [main] INFO  c.y.k.c.j.KeplerJobSchedulerRabbit - 开始配置定时调度中心连接客户端 
+2018-11-02 14:53:59.964 20047 [main] WARN  o.s.b.a.o.j.JpaBaseConfiguration$JpaWebConfiguration$JpaWebMvcConfiguration - spring.jpa.open-in-view is enabled by default. Therefore, database queries may be performed during view rendering. Explicitly configure spring.jpa.open-in-view to disable this warning 
+2018-11-02 14:54:03.465 23548 [main] WARN  o.s.b.s.r.RedisStarterDeprecationWarningAutoConfiguration - spring-boot-starter-redis is deprecated as of Spring Boot 1.4, please migrate to spring-boot-starter-data-redis 
+2018-11-02 14:54:03.494 23577 [main] INFO  o.s.b.a.e.web.EndpointLinksResolver - Exposing 2 endpoint(s) beneath base path '/actuator' 
+2018-11-02 14:54:03.510 23593 [main] INFO  o.s.b.a.e.w.s.WebMvcEndpointHandlerMapping - Mapped "{[/actuator/health],methods=[GET],produces=[application/vnd.spring-boot.actuator.v2+json || application/json]}" onto public java.lang.Object org.springframework.boot.actuate.endpoint.web.servlet.AbstractWebMvcEndpointHandlerMapping$OperationHandler.handle(javax.servlet.http.HttpServletRequest,java.util.Map<java.lang.String, java.lang.String>) 
+2018-11-02 14:54:03.511 23594 [main] INFO  o.s.b.a.e.w.s.WebMvcEndpointHandlerMapping - Mapped "{[/actuator/info],methods=[GET],produces=[application/vnd.spring-boot.actuator.v2+json || application/json]}" onto public java.lang.Object org.springframework.boot.actuate.endpoint.web.servlet.AbstractWebMvcEndpointHandlerMapping$OperationHandler.handle(javax.servlet.http.HttpServletRequest,java.util.Map<java.lang.String, java.lang.String>) 
+2018-11-02 14:54:03.512 23595 [main] INFO  o.s.b.a.e.w.s.WebMvcEndpointHandlerMapping - Mapped "{[/actuator],methods=[GET],produces=[application/vnd.spring-boot.actuator.v2+json || application/json]}" onto protected java.util.Map<java.lang.String, java.util.Map<java.lang.String, org.springframework.boot.actuate.endpoint.web.Link>> org.springframework.boot.actuate.endpoint.web.servlet.WebMvcEndpointHandlerMapping.links(javax.servlet.http.HttpServletRequest,javax.servlet.http.HttpServletResponse) 
+2018-11-02 14:54:04.112 24195 [osbFileListenerContainer-2] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq connection created 
+2018-11-02 14:54:04.131 24214 [osbFileListenerContainer-2] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq created 
+2018-11-02 14:54:04.134 24217 [osbFileListenerContainer-1] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq created 
+2018-11-02 14:54:04.242 24325 [alixListenerContainer-1] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq connection created 
+2018-11-02 14:54:04.261 24344 [alixListenerContainer-1] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq created 
+2018-11-02 14:54:04.290 24373 [alixListenerContainer-2] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq created 
+2018-11-02 14:54:04.360 24443 [compressMQListenerContainer-2] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq connection created 
+2018-11-02 14:54:04.368 24451 [compressMQListenerContainer-2] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq created 
+2018-11-02 14:54:04.371 24454 [compressMQListenerContainer-1] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq created 
+2018-11-02 14:54:04.432 24515 [pool-1-thread-2] INFO  c.y.c.system.job.JobSchedulerRabbit - init rabbitMQ JobScheduler begin!!! 
+2018-11-02 14:54:04.466 24549 [main] INFO  com.yixin.dsc.FileUploadTest - Started FileUploadTest in 23.697 seconds (JVM running for 25.068) 
+2018-11-02 14:54:04.472 24555 [main] INFO  c.y.k.component.DscBeforeRunner - 开始加载缓存数据 
+2018-11-02 14:54:04.629 24712 [main] INFO  o.h.h.i.QueryTranslatorFactoryInitiator - HHH000397: Using ASTQueryTranslatorFactory 
+2018-11-02 14:54:04.845 24928 [pool-1-thread-2] INFO  c.y.c.system.job.JobSchedulerRabbit - init rabbitMQ JobScheduler success!!! 
+2018-11-02 14:54:05.343 25426 [main] INFO  c.y.k.component.DscBeforeRunner - 数据加载完毕，耗时：871ms 
+2018-11-02 14:54:06.215 26298 [osbFileListenerContainer-1] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq closeed 
+2018-11-02 14:54:06.215 26298 [osbFileListenerContainer-2] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq closeed 
+2018-11-02 14:54:06.337 26420 [alixListenerContainer-1] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq closeed 
+2018-11-02 14:54:06.337 26420 [alixListenerContainer-2] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq closeed 
+2018-11-02 14:54:06.425 26508 [compressMQListenerContainer-1] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq closeed 
+2018-11-02 14:54:06.455 26538 [compressMQListenerContainer-2] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq closeed 
+2018-11-02 14:54:06.536 26619 [Thread-5] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq connection close 
+2018-11-02 14:54:06.547 26630 [Thread-5] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq connection close 
+2018-11-02 14:54:06.559 26642 [Thread-5] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq connection close 
+2018-11-02 14:54:06.560 26643 [Thread-5] INFO  c.y.c.s.util.SpringContainerManager - SpringContainer stoping... 
+2018-11-02 14:54:06.562 26645 [Thread-5] WARN  o.s.b.f.s.DisposableBeanAdapter - Invocation of destroy method failed on bean with name 'springContainerManager': java.lang.ExceptionInInitializerError 
+2018-11-02 14:57:28.624 1036 [main] INFO  com.yixin.dsc.FileUploadTest - Starting FileUploadTest on 4M5L1G2-222 with PID 8388 (started by sukang in E:\work-code\dsc) 
+2018-11-02 14:57:28.627 1039 [main] INFO  com.yixin.dsc.FileUploadTest - No active profile set, falling back to default profiles: default 
+2018-11-02 14:57:34.976 7388 [main] INFO  o.h.jpa.internal.util.LogHelper - HHH000204: Processing PersistenceUnitInfo [
+	name: default
+	...] 
+2018-11-02 14:57:35.057 7469 [main] INFO  org.hibernate.Version - HHH000412: Hibernate Core {5.2.16.Final} 
+2018-11-02 14:57:35.060 7472 [main] INFO  org.hibernate.cfg.Environment - HHH000206: hibernate.properties not found 
+2018-11-02 14:57:35.101 7513 [main] INFO  o.h.annotations.common.Version - HCANN000001: Hibernate Commons Annotations {5.0.1.Final} 
+2018-11-02 14:57:35.329 7741 [main] INFO  org.hibernate.dialect.Dialect - HHH000400: Using dialect: org.hibernate.dialect.MySQL5Dialect 
+2018-11-02 14:57:35.932 8344 [main] WARN  org.hibernate.id.UUIDHexGenerator - HHH000409: Using org.hibernate.id.UUIDHexGenerator which does not generate IETF RFC 4122 compliant UUID values; consider using org.hibernate.id.UUIDGenerator instead 
+2018-11-02 14:57:38.299 10711 [main] INFO  org.mongodb.driver.cluster - Cluster created with settings {hosts=[192.168.145.164:27017], mode=SINGLE, requiredClusterType=UNKNOWN, serverSelectionTimeout='30000 ms', maxWaitQueueSize=500} 
+2018-11-02 14:57:39.156 11568 [cluster-ClusterId{value='5bdbf56223ae3920c47bb5e0', description='null'}-192.168.145.164:27017] INFO  org.mongodb.driver.connection - Opened connection [connectionId{localValue:1, serverValue:530447}] to 192.168.145.164:27017 
+2018-11-02 14:57:39.189 11601 [main] INFO  c.y.kepler.common.RedisClientUtil - Init Redis Service : Centos6701:6380 
+2018-11-02 14:57:39.260 11672 [main] INFO  c.y.kepler.common.RedisClientUtil - Init Redis Service success! 
+2018-11-02 14:57:39.403 11815 [cluster-ClusterId{value='5bdbf56223ae3920c47bb5e0', description='null'}-192.168.145.164:27017] INFO  org.mongodb.driver.cluster - Monitor thread successfully connected to server with description ServerDescription{address=192.168.145.164:27017, type=REPLICA_SET_PRIMARY, state=CONNECTED, ok=true, version=ServerVersion{versionList=[3, 4, 2]}, minWireVersion=0, maxWireVersion=5, maxDocumentSize=16777216, logicalSessionTimeoutMinutes=null, roundTripTimeNanos=243895593, setName='dsj_dbtest01', canonicalAddress=192.168.145.164:27017, hosts=[192.168.145.164:27018, 192.168.145.164:27019, 192.168.145.164:27017], passives=[], arbiters=[], primary='192.168.145.164:27017', tagSet=TagSet{[]}, electionId=7fffffff000000000000019e, setVersion=1, lastWriteDate=Fri Nov 02 14:57:37 CST 2018, lastUpdateTimeNanos=8226739332623752} 
+2018-11-02 14:57:42.310 14722 [main] INFO  c.y.k.core.config.RabbitmqConfig - 初始化connectionFactory,address:192.168.145.161:5672,username:guest,password:guest,virtual-host:yx_osb_mq 
+2018-11-02 14:57:42.348 14760 [main] INFO  c.y.k.core.config.RabbitmqConfig -  osbFileMessageListener inside listener 
+2018-11-02 14:57:42.492 14904 [main] INFO  c.y.k.core.config.RabbitmqConfig - 初始化alixConnectionFactory,address:192.168.145.171,alixPort:5672,username:guest,password:guest,virtual-host:yx_mq 
+2018-11-02 14:57:42.508 14920 [main] INFO  c.y.k.core.config.RabbitmqConfig -  alixListenerContainer inside listener 
+2018-11-02 14:57:42.544 14956 [main] INFO  c.y.k.core.config.RabbitmqConfig - 初始化compressConnectionFactory，address:192.168.144.23:5672，username:rabbitadm，password:admin，v-host:compressor-vh 
+2018-11-02 14:57:42.565 14977 [main] INFO  c.y.k.core.config.RabbitmqConfig - compressMessageListener inside listener 
+2018-11-02 14:57:42.845 15257 [main] INFO  c.y.k.c.j.KeplerJobSchedulerRabbit - 调度任务配置信息：192.168.145.161:5672,192.168.145.162:5672,192.168.145.163:5672 
+2018-11-02 14:57:42.845 15257 [main] INFO  c.y.k.c.j.KeplerJobSchedulerRabbit - 开始配置定时调度中心连接客户端 
+2018-11-02 14:57:46.638 19050 [main] WARN  o.s.b.a.o.j.JpaBaseConfiguration$JpaWebConfiguration$JpaWebMvcConfiguration - spring.jpa.open-in-view is enabled by default. Therefore, database queries may be performed during view rendering. Explicitly configure spring.jpa.open-in-view to disable this warning 
+2018-11-02 14:57:50.630 23042 [main] WARN  o.s.b.s.r.RedisStarterDeprecationWarningAutoConfiguration - spring-boot-starter-redis is deprecated as of Spring Boot 1.4, please migrate to spring-boot-starter-data-redis 
+2018-11-02 14:57:50.663 23075 [main] INFO  o.s.b.a.e.web.EndpointLinksResolver - Exposing 2 endpoint(s) beneath base path '/actuator' 
+2018-11-02 14:57:50.679 23091 [main] INFO  o.s.b.a.e.w.s.WebMvcEndpointHandlerMapping - Mapped "{[/actuator/health],methods=[GET],produces=[application/vnd.spring-boot.actuator.v2+json || application/json]}" onto public java.lang.Object org.springframework.boot.actuate.endpoint.web.servlet.AbstractWebMvcEndpointHandlerMapping$OperationHandler.handle(javax.servlet.http.HttpServletRequest,java.util.Map<java.lang.String, java.lang.String>) 
+2018-11-02 14:57:50.680 23092 [main] INFO  o.s.b.a.e.w.s.WebMvcEndpointHandlerMapping - Mapped "{[/actuator/info],methods=[GET],produces=[application/vnd.spring-boot.actuator.v2+json || application/json]}" onto public java.lang.Object org.springframework.boot.actuate.endpoint.web.servlet.AbstractWebMvcEndpointHandlerMapping$OperationHandler.handle(javax.servlet.http.HttpServletRequest,java.util.Map<java.lang.String, java.lang.String>) 
+2018-11-02 14:57:50.681 23093 [main] INFO  o.s.b.a.e.w.s.WebMvcEndpointHandlerMapping - Mapped "{[/actuator],methods=[GET],produces=[application/vnd.spring-boot.actuator.v2+json || application/json]}" onto protected java.util.Map<java.lang.String, java.util.Map<java.lang.String, org.springframework.boot.actuate.endpoint.web.Link>> org.springframework.boot.actuate.endpoint.web.servlet.WebMvcEndpointHandlerMapping.links(javax.servlet.http.HttpServletRequest,javax.servlet.http.HttpServletResponse) 
+2018-11-02 14:57:51.492 23904 [osbFileListenerContainer-2] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq connection created 
+2018-11-02 14:57:51.513 23925 [osbFileListenerContainer-2] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq created 
+2018-11-02 14:57:51.770 24182 [osbFileListenerContainer-1] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq created 
+2018-11-02 14:57:52.077 24489 [alixListenerContainer-1] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq connection created 
+2018-11-02 14:57:52.304 24716 [alixListenerContainer-1] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq created 
+2018-11-02 14:57:52.326 24738 [alixListenerContainer-1] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq created 
+2018-11-02 14:57:52.394 24806 [compressMQListenerContainer-2] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq connection created 
+2018-11-02 14:57:52.405 24817 [compressMQListenerContainer-2] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq created 
+2018-11-02 14:57:52.406 24818 [compressMQListenerContainer-1] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq created 
+2018-11-02 14:57:52.453 24865 [main] INFO  com.yixin.dsc.FileUploadTest - Started FileUploadTest in 24.097 seconds (JVM running for 25.378) 
+2018-11-02 14:57:52.455 24867 [pool-1-thread-2] INFO  c.y.c.system.job.JobSchedulerRabbit - init rabbitMQ JobScheduler begin!!! 
+2018-11-02 14:57:52.471 24883 [main] INFO  c.y.k.component.DscBeforeRunner - 开始加载缓存数据 
+2018-11-02 14:57:52.582 24994 [main] INFO  o.h.h.i.QueryTranslatorFactoryInitiator - HHH000397: Using ASTQueryTranslatorFactory 
+2018-11-02 14:57:52.609 25021 [pool-1-thread-2] INFO  c.y.c.system.job.JobSchedulerRabbit - init rabbitMQ JobScheduler success!!! 
+2018-11-02 14:57:53.885 26297 [main] INFO  c.y.k.component.DscBeforeRunner - 数据加载完毕，耗时：1414ms 
+2018-11-02 14:57:54.838 27250 [osbFileListenerContainer-1] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq closeed 
+2018-11-02 14:57:54.838 27250 [osbFileListenerContainer-2] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq closeed 
+2018-11-02 14:57:55.370 27782 [alixListenerContainer-2] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq closeed 
+2018-11-02 14:57:55.370 27782 [alixListenerContainer-1] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq closeed 
+2018-11-02 14:57:55.449 27861 [compressMQListenerContainer-1] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq closeed 
+2018-11-02 14:57:55.450 27862 [compressMQListenerContainer-2] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq closeed 
+2018-11-02 14:57:55.565 27977 [Thread-5] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq connection close 
+2018-11-02 14:57:55.579 27991 [Thread-5] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq connection close 
+2018-11-02 14:57:55.593 28005 [Thread-5] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq connection close 
+2018-11-02 14:57:55.593 28005 [Thread-5] INFO  c.y.c.s.util.SpringContainerManager - SpringContainer stoping... 
+2018-11-02 14:57:55.596 28008 [Thread-5] WARN  o.s.b.f.s.DisposableBeanAdapter - Invocation of destroy method failed on bean with name 'springContainerManager': java.lang.ExceptionInInitializerError 
+2018-11-02 15:00:53.628 1803 [main] INFO  com.yixin.dsc.FileUploadTest - Starting FileUploadTest on 4M5L1G2-222 with PID 28000 (started by sukang in E:\work-code\dsc) 
+2018-11-02 15:00:53.630 1805 [main] INFO  com.yixin.dsc.FileUploadTest - No active profile set, falling back to default profiles: default 
+2018-11-02 15:00:59.962 8137 [main] INFO  o.h.jpa.internal.util.LogHelper - HHH000204: Processing PersistenceUnitInfo [
+	name: default
+	...] 
+2018-11-02 15:01:00.089 8264 [main] INFO  org.hibernate.Version - HHH000412: Hibernate Core {5.2.16.Final} 
+2018-11-02 15:01:00.091 8266 [main] INFO  org.hibernate.cfg.Environment - HHH000206: hibernate.properties not found 
+2018-11-02 15:01:00.149 8324 [main] INFO  o.h.annotations.common.Version - HCANN000001: Hibernate Commons Annotations {5.0.1.Final} 
+2018-11-02 15:01:00.338 8513 [main] INFO  org.hibernate.dialect.Dialect - HHH000400: Using dialect: org.hibernate.dialect.MySQL5Dialect 
+2018-11-02 15:01:01.008 9183 [main] WARN  org.hibernate.id.UUIDHexGenerator - HHH000409: Using org.hibernate.id.UUIDHexGenerator which does not generate IETF RFC 4122 compliant UUID values; consider using org.hibernate.id.UUIDGenerator instead 
+2018-11-02 15:01:03.082 11257 [main] INFO  org.mongodb.driver.cluster - Cluster created with settings {hosts=[192.168.145.164:27017], mode=SINGLE, requiredClusterType=UNKNOWN, serverSelectionTimeout='30000 ms', maxWaitQueueSize=500} 
+2018-11-02 15:01:03.735 11910 [main] INFO  c.y.kepler.common.RedisClientUtil - Init Redis Service : Centos6701:6380 
+2018-11-02 15:01:03.801 11976 [cluster-ClusterId{value='5bdbf62f23ae396d60abca69', description='null'}-192.168.145.164:27017] INFO  org.mongodb.driver.connection - Opened connection [connectionId{localValue:1, serverValue:530448}] to 192.168.145.164:27017 
+2018-11-02 15:01:03.812 11987 [cluster-ClusterId{value='5bdbf62f23ae396d60abca69', description='null'}-192.168.145.164:27017] INFO  org.mongodb.driver.cluster - Monitor thread successfully connected to server with description ServerDescription{address=192.168.145.164:27017, type=REPLICA_SET_PRIMARY, state=CONNECTED, ok=true, version=ServerVersion{versionList=[3, 4, 2]}, minWireVersion=0, maxWireVersion=5, maxDocumentSize=16777216, logicalSessionTimeoutMinutes=null, roundTripTimeNanos=9309779, setName='dsj_dbtest01', canonicalAddress=192.168.145.164:27017, hosts=[192.168.145.164:27018, 192.168.145.164:27019, 192.168.145.164:27017], passives=[], arbiters=[], primary='192.168.145.164:27017', tagSet=TagSet{[]}, electionId=7fffffff000000000000019e, setVersion=1, lastWriteDate=Fri Nov 02 15:01:02 CST 2018, lastUpdateTimeNanos=8226943739985254} 
+2018-11-02 15:01:05.200 13375 [main] INFO  c.y.kepler.common.RedisClientUtil - Init Redis Service success! 
+2018-11-02 15:01:07.650 15825 [main] INFO  c.y.k.core.config.RabbitmqConfig - 初始化connectionFactory,address:192.168.145.161:5672,username:guest,password:guest,virtual-host:yx_osb_mq 
+2018-11-02 15:01:07.671 15846 [main] INFO  c.y.k.core.config.RabbitmqConfig -  osbFileMessageListener inside listener 
+2018-11-02 15:01:07.771 15946 [main] INFO  c.y.k.core.config.RabbitmqConfig - 初始化alixConnectionFactory,address:192.168.145.171,alixPort:5672,username:guest,password:guest,virtual-host:yx_mq 
+2018-11-02 15:01:07.787 15962 [main] INFO  c.y.k.core.config.RabbitmqConfig -  alixListenerContainer inside listener 
+2018-11-02 15:01:07.819 15994 [main] INFO  c.y.k.core.config.RabbitmqConfig - 初始化compressConnectionFactory，address:192.168.144.23:5672，username:rabbitadm，password:admin，v-host:compressor-vh 
+2018-11-02 15:01:07.839 16014 [main] INFO  c.y.k.core.config.RabbitmqConfig - compressMessageListener inside listener 
+2018-11-02 15:01:08.129 16304 [main] INFO  c.y.k.c.j.KeplerJobSchedulerRabbit - 调度任务配置信息：192.168.145.161:5672,192.168.145.162:5672,192.168.145.163:5672 
+2018-11-02 15:01:08.129 16304 [main] INFO  c.y.k.c.j.KeplerJobSchedulerRabbit - 开始配置定时调度中心连接客户端 
+2018-11-02 15:01:09.061 17236 [main] INFO  io.lettuce.core.EpollProvider - Starting without optional epoll library 
+2018-11-02 15:01:09.063 17238 [main] INFO  io.lettuce.core.KqueueProvider - Starting without optional kqueue library 
+2018-11-02 15:01:15.225 23400 [main] WARN  o.s.b.a.o.j.JpaBaseConfiguration$JpaWebConfiguration$JpaWebMvcConfiguration - spring.jpa.open-in-view is enabled by default. Therefore, database queries may be performed during view rendering. Explicitly configure spring.jpa.open-in-view to disable this warning 
+2018-11-02 15:01:15.701 23876 [main] INFO  o.s.b.a.w.s.WelcomePageHandlerMapping - Adding welcome page template: index 
+2018-11-02 15:01:18.707 26882 [main] WARN  o.s.b.s.r.RedisStarterDeprecationWarningAutoConfiguration - spring-boot-starter-redis is deprecated as of Spring Boot 1.4, please migrate to spring-boot-starter-data-redis 
+2018-11-02 15:01:18.739 26914 [main] INFO  o.s.b.a.e.web.EndpointLinksResolver - Exposing 2 endpoint(s) beneath base path '/actuator' 
+2018-11-02 15:01:18.753 26928 [main] INFO  o.s.b.a.e.w.s.WebMvcEndpointHandlerMapping - Mapped "{[/actuator/health],methods=[GET],produces=[application/vnd.spring-boot.actuator.v2+json || application/json]}" onto public java.lang.Object org.springframework.boot.actuate.endpoint.web.servlet.AbstractWebMvcEndpointHandlerMapping$OperationHandler.handle(javax.servlet.http.HttpServletRequest,java.util.Map<java.lang.String, java.lang.String>) 
+2018-11-02 15:01:18.754 26929 [main] INFO  o.s.b.a.e.w.s.WebMvcEndpointHandlerMapping - Mapped "{[/actuator/info],methods=[GET],produces=[application/vnd.spring-boot.actuator.v2+json || application/json]}" onto public java.lang.Object org.springframework.boot.actuate.endpoint.web.servlet.AbstractWebMvcEndpointHandlerMapping$OperationHandler.handle(javax.servlet.http.HttpServletRequest,java.util.Map<java.lang.String, java.lang.String>) 
+2018-11-02 15:01:18.755 26930 [main] INFO  o.s.b.a.e.w.s.WebMvcEndpointHandlerMapping - Mapped "{[/actuator],methods=[GET],produces=[application/vnd.spring-boot.actuator.v2+json || application/json]}" onto protected java.util.Map<java.lang.String, java.util.Map<java.lang.String, org.springframework.boot.actuate.endpoint.web.Link>> org.springframework.boot.actuate.endpoint.web.servlet.WebMvcEndpointHandlerMapping.links(javax.servlet.http.HttpServletRequest,javax.servlet.http.HttpServletResponse) 
+2018-11-02 15:01:19.634 27809 [osbFileListenerContainer-1] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq connection created 
+2018-11-02 15:01:19.659 27834 [osbFileListenerContainer-1] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq created 
+2018-11-02 15:01:19.660 27835 [osbFileListenerContainer-2] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq created 
+2018-11-02 15:01:20.013 28188 [alixListenerContainer-1] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq connection created 
+2018-11-02 15:01:20.033 28208 [alixListenerContainer-1] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq created 
+2018-11-02 15:01:20.285 28460 [alixListenerContainer-2] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq created 
+2018-11-02 15:01:20.356 28531 [compressMQListenerContainer-1] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq connection created 
+2018-11-02 15:01:20.366 28541 [compressMQListenerContainer-1] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq created 
+2018-11-02 15:01:20.377 28552 [compressMQListenerContainer-2] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq created 
+2018-11-02 15:01:20.906 29081 [pool-1-thread-2] INFO  c.y.c.system.job.JobSchedulerRabbit - init rabbitMQ JobScheduler begin!!! 
+2018-11-02 15:01:20.908 29083 [main] INFO  com.yixin.dsc.FileUploadTest - Started FileUploadTest in 27.59 seconds (JVM running for 30.032) 
+2018-11-02 15:01:20.926 29101 [main] INFO  c.y.k.component.DscBeforeRunner - 开始加载缓存数据 
+2018-11-02 15:01:21.144 29319 [pool-1-thread-2] INFO  c.y.c.system.job.JobSchedulerRabbit - init rabbitMQ JobScheduler success!!! 
+2018-11-02 15:01:21.182 29357 [main] INFO  o.h.h.i.QueryTranslatorFactoryInitiator - HHH000397: Using ASTQueryTranslatorFactory 
+2018-11-02 15:01:22.109 30284 [main] INFO  c.y.k.component.DscBeforeRunner - 数据加载完毕，耗时：1183ms 
+2018-11-02 15:01:24.200 32375 [osbFileListenerContainer-1] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq closeed 
+2018-11-02 15:01:24.200 32375 [osbFileListenerContainer-2] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq closeed 
+2018-11-02 15:01:24.330 32505 [alixListenerContainer-2] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq closeed 
+2018-11-02 15:01:24.331 32506 [alixListenerContainer-1] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq closeed 
+2018-11-02 15:01:25.218 33393 [compressMQListenerContainer-2] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq closeed 
+2018-11-02 15:01:25.218 33393 [compressMQListenerContainer-1] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq closeed 
+2018-11-02 15:01:26.369 34544 [Thread-10] WARN  io.lettuce.core.RedisChannelHandler - Connection is already closed 
+2018-11-02 15:01:26.392 34567 [Thread-10] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq connection close 
+2018-11-02 15:01:26.402 34577 [Thread-10] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq connection close 
+2018-11-02 15:01:26.412 34587 [Thread-10] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq connection close 
+2018-11-02 15:01:26.412 34587 [Thread-10] INFO  c.y.c.s.util.SpringContainerManager - SpringContainer stoping... 
+2018-11-02 15:01:26.419 34594 [Thread-10] WARN  o.s.b.f.s.DisposableBeanAdapter - Invocation of destroy method failed on bean with name 'springContainerManager': java.lang.ExceptionInInitializerError 
+2018-11-02 15:03:53.808 1296 [main] INFO  com.yixin.dsc.FileUploadTest - Starting FileUploadTest on 4M5L1G2-222 with PID 19152 (started by sukang in E:\work-code\dsc) 
+2018-11-02 15:03:53.815 1303 [main] INFO  com.yixin.dsc.FileUploadTest - No active profile set, falling back to default profiles: default 
+2018-11-02 15:04:01.964 9452 [main] INFO  o.h.jpa.internal.util.LogHelper - HHH000204: Processing PersistenceUnitInfo [
+	name: default
+	...] 
+2018-11-02 15:04:02.136 9624 [main] INFO  org.hibernate.Version - HHH000412: Hibernate Core {5.2.16.Final} 
+2018-11-02 15:04:02.144 9632 [main] INFO  org.hibernate.cfg.Environment - HHH000206: hibernate.properties not found 
+2018-11-02 15:04:02.280 9768 [main] INFO  o.h.annotations.common.Version - HCANN000001: Hibernate Commons Annotations {5.0.1.Final} 
+2018-11-02 15:04:02.609 10097 [main] INFO  org.hibernate.dialect.Dialect - HHH000400: Using dialect: org.hibernate.dialect.MySQL5Dialect 
+2018-11-02 15:04:03.456 10944 [main] WARN  org.hibernate.id.UUIDHexGenerator - HHH000409: Using org.hibernate.id.UUIDHexGenerator which does not generate IETF RFC 4122 compliant UUID values; consider using org.hibernate.id.UUIDGenerator instead 
+2018-11-02 15:04:07.111 14599 [main] INFO  org.mongodb.driver.cluster - Cluster created with settings {hosts=[192.168.145.164:27017], mode=SINGLE, requiredClusterType=UNKNOWN, serverSelectionTimeout='30000 ms', maxWaitQueueSize=500} 
+2018-11-02 15:04:08.293 15781 [main] INFO  c.y.kepler.common.RedisClientUtil - Init Redis Service : Centos6701:6380 
+2018-11-02 15:04:08.413 15901 [main] INFO  c.y.kepler.common.RedisClientUtil - Init Redis Service success! 
+2018-11-02 15:04:08.858 16346 [cluster-ClusterId{value='5bdbf6e723ae394ad0b49dfa', description='null'}-192.168.145.164:27017] INFO  org.mongodb.driver.connection - Opened connection [connectionId{localValue:1, serverValue:530449}] to 192.168.145.164:27017 
+2018-11-02 15:04:08.875 16363 [cluster-ClusterId{value='5bdbf6e723ae394ad0b49dfa', description='null'}-192.168.145.164:27017] INFO  org.mongodb.driver.cluster - Monitor thread successfully connected to server with description ServerDescription{address=192.168.145.164:27017, type=REPLICA_SET_PRIMARY, state=CONNECTED, ok=true, version=ServerVersion{versionList=[3, 4, 2]}, minWireVersion=0, maxWireVersion=5, maxDocumentSize=16777216, logicalSessionTimeoutMinutes=null, roundTripTimeNanos=11802777, setName='dsj_dbtest01', canonicalAddress=192.168.145.164:27017, hosts=[192.168.145.164:27018, 192.168.145.164:27019, 192.168.145.164:27017], passives=[], arbiters=[], primary='192.168.145.164:27017', tagSet=TagSet{[]}, electionId=7fffffff000000000000019e, setVersion=1, lastWriteDate=Fri Nov 02 15:04:07 CST 2018, lastUpdateTimeNanos=8227128800267847} 
+2018-11-02 15:04:14.038 21526 [main] INFO  c.y.k.core.config.RabbitmqConfig - 初始化connectionFactory,address:192.168.145.161:5672,username:guest,password:guest,virtual-host:yx_osb_mq 
+2018-11-02 15:04:14.198 21686 [main] INFO  c.y.k.core.config.RabbitmqConfig -  osbFileMessageListener inside listener 
+2018-11-02 15:04:14.552 22040 [main] INFO  c.y.k.core.config.RabbitmqConfig - 初始化alixConnectionFactory,address:192.168.145.171,alixPort:5672,username:guest,password:guest,virtual-host:yx_mq 
+2018-11-02 15:04:14.603 22091 [main] INFO  c.y.k.core.config.RabbitmqConfig -  alixListenerContainer inside listener 
+2018-11-02 15:04:14.754 22242 [main] INFO  c.y.k.core.config.RabbitmqConfig - 初始化compressConnectionFactory，address:192.168.144.23:5672，username:rabbitadm，password:admin，v-host:compressor-vh 
+2018-11-02 15:04:14.810 22298 [main] INFO  c.y.k.core.config.RabbitmqConfig - compressMessageListener inside listener 
+2018-11-02 15:04:15.484 22972 [main] INFO  c.y.k.c.j.KeplerJobSchedulerRabbit - 调度任务配置信息：192.168.145.161:5672,192.168.145.162:5672,192.168.145.163:5672 
+2018-11-02 15:04:15.485 22973 [main] INFO  c.y.k.c.j.KeplerJobSchedulerRabbit - 开始配置定时调度中心连接客户端 
+2018-11-02 15:04:21.571 29059 [main] WARN  o.s.b.a.o.j.JpaBaseConfiguration$JpaWebConfiguration$JpaWebMvcConfiguration - spring.jpa.open-in-view is enabled by default. Therefore, database queries may be performed during view rendering. Explicitly configure spring.jpa.open-in-view to disable this warning 
+2018-11-02 15:04:27.183 34671 [main] WARN  o.s.b.s.r.RedisStarterDeprecationWarningAutoConfiguration - spring-boot-starter-redis is deprecated as of Spring Boot 1.4, please migrate to spring-boot-starter-data-redis 
+2018-11-02 15:04:27.259 34747 [main] INFO  o.s.b.a.e.web.EndpointLinksResolver - Exposing 2 endpoint(s) beneath base path '/actuator' 
+2018-11-02 15:04:27.309 34797 [main] INFO  o.s.b.a.e.w.s.WebMvcEndpointHandlerMapping - Mapped "{[/actuator/health],methods=[GET],produces=[application/vnd.spring-boot.actuator.v2+json || application/json]}" onto public java.lang.Object org.springframework.boot.actuate.endpoint.web.servlet.AbstractWebMvcEndpointHandlerMapping$OperationHandler.handle(javax.servlet.http.HttpServletRequest,java.util.Map<java.lang.String, java.lang.String>) 
+2018-11-02 15:04:27.311 34799 [main] INFO  o.s.b.a.e.w.s.WebMvcEndpointHandlerMapping - Mapped "{[/actuator/info],methods=[GET],produces=[application/vnd.spring-boot.actuator.v2+json || application/json]}" onto public java.lang.Object org.springframework.boot.actuate.endpoint.web.servlet.AbstractWebMvcEndpointHandlerMapping$OperationHandler.handle(javax.servlet.http.HttpServletRequest,java.util.Map<java.lang.String, java.lang.String>) 
+2018-11-02 15:04:27.312 34800 [main] INFO  o.s.b.a.e.w.s.WebMvcEndpointHandlerMapping - Mapped "{[/actuator],methods=[GET],produces=[application/vnd.spring-boot.actuator.v2+json || application/json]}" onto protected java.util.Map<java.lang.String, java.util.Map<java.lang.String, org.springframework.boot.actuate.endpoint.web.Link>> org.springframework.boot.actuate.endpoint.web.servlet.WebMvcEndpointHandlerMapping.links(javax.servlet.http.HttpServletRequest,javax.servlet.http.HttpServletResponse) 
+2018-11-02 15:04:28.946 36434 [osbFileListenerContainer-2] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq connection created 
+2018-11-02 15:04:28.968 36456 [osbFileListenerContainer-2] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq created 
+2018-11-02 15:04:28.968 36456 [osbFileListenerContainer-1] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq created 
+2018-11-02 15:04:29.300 36788 [alixListenerContainer-2] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq connection created 
+2018-11-02 15:04:29.319 36807 [alixListenerContainer-2] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq created 
+2018-11-02 15:04:29.338 36826 [alixListenerContainer-1] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq created 
+2018-11-02 15:04:30.815 38303 [compressMQListenerContainer-1] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq connection created 
+2018-11-02 15:04:30.833 38321 [compressMQListenerContainer-1] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq created 
+2018-11-02 15:04:30.833 38321 [compressMQListenerContainer-2] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq created 
+2018-11-02 15:04:30.896 38384 [main] INFO  com.yixin.dsc.FileUploadTest - Started FileUploadTest in 37.395 seconds (JVM running for 38.934) 
+2018-11-02 15:04:30.897 38385 [pool-1-thread-2] INFO  c.y.c.system.job.JobSchedulerRabbit - init rabbitMQ JobScheduler begin!!! 
+2018-11-02 15:04:30.910 38398 [main] INFO  c.y.k.component.DscBeforeRunner - 开始加载缓存数据 
+2018-11-02 15:04:31.016 38504 [main] INFO  o.h.h.i.QueryTranslatorFactoryInitiator - HHH000397: Using ASTQueryTranslatorFactory 
+2018-11-02 15:04:31.716 39204 [pool-1-thread-2] INFO  c.y.c.system.job.JobSchedulerRabbit - init rabbitMQ JobScheduler success!!! 
+2018-11-02 15:04:32.990 40478 [main] INFO  c.y.k.component.DscBeforeRunner - 数据加载完毕，耗时：2079ms 
+2018-11-02 15:04:33.274 40762 [osbFileListenerContainer-2] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq closeed 
+2018-11-02 15:04:33.274 40762 [osbFileListenerContainer-1] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq closeed 
+2018-11-02 15:04:33.369 40857 [alixListenerContainer-2] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq closeed 
+2018-11-02 15:04:33.369 40857 [alixListenerContainer-1] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq closeed 
+2018-11-02 15:04:33.879 41367 [compressMQListenerContainer-1] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq closeed 
+2018-11-02 15:04:33.879 41367 [compressMQListenerContainer-2] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq closeed 
+2018-11-02 15:04:33.960 41448 [Thread-5] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq connection close 
+2018-11-02 15:04:33.970 41458 [Thread-5] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq connection close 
+2018-11-02 15:04:33.985 41473 [Thread-5] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq connection close 
+2018-11-02 15:04:33.985 41473 [Thread-5] INFO  c.y.c.s.util.SpringContainerManager - SpringContainer stoping... 
+2018-11-02 15:04:33.989 41477 [Thread-5] WARN  o.s.b.f.s.DisposableBeanAdapter - Invocation of destroy method failed on bean with name 'springContainerManager': java.lang.ExceptionInInitializerError 
+2018-11-02 15:07:30.523 991  [main] INFO  com.yixin.dsc.FileUploadTest - Starting FileUploadTest on 4M5L1G2-222 with PID 4072 (started by sukang in E:\work-code\dsc) 
+2018-11-02 15:07:30.528 996  [main] INFO  com.yixin.dsc.FileUploadTest - No active profile set, falling back to default profiles: default 
+2018-11-02 15:07:36.723 7191 [main] INFO  o.h.jpa.internal.util.LogHelper - HHH000204: Processing PersistenceUnitInfo [
+	name: default
+	...] 
+2018-11-02 15:07:36.813 7281 [main] INFO  org.hibernate.Version - HHH000412: Hibernate Core {5.2.16.Final} 
+2018-11-02 15:07:36.816 7284 [main] INFO  org.hibernate.cfg.Environment - HHH000206: hibernate.properties not found 
+2018-11-02 15:07:36.877 7345 [main] INFO  o.h.annotations.common.Version - HCANN000001: Hibernate Commons Annotations {5.0.1.Final} 
+2018-11-02 15:07:37.064 7532 [main] INFO  org.hibernate.dialect.Dialect - HHH000400: Using dialect: org.hibernate.dialect.MySQL5Dialect 
+2018-11-02 15:07:37.662 8130 [main] WARN  org.hibernate.id.UUIDHexGenerator - HHH000409: Using org.hibernate.id.UUIDHexGenerator which does not generate IETF RFC 4122 compliant UUID values; consider using org.hibernate.id.UUIDGenerator instead 
+2018-11-02 15:09:30.424 2262 [main] INFO  com.yixin.dsc.FileUploadTest - Starting FileUploadTest on 4M5L1G2-222 with PID 21252 (started by sukang in E:\work-code\dsc) 
+2018-11-02 15:09:30.428 2266 [main] INFO  com.yixin.dsc.FileUploadTest - No active profile set, falling back to default profiles: default 
+2018-11-02 15:09:39.985 1671 [main] INFO  com.yixin.dsc.FileUploadTest - Starting FileUploadTest on 4M5L1G2-222 with PID 16860 (started by sukang in E:\work-code\dsc) 
+2018-11-02 15:09:39.988 1674 [main] INFO  com.yixin.dsc.FileUploadTest - No active profile set, falling back to default profiles: default 
+2018-11-02 15:09:46.416 8102 [main] INFO  o.h.jpa.internal.util.LogHelper - HHH000204: Processing PersistenceUnitInfo [
+	name: default
+	...] 
+2018-11-02 15:09:46.524 8210 [main] INFO  org.hibernate.Version - HHH000412: Hibernate Core {5.2.16.Final} 
+2018-11-02 15:09:46.528 8214 [main] INFO  org.hibernate.cfg.Environment - HHH000206: hibernate.properties not found 
+2018-11-02 15:09:46.585 8271 [main] INFO  o.h.annotations.common.Version - HCANN000001: Hibernate Commons Annotations {5.0.1.Final} 
+2018-11-02 15:09:46.777 8463 [main] INFO  org.hibernate.dialect.Dialect - HHH000400: Using dialect: org.hibernate.dialect.MySQL5Dialect 
+2018-11-02 15:09:47.329 9015 [main] WARN  org.hibernate.id.UUIDHexGenerator - HHH000409: Using org.hibernate.id.UUIDHexGenerator which does not generate IETF RFC 4122 compliant UUID values; consider using org.hibernate.id.UUIDGenerator instead 
+2018-11-02 15:09:49.634 11320 [main] INFO  org.mongodb.driver.cluster - Cluster created with settings {hosts=[192.168.145.164:27017], mode=SINGLE, requiredClusterType=UNKNOWN, serverSelectionTimeout='30000 ms', maxWaitQueueSize=500} 
+2018-11-02 15:09:50.300 11986 [cluster-ClusterId{value='5bdbf83d23ae3941dcac8a16', description='null'}-192.168.145.164:27017] INFO  org.mongodb.driver.connection - Opened connection [connectionId{localValue:1, serverValue:530450}] to 192.168.145.164:27017 
+2018-11-02 15:09:50.314 12000 [cluster-ClusterId{value='5bdbf83d23ae3941dcac8a16', description='null'}-192.168.145.164:27017] INFO  org.mongodb.driver.cluster - Monitor thread successfully connected to server with description ServerDescription{address=192.168.145.164:27017, type=REPLICA_SET_PRIMARY, state=CONNECTED, ok=true, version=ServerVersion{versionList=[3, 4, 2]}, minWireVersion=0, maxWireVersion=5, maxDocumentSize=16777216, logicalSessionTimeoutMinutes=null, roundTripTimeNanos=10928640, setName='dsj_dbtest01', canonicalAddress=192.168.145.164:27017, hosts=[192.168.145.164:27018, 192.168.145.164:27019, 192.168.145.164:27017], passives=[], arbiters=[], primary='192.168.145.164:27017', tagSet=TagSet{[]}, electionId=7fffffff000000000000019e, setVersion=1, lastWriteDate=Fri Nov 02 15:09:38 CST 2018, lastUpdateTimeNanos=8227470235822441} 
+2018-11-02 15:09:50.493 12179 [main] INFO  c.y.kepler.common.RedisClientUtil - Init Redis Service : Centos6701:6380 
+2018-11-02 15:09:50.601 12287 [main] INFO  c.y.kepler.common.RedisClientUtil - Init Redis Service success! 
+2018-11-02 15:09:53.546 15232 [main] INFO  c.y.k.core.config.RabbitmqConfig - 初始化connectionFactory,address:192.168.145.161:5672,username:guest,password:guest,virtual-host:yx_osb_mq 
+2018-11-02 15:09:53.567 15253 [main] INFO  c.y.k.core.config.RabbitmqConfig -  osbFileMessageListener inside listener 
+2018-11-02 15:09:53.690 15376 [main] INFO  c.y.k.core.config.RabbitmqConfig - 初始化alixConnectionFactory,address:192.168.145.171,alixPort:5672,username:guest,password:guest,virtual-host:yx_mq 
+2018-11-02 15:09:53.707 15393 [main] INFO  c.y.k.core.config.RabbitmqConfig -  alixListenerContainer inside listener 
+2018-11-02 15:09:53.743 15429 [main] INFO  c.y.k.core.config.RabbitmqConfig - 初始化compressConnectionFactory，address:192.168.144.23:5672，username:rabbitadm，password:admin，v-host:compressor-vh 
+2018-11-02 15:09:53.766 15452 [main] INFO  c.y.k.core.config.RabbitmqConfig - compressMessageListener inside listener 
+2018-11-02 15:09:54.100 15786 [main] INFO  c.y.k.c.j.KeplerJobSchedulerRabbit - 调度任务配置信息：192.168.145.161:5672,192.168.145.162:5672,192.168.145.163:5672 
+2018-11-02 15:09:54.101 15787 [main] INFO  c.y.k.c.j.KeplerJobSchedulerRabbit - 开始配置定时调度中心连接客户端 
+2018-11-02 15:09:55.183 16869 [main] INFO  io.lettuce.core.EpollProvider - Starting without optional epoll library 
+2018-11-02 15:09:55.185 16871 [main] INFO  io.lettuce.core.KqueueProvider - Starting without optional kqueue library 
+2018-11-02 15:10:01.730 23416 [main] WARN  o.s.b.a.o.j.JpaBaseConfiguration$JpaWebConfiguration$JpaWebMvcConfiguration - spring.jpa.open-in-view is enabled by default. Therefore, database queries may be performed during view rendering. Explicitly configure spring.jpa.open-in-view to disable this warning 
+2018-11-02 15:10:02.336 24022 [main] INFO  o.s.b.a.w.s.WelcomePageHandlerMapping - Adding welcome page template: index 
+2018-11-02 15:10:05.924 27610 [main] WARN  o.s.b.s.r.RedisStarterDeprecationWarningAutoConfiguration - spring-boot-starter-redis is deprecated as of Spring Boot 1.4, please migrate to spring-boot-starter-data-redis 
+2018-11-02 15:10:05.959 27645 [main] INFO  o.s.b.a.e.web.EndpointLinksResolver - Exposing 2 endpoint(s) beneath base path '/actuator' 
+2018-11-02 15:10:05.975 27661 [main] INFO  o.s.b.a.e.w.s.WebMvcEndpointHandlerMapping - Mapped "{[/actuator/health],methods=[GET],produces=[application/vnd.spring-boot.actuator.v2+json || application/json]}" onto public java.lang.Object org.springframework.boot.actuate.endpoint.web.servlet.AbstractWebMvcEndpointHandlerMapping$OperationHandler.handle(javax.servlet.http.HttpServletRequest,java.util.Map<java.lang.String, java.lang.String>) 
+2018-11-02 15:10:05.977 27663 [main] INFO  o.s.b.a.e.w.s.WebMvcEndpointHandlerMapping - Mapped "{[/actuator/info],methods=[GET],produces=[application/vnd.spring-boot.actuator.v2+json || application/json]}" onto public java.lang.Object org.springframework.boot.actuate.endpoint.web.servlet.AbstractWebMvcEndpointHandlerMapping$OperationHandler.handle(javax.servlet.http.HttpServletRequest,java.util.Map<java.lang.String, java.lang.String>) 
+2018-11-02 15:10:05.978 27664 [main] INFO  o.s.b.a.e.w.s.WebMvcEndpointHandlerMapping - Mapped "{[/actuator],methods=[GET],produces=[application/vnd.spring-boot.actuator.v2+json || application/json]}" onto protected java.util.Map<java.lang.String, java.util.Map<java.lang.String, org.springframework.boot.actuate.endpoint.web.Link>> org.springframework.boot.actuate.endpoint.web.servlet.WebMvcEndpointHandlerMapping.links(javax.servlet.http.HttpServletRequest,javax.servlet.http.HttpServletResponse) 
+2018-11-02 15:10:06.935 28621 [osbFileListenerContainer-2] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq connection created 
+2018-11-02 15:10:06.957 28643 [osbFileListenerContainer-1] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq created 
+2018-11-02 15:10:06.959 28645 [osbFileListenerContainer-2] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq created 
+2018-11-02 15:10:07.594 29280 [alixListenerContainer-1] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq connection created 
+2018-11-02 15:10:07.623 29309 [alixListenerContainer-1] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq created 
+2018-11-02 15:10:07.658 29344 [alixListenerContainer-2] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq created 
+2018-11-02 15:10:07.987 29673 [compressMQListenerContainer-2] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq connection created 
+2018-11-02 15:10:07.994 29680 [compressMQListenerContainer-2] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq created 
+2018-11-02 15:10:07.995 29681 [compressMQListenerContainer-1] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq created 
+2018-11-02 15:10:08.179 29865 [pool-1-thread-1] INFO  c.y.c.system.job.JobSchedulerRabbit - init rabbitMQ JobScheduler begin!!! 
+2018-11-02 15:10:08.186 29872 [main] INFO  com.yixin.dsc.FileUploadTest - Started FileUploadTest in 28.478 seconds (JVM running for 30.895) 
+2018-11-02 15:10:08.192 29878 [main] INFO  c.y.k.component.DscBeforeRunner - 开始加载缓存数据 
+2018-11-02 15:10:08.321 30007 [main] INFO  o.h.h.i.QueryTranslatorFactoryInitiator - HHH000397: Using ASTQueryTranslatorFactory 
+2018-11-02 15:10:08.354 30040 [pool-1-thread-1] INFO  c.y.c.system.job.JobSchedulerRabbit - init rabbitMQ JobScheduler success!!! 
+2018-11-02 15:10:09.289 30975 [main] INFO  c.y.k.component.DscBeforeRunner - 数据加载完毕，耗时：1097ms 
+2018-11-02 15:10:10.241 31927 [main] INFO  c.y.kepler.core.domain.AsyncTask - 订单号411324,文件校验,处理类为com.yixin.kepler.core.attachment.YILLIONUploadAttachment 
+2018-11-02 15:10:11.394 33080 [main] INFO  c.y.k.c.a.UploadAttachmentDomain - applicantOrderIdPositive需要合并的文件类型有applicantOrderIdPositive,applicantOrderIdReverse 
+2018-11-02 15:11:15.228 1866 [main] INFO  com.yixin.dsc.FileUploadTest - Starting FileUploadTest on 4M5L1G2-222 with PID 26148 (started by sukang in E:\work-code\dsc) 
+2018-11-02 15:11:15.241 1879 [main] INFO  com.yixin.dsc.FileUploadTest - No active profile set, falling back to default profiles: default 
+2018-11-02 15:11:21.961 8599 [main] INFO  o.h.jpa.internal.util.LogHelper - HHH000204: Processing PersistenceUnitInfo [
+	name: default
+	...] 
+2018-11-02 15:11:22.060 8698 [main] INFO  org.hibernate.Version - HHH000412: Hibernate Core {5.2.16.Final} 
+2018-11-02 15:11:22.063 8701 [main] INFO  org.hibernate.cfg.Environment - HHH000206: hibernate.properties not found 
+2018-11-02 15:11:22.125 8763 [main] INFO  o.h.annotations.common.Version - HCANN000001: Hibernate Commons Annotations {5.0.1.Final} 
+2018-11-02 15:11:22.317 8955 [main] INFO  org.hibernate.dialect.Dialect - HHH000400: Using dialect: org.hibernate.dialect.MySQL5Dialect 
+2018-11-02 15:11:22.889 9527 [main] WARN  org.hibernate.id.UUIDHexGenerator - HHH000409: Using org.hibernate.id.UUIDHexGenerator which does not generate IETF RFC 4122 compliant UUID values; consider using org.hibernate.id.UUIDGenerator instead 
+2018-11-02 15:11:24.737 11375 [main] INFO  org.mongodb.driver.cluster - Cluster created with settings {hosts=[192.168.145.164:27017], mode=SINGLE, requiredClusterType=UNKNOWN, serverSelectionTimeout='30000 ms', maxWaitQueueSize=500} 
+2018-11-02 15:11:25.409 12047 [main] INFO  c.y.kepler.common.RedisClientUtil - Init Redis Service : Centos6701:6380 
+2018-11-02 15:11:25.488 12126 [cluster-ClusterId{value='5bdbf89c23ae3966245f813d', description='null'}-192.168.145.164:27017] INFO  org.mongodb.driver.connection - Opened connection [connectionId{localValue:1, serverValue:530451}] to 192.168.145.164:27017 
+2018-11-02 15:11:25.505 12143 [cluster-ClusterId{value='5bdbf89c23ae3966245f813d', description='null'}-192.168.145.164:27017] INFO  org.mongodb.driver.cluster - Monitor thread successfully connected to server with description ServerDescription{address=192.168.145.164:27017, type=REPLICA_SET_PRIMARY, state=CONNECTED, ok=true, version=ServerVersion{versionList=[3, 4, 2]}, minWireVersion=0, maxWireVersion=5, maxDocumentSize=16777216, logicalSessionTimeoutMinutes=null, roundTripTimeNanos=15424499, setName='dsj_dbtest01', canonicalAddress=192.168.145.164:27017, hosts=[192.168.145.164:27018, 192.168.145.164:27019, 192.168.145.164:27017], passives=[], arbiters=[], primary='192.168.145.164:27017', tagSet=TagSet{[]}, electionId=7fffffff000000000000019e, setVersion=1, lastWriteDate=Fri Nov 02 15:11:23 CST 2018, lastUpdateTimeNanos=8227565425490216} 
+2018-11-02 15:11:25.513 12151 [main] INFO  c.y.kepler.common.RedisClientUtil - Init Redis Service success! 
+2018-11-02 15:11:27.833 14471 [main] INFO  c.y.k.core.config.RabbitmqConfig - 初始化connectionFactory,address:192.168.145.161:5672,username:guest,password:guest,virtual-host:yx_osb_mq 
+2018-11-02 15:11:27.850 14488 [main] INFO  c.y.k.core.config.RabbitmqConfig -  osbFileMessageListener inside listener 
+2018-11-02 15:11:27.959 14597 [main] INFO  c.y.k.core.config.RabbitmqConfig - 初始化alixConnectionFactory,address:192.168.145.171,alixPort:5672,username:guest,password:guest,virtual-host:yx_mq 
+2018-11-02 15:11:27.969 14607 [main] INFO  c.y.k.core.config.RabbitmqConfig -  alixListenerContainer inside listener 
+2018-11-02 15:11:28.005 14643 [main] INFO  c.y.k.core.config.RabbitmqConfig - 初始化compressConnectionFactory，address:192.168.144.23:5672，username:rabbitadm，password:admin，v-host:compressor-vh 
+2018-11-02 15:11:28.021 14659 [main] INFO  c.y.k.core.config.RabbitmqConfig - compressMessageListener inside listener 
+2018-11-02 15:11:28.314 14952 [main] INFO  c.y.k.c.j.KeplerJobSchedulerRabbit - 调度任务配置信息：192.168.145.161:5672,192.168.145.162:5672,192.168.145.163:5672 
+2018-11-02 15:11:28.316 14954 [main] INFO  c.y.k.c.j.KeplerJobSchedulerRabbit - 开始配置定时调度中心连接客户端 
+2018-11-02 15:11:29.381 16019 [main] INFO  io.lettuce.core.EpollProvider - Starting without optional epoll library 
+2018-11-02 15:11:29.382 16020 [main] INFO  io.lettuce.core.KqueueProvider - Starting without optional kqueue library 
+2018-11-02 15:11:35.521 22159 [main] WARN  o.s.b.a.o.j.JpaBaseConfiguration$JpaWebConfiguration$JpaWebMvcConfiguration - spring.jpa.open-in-view is enabled by default. Therefore, database queries may be performed during view rendering. Explicitly configure spring.jpa.open-in-view to disable this warning 
+2018-11-02 15:11:36.083 22721 [main] INFO  o.s.b.a.w.s.WelcomePageHandlerMapping - Adding welcome page template: index 
+2018-11-02 15:11:39.125 25763 [main] WARN  o.s.b.s.r.RedisStarterDeprecationWarningAutoConfiguration - spring-boot-starter-redis is deprecated as of Spring Boot 1.4, please migrate to spring-boot-starter-data-redis 
+2018-11-02 15:11:39.159 25797 [main] INFO  o.s.b.a.e.web.EndpointLinksResolver - Exposing 2 endpoint(s) beneath base path '/actuator' 
+2018-11-02 15:11:39.184 25822 [main] INFO  o.s.b.a.e.w.s.WebMvcEndpointHandlerMapping - Mapped "{[/actuator/health],methods=[GET],produces=[application/vnd.spring-boot.actuator.v2+json || application/json]}" onto public java.lang.Object org.springframework.boot.actuate.endpoint.web.servlet.AbstractWebMvcEndpointHandlerMapping$OperationHandler.handle(javax.servlet.http.HttpServletRequest,java.util.Map<java.lang.String, java.lang.String>) 
+2018-11-02 15:11:39.185 25823 [main] INFO  o.s.b.a.e.w.s.WebMvcEndpointHandlerMapping - Mapped "{[/actuator/info],methods=[GET],produces=[application/vnd.spring-boot.actuator.v2+json || application/json]}" onto public java.lang.Object org.springframework.boot.actuate.endpoint.web.servlet.AbstractWebMvcEndpointHandlerMapping$OperationHandler.handle(javax.servlet.http.HttpServletRequest,java.util.Map<java.lang.String, java.lang.String>) 
+2018-11-02 15:11:39.186 25824 [main] INFO  o.s.b.a.e.w.s.WebMvcEndpointHandlerMapping - Mapped "{[/actuator],methods=[GET],produces=[application/vnd.spring-boot.actuator.v2+json || application/json]}" onto protected java.util.Map<java.lang.String, java.util.Map<java.lang.String, org.springframework.boot.actuate.endpoint.web.Link>> org.springframework.boot.actuate.endpoint.web.servlet.WebMvcEndpointHandlerMapping.links(javax.servlet.http.HttpServletRequest,javax.servlet.http.HttpServletResponse) 
+2018-11-02 15:11:40.619 27257 [osbFileListenerContainer-1] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq connection created 
+2018-11-02 15:11:40.639 27277 [osbFileListenerContainer-1] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq created 
+2018-11-02 15:11:40.640 27278 [osbFileListenerContainer-2] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq created 
+2018-11-02 15:11:40.935 27573 [alixListenerContainer-1] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq connection created 
+2018-11-02 15:11:40.953 27591 [alixListenerContainer-1] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq created 
+2018-11-02 15:11:40.977 27615 [alixListenerContainer-2] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq created 
+2018-11-02 15:11:41.267 27905 [compressMQListenerContainer-1] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq connection created 
+2018-11-02 15:11:41.279 27917 [compressMQListenerContainer-1] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq created 
+2018-11-02 15:11:41.279 27917 [compressMQListenerContainer-2] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq created 
+2018-11-02 15:11:42.683 29321 [main] INFO  com.yixin.dsc.FileUploadTest - Started FileUploadTest in 27.873 seconds (JVM running for 30.389) 
+2018-11-02 15:11:42.688 29326 [main] INFO  c.y.k.component.DscBeforeRunner - 开始加载缓存数据 
+2018-11-02 15:11:42.706 29344 [pool-1-thread-1] INFO  c.y.c.system.job.JobSchedulerRabbit - init rabbitMQ JobScheduler begin!!! 
+2018-11-02 15:11:42.816 29454 [main] INFO  o.h.h.i.QueryTranslatorFactoryInitiator - HHH000397: Using ASTQueryTranslatorFactory 
+2018-11-02 15:11:43.427 30065 [main] INFO  c.y.k.component.DscBeforeRunner - 数据加载完毕，耗时：738ms 
+2018-11-02 15:11:43.493 30131 [pool-1-thread-1] INFO  c.y.c.system.job.JobSchedulerRabbit - init rabbitMQ JobScheduler success!!! 
+2018-11-02 15:11:43.945 30583 [pool-7-thread-1] INFO  c.y.kepler.core.domain.AsyncTask - 订单号411324,申请文件上传任务,处理类为com.yixin.kepler.core.attachment.YILLIONUploadAttachment 
+2018-11-02 15:11:43.961 30599 [pool-7-thread-1] INFO  c.y.k.c.a.UploadAttachmentDomain - 根据资方code获取到的资方id为:40281e8363e42a820163e42a9dc50004 
+2018-11-02 15:11:43.989 30627 [pool-7-thread-1] INFO  c.y.k.c.a.UploadAttachmentDomain - [文件处理]附件列表上传,申请单号为411324, 阶段类型为last_trial 
+2018-11-02 15:11:44.111 30749 [pool-7-thread-1] INFO  c.y.k.c.attachment.AttachmentDomain - 将文件上传并重新设置 
+2018-11-02 15:11:44.425 31063 [pool-7-thread-1] INFO  c.y.k.c.attachment.AttachmentDomain - 上传文件到文件平台的请求路径为http://192.168.145.99:8080/fileserver/api/fileDownload/downloadFileByUrl,数据为[{"fileName":"abc.jpg","fileUrl":"http://192.168.145.34/group1/M01/2F/31/wKiRIlsjNzm6YHX6AAC2O9Y2118236.jpg"},{"fileName":"1.pdf","fileUrl":"http://192.168.145.117:8081/tox/standardprocess/unionLoan/loadMcloudFile.do?hash=f68eef10d5a419bb81cac7c18a76c9b4674d530c1149c016e28d9e4816f9dbc6.pdf"},{"fileName":"abc.jpg","fileUrl":"http://192.168.145.34/group1/M01/2F/31/wKiRIlsjNzm6YHX6AAC2O9Y2118236.jpg"},{"fileName":"abc.jpg","fileUrl":"http://192.168.145.34/group1/M01/2F/31/wKiRIlsjNzm6YHX6AAC2O9Y2118236.jpg"},{"fileName":"abc.jpg","fileUrl":"http://192.168.145.34/group1/M01/2F/31/wKiRIlsjNzm6YHX6AAC2O9Y2118236.jpg"},{"fileName":"abc.jpg","fileUrl":"http://192.168.145.34/group1/M01/2F/31/wKiRIlsjNzm6YHX6AAC2O9Y2118236.jpg"},{"fileName":"abc.jpg","fileUrl":"http://192.168.145.34/group1/M01/2F/31/wKiRIlsjNzm6YHX6AAC2O9Y2118236.jpg"},{"fileName":"abc.jpg","fileUrl":"http://192.168.145.34/group1/M01/2F/31/wKiRIlsjNzm6YHX6AAC2O9Y2118236.jpg"},{"fileName":"abc.jpg","fileUrl":"http://192.168.145.34/group1/M01/2F/31/wKiRIlsjNzm6YHX6AAC2O9Y2118236.jpg"},{"fileName":"abc.jpg","fileUrl":"http://192.168.145.34/group1/M01/2F/31/wKiRIlsjNzm6YHX6AAC2O9Y2118236.jpg"}] 
+2018-11-02 15:11:44.594 31232 [pool-7-thread-1] INFO  com.yixin.kepler.common.RestUtil - post 请求结束，返回：{"data":null,"errorMessage":"传入参数缺失文件url信息!","hasErrors":true,"success":false} 
+2018-11-02 15:11:44.594 31232 [pool-7-thread-1] INFO  c.y.k.c.attachment.AttachmentDomain - 上传文件到文件平台获取到的信息为{"data":null,"errorMessage":"传入参数缺失文件url信息!","hasErrors":true,"success":false} 
+2018-11-02 15:11:44.709 31347 [pool-7-thread-1] ERROR c.y.k.c.a.UploadAttachmentDomain - 订单号(411324),阶段为(last_trial)上传文件发生异常 
+java.lang.NullPointerException: null
+	at com.yixin.kepler.core.attachment.AttachmentDomain.uploadFileByUrl(AttachmentDomain.java:96)
+	at com.yixin.kepler.core.attachment.YILLIONUploadAttachment.getData(YILLIONUploadAttachment.java:52)
+	at com.yixin.kepler.core.attachment.UploadAttachmentDomain.doIt0(UploadAttachmentDomain.java:101)
+	at com.yixin.kepler.core.attachment.UploadAttachmentDomain.doIt(UploadAttachmentDomain.java:74)
+	at com.yixin.kepler.core.attachment.UploadAttachmentDomain.doIt(UploadAttachmentDomain.java:1)
+	at com.yixin.kepler.core.domain.AsyncTask.uploadAttachment(AsyncTask.java:115)
+	at com.yixin.kepler.core.domain.AsyncTask$$FastClassBySpringCGLIB$$e6b8d369.invoke(<generated>)
+	at org.springframework.cglib.proxy.MethodProxy.invoke(MethodProxy.java:204)
+	at org.springframework.aop.framework.CglibAopProxy$CglibMethodInvocation.invokeJoinpoint(CglibAopProxy.java:747)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:163)
+	at org.springframework.aop.interceptor.AsyncExecutionInterceptor.lambda$invoke$0(AsyncExecutionInterceptor.java:115)
+	at java.util.concurrent.FutureTask.run(FutureTask.java:266)
+	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1142)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:617)
+	at java.lang.Thread.run(Thread.java:745)
+2018-11-02 15:11:44.852 31490 [pool-7-thread-1] WARN  com.yixin.dsc.util.MailMessageUtils - 未找到邮箱发送配置项，无法发送邮件。具体邮件信息：{"mailSubject":"订单号(411324),阶段为(last_trial)上传文件发生异常","mailText":"ip为(192.168.147.38),发生时间为(2018-11-02 15:11:44),执行发生异常，异常信息为(空指针)."} 
+2018-11-02 15:19:10.271 1786 [main] INFO  com.yixin.dsc.FileUploadTest - Starting FileUploadTest on 4M5L1G2-222 with PID 16340 (started by sukang in E:\work-code\dsc) 
+2018-11-02 15:19:10.278 1793 [main] INFO  com.yixin.dsc.FileUploadTest - No active profile set, falling back to default profiles: default 
+2018-11-02 15:19:16.898 8413 [main] INFO  o.h.jpa.internal.util.LogHelper - HHH000204: Processing PersistenceUnitInfo [
+	name: default
+	...] 
+2018-11-02 15:19:16.997 8512 [main] INFO  org.hibernate.Version - HHH000412: Hibernate Core {5.2.16.Final} 
+2018-11-02 15:19:17.002 8517 [main] INFO  org.hibernate.cfg.Environment - HHH000206: hibernate.properties not found 
+2018-11-02 15:19:17.055 8570 [main] INFO  o.h.annotations.common.Version - HCANN000001: Hibernate Commons Annotations {5.0.1.Final} 
+2018-11-02 15:19:17.227 8742 [main] INFO  org.hibernate.dialect.Dialect - HHH000400: Using dialect: org.hibernate.dialect.MySQL5Dialect 
+2018-11-02 15:19:17.823 9338 [main] WARN  org.hibernate.id.UUIDHexGenerator - HHH000409: Using org.hibernate.id.UUIDHexGenerator which does not generate IETF RFC 4122 compliant UUID values; consider using org.hibernate.id.UUIDGenerator instead 
+2018-11-02 15:19:19.848 11363 [main] INFO  org.mongodb.driver.cluster - Cluster created with settings {hosts=[192.168.145.164:27017], mode=SINGLE, requiredClusterType=UNKNOWN, serverSelectionTimeout='30000 ms', maxWaitQueueSize=500} 
+2018-11-02 15:19:20.492 12007 [cluster-ClusterId{value='5bdbfa7723ae393fd4e4967b', description='null'}-192.168.145.164:27017] INFO  org.mongodb.driver.connection - Opened connection [connectionId{localValue:1, serverValue:530452}] to 192.168.145.164:27017 
+2018-11-02 15:19:20.504 12019 [cluster-ClusterId{value='5bdbfa7723ae393fd4e4967b', description='null'}-192.168.145.164:27017] INFO  org.mongodb.driver.cluster - Monitor thread successfully connected to server with description ServerDescription{address=192.168.145.164:27017, type=REPLICA_SET_PRIMARY, state=CONNECTED, ok=true, version=ServerVersion{versionList=[3, 4, 2]}, minWireVersion=0, maxWireVersion=5, maxDocumentSize=16777216, logicalSessionTimeoutMinutes=null, roundTripTimeNanos=10752331, setName='dsj_dbtest01', canonicalAddress=192.168.145.164:27017, hosts=[192.168.145.164:27018, 192.168.145.164:27019, 192.168.145.164:27017], passives=[], arbiters=[], primary='192.168.145.164:27017', tagSet=TagSet{[]}, electionId=7fffffff000000000000019e, setVersion=1, lastWriteDate=Fri Nov 02 15:19:05 CST 2018, lastUpdateTimeNanos=8228040418977744} 
+2018-11-02 15:19:20.518 12033 [main] INFO  c.y.kepler.common.RedisClientUtil - Init Redis Service : Centos6701:6380 
+2018-11-02 15:19:20.598 12113 [main] INFO  c.y.kepler.common.RedisClientUtil - Init Redis Service success! 
+2018-11-02 15:19:22.915 14430 [main] INFO  c.y.k.core.config.RabbitmqConfig - 初始化connectionFactory,address:192.168.145.161:5672,username:guest,password:guest,virtual-host:yx_osb_mq 
+2018-11-02 15:19:22.939 14454 [main] INFO  c.y.k.core.config.RabbitmqConfig -  osbFileMessageListener inside listener 
+2018-11-02 15:19:23.053 14568 [main] INFO  c.y.k.core.config.RabbitmqConfig - 初始化alixConnectionFactory,address:192.168.145.171,alixPort:5672,username:guest,password:guest,virtual-host:yx_mq 
+2018-11-02 15:19:23.062 14577 [main] INFO  c.y.k.core.config.RabbitmqConfig -  alixListenerContainer inside listener 
+2018-11-02 15:19:23.097 14612 [main] INFO  c.y.k.core.config.RabbitmqConfig - 初始化compressConnectionFactory，address:192.168.144.23:5672，username:rabbitadm，password:admin，v-host:compressor-vh 
+2018-11-02 15:19:23.118 14633 [main] INFO  c.y.k.core.config.RabbitmqConfig - compressMessageListener inside listener 
+2018-11-02 15:19:23.406 14921 [main] INFO  c.y.k.c.j.KeplerJobSchedulerRabbit - 调度任务配置信息：192.168.145.161:5672,192.168.145.162:5672,192.168.145.163:5672 
+2018-11-02 15:19:23.406 14921 [main] INFO  c.y.k.c.j.KeplerJobSchedulerRabbit - 开始配置定时调度中心连接客户端 
+2018-11-02 15:19:24.271 15786 [main] INFO  io.lettuce.core.EpollProvider - Starting without optional epoll library 
+2018-11-02 15:19:24.273 15788 [main] INFO  io.lettuce.core.KqueueProvider - Starting without optional kqueue library 
+2018-11-02 15:19:30.255 21770 [main] WARN  o.s.b.a.o.j.JpaBaseConfiguration$JpaWebConfiguration$JpaWebMvcConfiguration - spring.jpa.open-in-view is enabled by default. Therefore, database queries may be performed during view rendering. Explicitly configure spring.jpa.open-in-view to disable this warning 
+2018-11-02 15:19:30.678 22193 [main] INFO  o.s.b.a.w.s.WelcomePageHandlerMapping - Adding welcome page template: index 
+2018-11-02 15:19:33.716 25231 [main] WARN  o.s.b.s.r.RedisStarterDeprecationWarningAutoConfiguration - spring-boot-starter-redis is deprecated as of Spring Boot 1.4, please migrate to spring-boot-starter-data-redis 
+2018-11-02 15:19:33.741 25256 [main] INFO  o.s.b.a.e.web.EndpointLinksResolver - Exposing 2 endpoint(s) beneath base path '/actuator' 
+2018-11-02 15:19:33.755 25270 [main] INFO  o.s.b.a.e.w.s.WebMvcEndpointHandlerMapping - Mapped "{[/actuator/health],methods=[GET],produces=[application/vnd.spring-boot.actuator.v2+json || application/json]}" onto public java.lang.Object org.springframework.boot.actuate.endpoint.web.servlet.AbstractWebMvcEndpointHandlerMapping$OperationHandler.handle(javax.servlet.http.HttpServletRequest,java.util.Map<java.lang.String, java.lang.String>) 
+2018-11-02 15:19:33.756 25271 [main] INFO  o.s.b.a.e.w.s.WebMvcEndpointHandlerMapping - Mapped "{[/actuator/info],methods=[GET],produces=[application/vnd.spring-boot.actuator.v2+json || application/json]}" onto public java.lang.Object org.springframework.boot.actuate.endpoint.web.servlet.AbstractWebMvcEndpointHandlerMapping$OperationHandler.handle(javax.servlet.http.HttpServletRequest,java.util.Map<java.lang.String, java.lang.String>) 
+2018-11-02 15:19:33.757 25272 [main] INFO  o.s.b.a.e.w.s.WebMvcEndpointHandlerMapping - Mapped "{[/actuator],methods=[GET],produces=[application/vnd.spring-boot.actuator.v2+json || application/json]}" onto protected java.util.Map<java.lang.String, java.util.Map<java.lang.String, org.springframework.boot.actuate.endpoint.web.Link>> org.springframework.boot.actuate.endpoint.web.servlet.WebMvcEndpointHandlerMapping.links(javax.servlet.http.HttpServletRequest,javax.servlet.http.HttpServletResponse) 
+2018-11-02 15:19:35.351 26866 [osbFileListenerContainer-1] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq connection created 
+2018-11-02 15:19:35.365 26880 [osbFileListenerContainer-2] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq created 
+2018-11-02 15:19:35.365 26880 [osbFileListenerContainer-1] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq created 
+2018-11-02 15:19:36.197 27712 [alixListenerContainer-1] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq connection created 
+2018-11-02 15:19:36.218 27733 [alixListenerContainer-1] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq created 
+2018-11-02 15:19:36.243 27758 [alixListenerContainer-2] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq created 
+2018-11-02 15:19:36.332 27847 [compressMQListenerContainer-2] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq connection created 
+2018-11-02 15:19:36.342 27857 [compressMQListenerContainer-2] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq created 
+2018-11-02 15:19:36.343 27858 [compressMQListenerContainer-1] INFO  c.y.k.core.config.RabbitmqConfig - rabbitmq created 
+2018-11-02 15:19:38.683 30198 [pool-1-thread-1] INFO  c.y.c.system.job.JobSchedulerRabbit - init rabbitMQ JobScheduler begin!!! 
+2018-11-02 15:19:38.693 30208 [main] INFO  com.yixin.dsc.FileUploadTest - Started FileUploadTest in 28.688 seconds (JVM running for 31.108) 
+2018-11-02 15:19:38.699 30214 [main] INFO  c.y.k.component.DscBeforeRunner - 开始加载缓存数据 
+2018-11-02 15:19:38.814 30329 [main] INFO  o.h.h.i.QueryTranslatorFactoryInitiator - HHH000397: Using ASTQueryTranslatorFactory 
+2018-11-02 15:19:39.483 30998 [pool-1-thread-1] INFO  c.y.c.system.job.JobSchedulerRabbit - init rabbitMQ JobScheduler success!!! 
+2018-11-02 15:19:40.106 31621 [main] INFO  c.y.k.component.DscBeforeRunner - 数据加载完毕，耗时：1407ms 
+2018-11-02 15:19:40.611 32126 [pool-7-thread-1] INFO  c.y.kepler.core.domain.AsyncTask - 订单号411324,申请文件上传任务,处理类为com.yixin.kepler.core.attachment.YILLIONUploadAttachment 
+2018-11-02 15:19:40.649 32164 [pool-7-thread-1] INFO  c.y.k.c.a.UploadAttachmentDomain - 根据资方code获取到的资方id为:40281e8363e42a820163e42a9dc50004 
+2018-11-02 15:19:40.995 32510 [pool-7-thread-1] INFO  c.y.k.c.a.UploadAttachmentDomain - [文件处理]附件列表上传,申请单号为411324, 阶段类型为last_trial 
+2018-11-02 15:19:41.218 32733 [pool-7-thread-1] INFO  c.y.k.c.attachment.AttachmentDomain - 将文件上传并重新设置 
+2018-11-02 15:19:41.327 32842 [pool-7-thread-1] INFO  c.y.k.c.attachment.AttachmentDomain - 上传文件到文件平台的请求路径为http://192.168.145.99:8080/fileserver/api/fileDownload/downloadFileByUrl,数据为[{"fileName":"4.jpg","fileUrl":"http://192.168.145.117:8081/tox/standardprocess/unionLoan/loadMcloudFile.do?hash=1ae640bbcc21803b733ec73ad20975b32a3001a0d981f9d970315f8e1aca6c45.jpg"},{"fileName":"5.jpg","fileUrl":"http://192.168.145.117:8081/tox/standardprocess/unionLoan/loadMcloudFile.do?hash=dbe3e01494711281ffc229613890a9749ae36c2d70c45da3d9331cc3d4b71048.jpg"}] 
+2018-11-02 15:19:41.692 33207 [pool-7-thread-1] INFO  com.yixin.kepler.common.RestUtil - post 请求结束，返回：{"data":[{"filename":"4.jpg","fileId":"group1/M00/E7/70/wKiRIlvb-jD4YRXFAABOA194rA4110.jpg"},{"filename":"5.jpg","fileId":"group1/M01/E7/70/wKiRIlvb-jDCaE6GAABYPp9hzgs849.jpg"}],"errorMessage":null,"hasErrors":false,"success":true} 
+2018-11-02 15:19:41.692 33207 [pool-7-thread-1] INFO  c.y.k.c.attachment.AttachmentDomain - 上传文件到文件平台获取到的信息为{"data":[{"filename":"4.jpg","fileId":"group1/M00/E7/70/wKiRIlvb-jD4YRXFAABOA194rA4110.jpg"},{"filename":"5.jpg","fileId":"group1/M01/E7/70/wKiRIlvb-jDCaE6GAABYPp9hzgs849.jpg"}],"errorMessage":null,"hasErrors":false,"success":true} 
+2018-11-02 15:19:41.769 33284 [pool-7-thread-1] INFO  c.y.k.c.attachment.AttachmentDomain - 源文件名称4.jpg,上传后的文件id：group1/M00/E7/70/wKiRIlvb-jD4YRXFAABOA194rA4110.jpg 
+2018-11-02 15:19:41.804 33319 [pool-7-thread-1] INFO  c.y.c.s.domain.EntityJpaRepository - update a entity: class com.yixin.dsc.entity.order.DscFileAttachment/402811da6431212e0164312907150097. 
+2018-11-02 15:19:41.992 33507 [pool-7-thread-1] INFO  c.y.k.c.attachment.AttachmentDomain - 源文件名称5.jpg,上传后的文件id：group1/M01/E7/70/wKiRIlvb-jDCaE6GAABYPp9hzgs849.jpg 
+2018-11-02 15:19:42.691 34206 [pool-7-thread-1] INFO  c.y.c.s.domain.EntityJpaRepository - update a entity: class com.yixin.dsc.entity.order.DscFileAttachment/402811da6431212e0164312907340098. 
+2018-11-02 15:19:42.953 34468 [pool-7-thread-1] INFO  c.y.k.c.a.UploadAttachmentDomain - [文件处理]获取到的校验规则为{applicantOrderIdPositive=com.yixin.kepler.enity.AssetAttachmentRule@d} 
+2018-11-02 15:19:43.184 34699 [pool-7-thread-1] INFO  c.y.k.c.a.UploadAttachmentDomain - applicantOrderIdPositive需要合并的文件类型有applicantOrderIdPositive,applicantOrderIdReverse 
+2018-11-02 15:19:44.949 36464 [pool-7-thread-1] INFO  c.y.k.c.a.YILLIONUploadAttachment - 订单号411324文件类型为applicantOrderIdPositive,数量为2 
+2018-11-02 15:19:45.393 36908 [pool-7-thread-1] INFO  c.y.k.c.a.UploadAttachmentDomain - [文件处理]最终上传的的文件列表:
+[{fileName=9e338ac9f65a4764a7e0d6eb2ebebcbd_010101_20181102151945.jpg, fileId=group1/M00/E7/70/wKiRIlvb-jD4YRXFAABOA194rA4110.jpg}, {fileName=9e338ac9f65a4764a7e0d6eb2ebebcbd_010102_20181102151945.jpg, fileId=group1/M01/E7/70/wKiRIlvb-jDCaE6GAABYPp9hzgs849.jpg}] 
+2018-11-02 15:19:45.449 36964 [pool-7-thread-1] INFO  c.y.k.core.attachment.OsbFileDomain - 获取到的配置yillion2yx.server.ip=124.235.119.136 
+2018-11-02 15:19:45.449 36964 [pool-7-thread-1] INFO  c.y.k.core.attachment.OsbFileDomain - 获取到的配置yillion2yx.server.port=20001 
+2018-11-02 15:19:45.449 36964 [pool-7-thread-1] INFO  c.y.k.core.attachment.OsbFileDomain - 获取到的配置yillion2yx.server.type=sftp 
+2018-11-02 15:19:45.449 36964 [pool-7-thread-1] INFO  c.y.k.core.attachment.OsbFileDomain - 获取到的配置yillion2yx.server.uname=CED 
+2018-11-02 15:19:45.450 36965 [pool-7-thread-1] INFO  c.y.k.core.attachment.OsbFileDomain - 获取到的配置yillion2yx.server.pwd=yillion123 
+2018-11-02 15:19:45.450 36965 [pool-7-thread-1] INFO  c.y.k.core.attachment.OsbFileDomain - 获取到的配置yillion2yx.server.encrypt.key=null 
+2018-11-02 15:19:45.450 36965 [pool-7-thread-1] INFO  c.y.k.core.attachment.OsbFileDomain - 获取到的配置yillion2yx.server.encrypt.type=null 
+2018-11-02 15:19:45.451 36966 [pool-7-thread-1] INFO  c.y.k.core.attachment.OsbFileDomain - [osb文件处理]获取到的交易流水号tranNo：8228065365622652 
+2018-11-02 15:19:45.577 37092 [pool-7-thread-1] INFO  c.y.c.s.domain.EntityJpaRepository - create a entity: class com.yixin.kepler.enity.OsbFileLog/402813a666d34a5c0166d34ac8390000. 
+2018-11-02 15:19:45.664 37179 [pool-7-thread-1] INFO  c.y.k.c.a.YILLIONUploadAttachment - [osb文件处理]需要处理的osbFileLog：{"id":"402813a666d34a5c0166d34ac8390000","version":0,"creatorId":"admin","creatorName":"系统","creatorDepartmentId":100,"creatorDepartmentName":"大数据应用中心","createTime":1541143185451,"updatorId":null,"updatorName":null,"updatorDepartmentId":null,"updatorDepartmentName":null,"updateTime":1541143185451,"deleted":false,"bzId":"411324","routingKey":"file_transfer_kepler_docker23_routingKey","bzType":"last_trial","tranNo":"8228065365622652","type":0,"compress":false,"compressPwd":null,"encryptKey":null,"encryptType":null,"compressFormat":"","compressName":"","compressTranNo":null,"compressFileJson":null,"archives":true,"fileJson":"[{\"fileName\":\"9e338ac9f65a4764a7e0d6eb2ebebcbd_010101_20181102151945.jpg\",\"fileId\":\"group1/M00/E7/70/wKiRIlvb-jD4YRXFAABOA194rA4110.jpg\"},{\"fileName\":\"9e338ac9f65a4764a7e0d6eb2ebebcbd_010102_20181102151945.jpg\",\"fileId\":\"group1/M01/E7/70/wKiRIlvb-jDCaE6GAABYPp9hzgs849.jpg\"}]","serverType":"sftp","serverPort":20001,"serverIp":"124.235.119.136","serverUname":"CED","serverPwd":"yillion123","serverFilePath":"/yillion/20181102/9e338ac9f65a4764a7e0d6eb2ebebcbd/","dealStatus":0,"sourceFileJson":null,"reserve1":null} 
+2018-11-02 15:19:45.664 37179 [pool-7-thread-1] INFO  c.y.k.c.a.YILLIONUploadAttachment - [osb文件处理]即将传递给osb的参数信息JSON：{server=sftp, archives=true, systemId=file_transfer_kepler_docker23_routingKey, serialNumber=8228065365622652, compress=false, filePath=/yillion/20181102/9e338ac9f65a4764a7e0d6eb2ebebcbd/, compressFormat=, serverPort=20001, serverPassword=yillion123, password=null, compressPackageName=, serverUserName=CED, serverIP=124.235.119.136, files=[{"fileName":"9e338ac9f65a4764a7e0d6eb2ebebcbd_010101_20181102151945.jpg","fileId":"group1/M00/E7/70/wKiRIlvb-jD4YRXFAABOA194rA4110.jpg"},{"fileName":"9e338ac9f65a4764a7e0d6eb2ebebcbd_010102_20181102151945.jpg","fileId":"group1/M01/E7/70/wKiRIlvb-jDCaE6GAABYPp9hzgs849.jpg"}]} 
+2018-11-02 15:19:45.664 37179 [pool-7-thread-1] INFO  c.y.k.core.attachment.OsbFileDomain - [osb文件处理]请求osb上传文件处理url：http://172.31.5.48:7003/osb/api/fileTransfer/fileUpload，data：{server=sftp, archives=true, systemId=file_transfer_kepler_docker23_routingKey, serialNumber=8228065365622652, compress=false, filePath=/yillion/20181102/9e338ac9f65a4764a7e0d6eb2ebebcbd/, compressFormat=, serverPort=20001, serverPassword=yillion123, password=null, compressPackageName=, serverUserName=CED, serverIP=124.235.119.136, files=[{"fileName":"9e338ac9f65a4764a7e0d6eb2ebebcbd_010101_20181102151945.jpg","fileId":"group1/M00/E7/70/wKiRIlvb-jD4YRXFAABOA194rA4110.jpg"},{"fileName":"9e338ac9f65a4764a7e0d6eb2ebebcbd_010102_20181102151945.jpg","fileId":"group1/M01/E7/70/wKiRIlvb-jDCaE6GAABYPp9hzgs849.jpg"}]} 
+2018-11-02 15:20:06.674 58189 [pool-7-thread-1] ERROR c.y.k.core.attachment.OsbFileDomain - [osb文件处理]请求osb上传文件处理失败url：http://172.31.5.48:7003/osb/api/fileTransfer/fileUpload，data：{server=sftp, archives=true, systemId=file_transfer_kepler_docker23_routingKey, serialNumber=8228065365622652, compress=false, filePath=/yillion/20181102/9e338ac9f65a4764a7e0d6eb2ebebcbd/, compressFormat=, serverPort=20001, serverPassword=yillion123, password=null, compressPackageName=, serverUserName=CED, serverIP=124.235.119.136, files=[{"fileName":"9e338ac9f65a4764a7e0d6eb2ebebcbd_010101_20181102151945.jpg","fileId":"group1/M00/E7/70/wKiRIlvb-jD4YRXFAABOA194rA4110.jpg"},{"fileName":"9e338ac9f65a4764a7e0d6eb2ebebcbd_010102_20181102151945.jpg","fileId":"group1/M01/E7/70/wKiRIlvb-jDCaE6GAABYPp9hzgs849.jpg"}]}，body：{} 
+org.springframework.web.client.ResourceAccessException: I/O error on POST request for "http://172.31.5.48:7003/osb/api/fileTransfer/fileUpload": Connection timed out: connect; nested exception is java.net.ConnectException: Connection timed out: connect
+	at org.springframework.web.client.RestTemplate.doExecute(RestTemplate.java:741)
+	at org.springframework.web.client.RestTemplate.execute(RestTemplate.java:684)
+	at org.springframework.web.client.RestTemplate.postForObject(RestTemplate.java:435)
+	at com.yixin.kepler.common.RestUtil.postJson(RestUtil.java:51)
+	at com.yixin.kepler.core.attachment.OsbFileDomain.upload(OsbFileDomain.java:548)
+	at com.yixin.kepler.core.attachment.OsbFileDomain.uploadOsbData(OsbFileDomain.java:851)
+	at com.yixin.kepler.core.attachment.YILLIONUploadAttachment.upLoadTask(YILLIONUploadAttachment.java:175)
+	at com.yixin.kepler.core.attachment.UploadAttachmentDomain.doIt0(UploadAttachmentDomain.java:117)
+	at com.yixin.kepler.core.attachment.UploadAttachmentDomain.doIt(UploadAttachmentDomain.java:74)
+	at com.yixin.kepler.core.attachment.UploadAttachmentDomain.doIt(UploadAttachmentDomain.java:1)
+	at com.yixin.kepler.core.domain.AsyncTask.uploadAttachment(AsyncTask.java:115)
+	at com.yixin.kepler.core.domain.AsyncTask$$FastClassBySpringCGLIB$$e6b8d369.invoke(<generated>)
+	at org.springframework.cglib.proxy.MethodProxy.invoke(MethodProxy.java:204)
+	at org.springframework.aop.framework.CglibAopProxy$CglibMethodInvocation.invokeJoinpoint(CglibAopProxy.java:747)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:163)
+	at org.springframework.aop.interceptor.AsyncExecutionInterceptor.lambda$invoke$0(AsyncExecutionInterceptor.java:115)
+	at java.util.concurrent.FutureTask.run(FutureTask.java:266)
+	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1142)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:617)
+	at java.lang.Thread.run(Thread.java:745)
+Caused by: java.net.ConnectException: Connection timed out: connect
+	at java.net.DualStackPlainSocketImpl.connect0(Native Method)
+	at java.net.DualStackPlainSocketImpl.socketConnect(DualStackPlainSocketImpl.java:79)
+	at java.net.AbstractPlainSocketImpl.doConnect(AbstractPlainSocketImpl.java:350)
+	at java.net.AbstractPlainSocketImpl.connectToAddress(AbstractPlainSocketImpl.java:206)
+	at java.net.AbstractPlainSocketImpl.connect(AbstractPlainSocketImpl.java:188)
+	at java.net.PlainSocketImpl.connect(PlainSocketImpl.java:172)
+	at java.net.SocksSocketImpl.connect(SocksSocketImpl.java:392)
+	at java.net.Socket.connect(Socket.java:589)
+	at java.net.Socket.connect(Socket.java:538)
+	at sun.net.NetworkClient.doConnect(NetworkClient.java:180)
+	at sun.net.www.http.HttpClient.openServer(HttpClient.java:432)
+	at sun.net.www.http.HttpClient.openServer(HttpClient.java:527)
+	at sun.net.www.http.HttpClient.<init>(HttpClient.java:211)
+	at sun.net.www.http.HttpClient.New(HttpClient.java:308)
+	at sun.net.www.http.HttpClient.New(HttpClient.java:326)
+	at sun.net.www.protocol.http.HttpURLConnection.getNewHttpClient(HttpURLConnection.java:1202)
+	at sun.net.www.protocol.http.HttpURLConnection.plainConnect0(HttpURLConnection.java:1138)
+	at sun.net.www.protocol.http.HttpURLConnection.plainConnect(HttpURLConnection.java:1032)
+	at sun.net.www.protocol.http.HttpURLConnection.connect(HttpURLConnection.java:966)
+	at org.springframework.http.client.SimpleBufferingClientHttpRequest.executeInternal(SimpleBufferingClientHttpRequest.java:76)
+	at org.springframework.http.client.AbstractBufferingClientHttpRequest.executeInternal(AbstractBufferingClientHttpRequest.java:48)
+	at org.springframework.http.client.AbstractClientHttpRequest.execute(AbstractClientHttpRequest.java:53)
+	at org.springframework.web.client.RestTemplate.doExecute(RestTemplate.java:727)
+	... 19 common frames omitted
+2018-11-02 15:20:06.681 58196 [pool-7-thread-1] INFO  c.y.k.core.attachment.OsbFileDomain - [osb文件处理]处理上传受理收妥通知 
+2018-11-02 15:20:06.681 58196 [pool-7-thread-1] INFO  c.y.k.core.attachment.OsbFileDomain - [osb文件处理]osb受理文件处理失败，将OsbFileLog的状态更新为‘osb处理失败-4‘，等待下次定时调度重新请求 
+2018-11-02 15:20:07.015 58530 [pool-7-thread-1] INFO  c.y.c.s.domain.EntityJpaRepository - update a entity: class com.yixin.kepler.enity.OsbFileLog/402813a666d34a5c0166d34ac8390000. 
+2018-11-02 15:20:07.068 58583 [pool-7-thread-1] ERROR c.y.k.core.attachment.OsbFileDomain - [osb文件处理]osb受理文件处理失败,具体返回内容body：null，接收消息时间time：2018-11-02 15:20:07 
+2018-11-02 15:22:02.084 173599 [task-scheduler-2] ERROR o.s.i.handler.LoggingHandler - org.springframework.dao.QueryTimeoutException: Redis command timed out; nested exception is io.lettuce.core.RedisCommandTimeoutException: Command timed out
+	at org.springframework.data.redis.connection.lettuce.LettuceExceptionConverter.convert(LettuceExceptionConverter.java:70)
+	at org.springframework.data.redis.connection.lettuce.LettuceExceptionConverter.convert(LettuceExceptionConverter.java:41)
+	at org.springframework.data.redis.PassThroughExceptionTranslationStrategy.translate(PassThroughExceptionTranslationStrategy.java:44)
+	at org.springframework.data.redis.FallbackExceptionTranslationStrategy.translate(FallbackExceptionTranslationStrategy.java:42)
+	at org.springframework.data.redis.connection.lettuce.LettuceConnection.convertLettuceAccessException(LettuceConnection.java:257)
+	at org.springframework.data.redis.connection.lettuce.LettuceKeyCommands.convertLettuceAccessException(LettuceKeyCommands.java:650)
+	at org.springframework.data.redis.connection.lettuce.LettuceKeyCommands.del(LettuceKeyCommands.java:98)
+	at org.springframework.data.redis.connection.DefaultedRedisConnection.del(DefaultedRedisConnection.java:61)
+	at org.springframework.data.redis.core.RedisTemplate.lambda$delete$2(RedisTemplate.java:709)
+	at org.springframework.data.redis.core.RedisTemplate.execute(RedisTemplate.java:224)
+	at org.springframework.data.redis.core.RedisTemplate.execute(RedisTemplate.java:184)
+	at org.springframework.data.redis.core.RedisTemplate.delete(RedisTemplate.java:709)
+	at org.springframework.session.data.redis.RedisSessionExpirationPolicy.cleanExpiredSessions(RedisSessionExpirationPolicy.java:133)
+	at org.springframework.session.data.redis.RedisOperationsSessionRepository.cleanupExpiredSessions(RedisOperationsSessionRepository.java:393)
+	at org.springframework.session.data.redis.config.annotation.web.http.RedisHttpSessionConfiguration.lambda$configureTasks$0(RedisHttpSessionConfiguration.java:242)
+	at org.springframework.scheduling.support.DelegatingErrorHandlingRunnable.run(DelegatingErrorHandlingRunnable.java:54)
+	at org.springframework.scheduling.concurrent.ReschedulingRunnable.run(ReschedulingRunnable.java:93)
+	at java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:511)
+	at java.util.concurrent.FutureTask.run(FutureTask.java:266)
+	at java.util.concurrent.ScheduledThreadPoolExecutor$ScheduledFutureTask.access$201(ScheduledThreadPoolExecutor.java:180)
+	at java.util.concurrent.ScheduledThreadPoolExecutor$ScheduledFutureTask.run(ScheduledThreadPoolExecutor.java:293)
+	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1142)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:617)
+	at java.lang.Thread.run(Thread.java:745)
+Caused by: io.lettuce.core.RedisCommandTimeoutException: Command timed out
+	at io.lettuce.core.LettuceFutures.awaitOrCancel(LettuceFutures.java:114)
+	at io.lettuce.core.cluster.ClusterFutureSyncInvocationHandler.handleInvocation(ClusterFutureSyncInvocationHandler.java:118)
+	at io.lettuce.core.internal.AbstractInvocationHandler.invoke(AbstractInvocationHandler.java:80)
+	at com.sun.proxy.$Proxy163.del(Unknown Source)
+	at org.springframework.data.redis.connection.lettuce.LettuceKeyCommands.del(LettuceKeyCommands.java:96)
+	... 17 more
+ 

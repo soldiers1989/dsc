@@ -1,0 +1,106 @@
+package com.yixin.kepler.core.job;
+
+
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.util.Date;
+import java.util.List;
+
+import org.apache.commons.collections.CollectionUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
+
+import com.yixin.common.system.ioc.SpringContextUtil;
+import com.yixin.common.system.job.JobExecutor;
+import com.yixin.common.utils.JobParamDTO;
+import com.yixin.kepler.core.constant.CommonConstant;
+import com.yixin.kepler.core.service.BankResultService;
+import com.yixin.kepler.dto.BaseMsgDTO;
+import com.yixin.kepler.enity.AssetMainInfo;
+import com.yixin.kepler.enity.AssetResultTask;
+
+import net.sf.json.JSONObject;
+
+/**
+ * 处理银行结果查询job
+ * @author sukang
+ * @date 2018-06-09 11:19:00
+ */
+@Component
+public class BankResultJobScheduler implements JobExecutor {
+	
+	private final Logger logger = LoggerFactory.getLogger(getClass());
+
+	private final String SUFFIX = "ResultService";
+
+	@Override
+	public JobParamDTO execute(JobParamDTO jobParamDTO) {
+
+		JobParamDTO resultParamDto = new JobParamDTO();
+		//获取需要执行银行查询结果的任务,超过1天的创建时间如果还没有结果就停止
+		List<AssetResultTask> currentTask = AssetResultTask.getCurrentTask(new Date(),36);
+
+		logger.info("--------查询任务开始-----------");
+
+		if (CollectionUtils.isNotEmpty(currentTask)) {
+
+			try {
+				//开始执行查询任务
+				for (AssetResultTask task : currentTask) {
+
+					logger.info("申请编号为{}的业务结果查询任务开始执行",task.getApplyNo());
+
+					//获取资方code路由到具体处理类
+					String financialCode = AssetMainInfo.getByApplyNo(task.getApplyNo())
+							.getFinancialCode();
+
+					BankResultService bean = SpringContextUtil.getBean(
+							financialCode.concat(SUFFIX), BankResultService.class);
+
+					BaseMsgDTO baseMsgDTO = bean.selectResult(task);
+
+					logger.info("申请编号为{}执行的结果为:{}",task.getApplyNo(),
+							JSONObject.fromObject(baseMsgDTO));
+
+					//更新任务执行状态
+					task.setExecState(1);
+					task.setExecTimes(task.getExecTimes()+1);
+
+					if (CommonConstant.SUCCESS.equals(baseMsgDTO.getCode())) {
+						task.setIsEnd(1);
+					}else if (CommonConstant.PROCESSING.equals(baseMsgDTO.getCode())) {
+						task.setNextTime(getNextTime(task.getExecTimes()));
+					}else {
+						task.setIsEnd(1);
+					}
+					task.update();
+					logger.info("申请编号为{}的业务结果查询任务执行结束",task.getApplyNo());
+				}
+
+				resultParamDto.setResultCode("200");
+				resultParamDto.setResultContent("银行结果任务查询结束");
+			} catch (Exception e) {
+				resultParamDto.setResultCode("400");
+				resultParamDto.setResultContent("银行结果查询任务异常");
+				logger.error("银行结果任务查询异常，异常信息为：",e);
+			}
+		}
+		logger.info("--------查询任务结束-----------");
+		return resultParamDto;
+	}
+
+
+	/**
+	 * 根据执行次数计算下次的执行时间
+	 * @param execTimes 执行次数
+	 * @return 下次执行日期
+	 */
+	private Date getNextTime(Integer execTimes) {
+		LocalDateTime now = LocalDateTime.now().plusMinutes(execTimes);
+		Instant instant = now.atZone(ZoneId.systemDefault()).toInstant();
+		return Date.from(instant);
+	}
+
+}

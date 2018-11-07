@@ -1,0 +1,13 @@
+package com.yixin.dsc.service.own;
+
+/**
+ * 运维接口service
+ * Package : com.yixin.dsc.service.own
+ * 
+ * @author YixinCapital -- wangwenlong
+ *		   2018年10月17日 下午1:57:19
+ *
+ */
+public interface DscOwnService {
+
+}

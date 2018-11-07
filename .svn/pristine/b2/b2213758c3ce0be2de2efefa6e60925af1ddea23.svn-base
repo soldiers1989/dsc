@@ -1,0 +1,865 @@
+package com.yixin.dsc.entity.order;
+
+import com.yixin.common.system.domain.BZBaseEntiy;
+import org.apache.commons.lang3.StringUtils;
+
+import javax.persistence.Column;
+import javax.persistence.Entity;
+import javax.persistence.Table;
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+
+/**
+ * 申请主表
+ * Package : com.yixin.dsc.entity.order
+ * 
+ * @author YixinCapital -- wangwenlong
+ *		   2018年6月5日 下午2:42:37
+ *
+ */
+@Entity
+@Table(name = "DSC_SALES_APPLY_MAIN")
+public class DscSalesApplyMain extends BZBaseEntiy {
+
+	private static final long serialVersionUID = 4049043149828906498L;
+
+	/**
+	 * 申请编号
+	 */
+	@Column(name = "apply_no", unique = true , columnDefinition = "varchar(50) comment '申请编号'")
+	private String applyNo;
+
+	/**
+	 * 产品编号
+	 */
+	@Column(name = "product_no",columnDefinition = "varchar(50) comment '产品编号'")
+	private String productNo;
+
+	/**
+	 * 资方id
+	 */
+	@Column(name = "capital_id", columnDefinition = "varchar(50) comment '资方id'")
+	private String capitalId;
+	
+	/**
+	 * 经销商渠道编码
+	 */
+	@Column(name = "dealer_channel_code", columnDefinition = "varchar(128) comment '经销商渠道编码'")
+	private String dealerChannelCode;
+	
+	/**
+	 * 经销商渠道名称
+	 */
+	@Column(name = "dealer_channel_name", columnDefinition = "varchar(128) comment '经销商渠道名称'")
+	private String dealerChannelName;
+
+	/**
+	 * 发起融租公司编号
+	 */
+	@Column(name = "renting_company_code", columnDefinition = "varchar(32) comment '发起融租公司编号'")
+	private String rentingCompanyCode;
+	
+	/**
+	 * 还款卡归属人
+	 */
+	@Column(name = "ahkkgsr", columnDefinition = "varchar(64) comment '还款卡归属人'")
+	private String ahkkgsr;
+	
+	/**
+	 * 持卡人身份证号码
+	 */
+	@Column(name = "ackrzjhm", columnDefinition = "varchar(64) comment '持卡人身份证号码'")
+	private String ackrzjhm;
+		
+	/**
+	 * 还款卡账户类型
+	 */
+	@Column(name = "ahkrkzhlx", columnDefinition = "varchar(64) comment '还款卡账户类型'")
+	private String ahkrkzhlx;
+		
+	/**
+	 * 企业开户支行
+	 */
+	@Column(name = "akhrkhhzh", columnDefinition = "varchar(128) comment '企业开户支行'")
+	private String akhrkhhzh;
+		
+	/**
+	 * 借记卡帐号 /易鑫验证四要素还款卡号
+	 */
+	@Column(name = "ahkrjjkzh", columnDefinition = "varchar(128) comment '借记卡帐号'")
+	private String ahkrjjkzh;
+		
+	/**
+	 * 开户名
+	 */
+	@Column(name = "ahkrkhm", columnDefinition = "varchar(64) comment '开户名'")
+	private String ahkrkhm;
+	
+	/**
+	 * 对公收款方式
+	 */
+	@Column(name = "adgskfs", columnDefinition = "varchar(64) comment '对公收款方式'")
+	private String adgskfs;
+	
+	/**
+	 * 提报信息备注
+	 */
+	@Column(name = "aremark", columnDefinition = "varchar(64) comment '提报信息备注'")
+	private String aremark;
+	/**
+	 * 还款频率
+	 */
+	@Column(name = "ahkpl", columnDefinition = "varchar(64) comment '还款频率'")
+	private String ahkpl;	
+	/**
+	 * 还款方式
+	 */
+	@Column(name = "ahkfs", columnDefinition = "varchar(64) comment '还款方式'")
+	private String ahkfs;	
+	/**
+	 * 利率类型
+	 */
+	@Column(name = "allfs", columnDefinition = "varchar(64) comment '利率类型'")
+	private String allfs;
+	/**
+	 * GPS价格类型
+	 */
+	@Column(name = "agpsjglx", columnDefinition = "varchar(64) comment 'GPS价格类型'")
+	private String agpsjglx; 
+	/**
+	 * 融资期限
+	 */
+	@Column(name = "arzqx", columnDefinition = "varchar(64) comment '融资期限'")
+	private String arzqx;
+	/**
+	 * 抵扣类型
+	 */
+	@Column(name = "addlxlx", columnDefinition = "varchar(64) comment '抵扣类型'")
+	private String addlxlx;
+
+	//------------------ 0609wxl补充字段 start
+
+	/**
+	 * 合作商产品类型
+	 */
+	@Column(name = "acplx", columnDefinition = "varchar(64) comment '合作商产品类型'")
+	private String acplx;
+
+	/**
+	 * 还款卡
+	 */
+	@Column(name = "afjid", columnDefinition = "varchar(64) comment '还款卡'")
+	private String afjid;
+
+
+	/**
+	 * 合作渠道一级科目
+	 */
+	@Column(name = "admsx", columnDefinition = "varchar(64) comment '合作渠道一级科目'")
+	private String admsx;
+
+
+	//------------------ 0609wxl补充字段 end
+	/**
+	 * 是否融责信宝  0：否 ；1：是
+	 */
+	@Column(name = "asfrzxb", columnDefinition = "varchar(10) comment '是否融责信宝'")
+	private String asfrzxb;
+	//------------------ 0625whl补充字段 end
+
+	/**
+	 * 抵押权人
+	 */
+	@Column(name = "adyqr", columnDefinition = "varchar(64) comment '抵押权人'")
+	private String adyqr;
+	/**
+	 * 车辆抵押城市
+	 */
+	@Column(name = "acldycs", columnDefinition = "varchar(64) comment '车辆抵押城市'")
+	private String acldycs;
+
+
+	/***
+	 * 经销商收款额
+	 */
+	@Column(name = "dealer_collect_amount", columnDefinition = "decimal(19,2) comment '经销商收款额'")
+	private BigDecimal dealerCollectAmount;
+	/**
+	 *alix放款日期
+	 */
+	@Column(name = "alix_loan_date",columnDefinition = "datetime comment 'alix放款日期'")
+	private Date alixLoanDate;
+
+	
+	//============== 2018/07/11 新增字段  =============================
+	/**
+	 *	所属机构/用户所在机构
+	 */
+	@Column(name = "affiliated_institutions", columnDefinition = "varchar(128) comment '所属机构/用户所在机构'")
+	private String affiliatedInstitutions;
+	
+	/**
+	 *	易鑫验证四要素银行预留手机号码
+	 */
+	@Column(name = "ackrsjhm", columnDefinition = "varchar(64) comment '易鑫验证四要素银行预留手机号码'")
+	private String ackrsjhm;
+	
+	/**
+	 *	经销商渠道所在市
+	 */
+	@Column(name = "acs_code", columnDefinition = "varchar(64) comment '经销商渠道所在市'")
+	private String acsCode;
+	
+	/**
+	 *	经销商渠道所在市名称
+	 */
+	@Column(name = "acs_name", columnDefinition = "varchar(64) comment '经销商渠道所在市名称'")
+	private String acsName;
+	
+	/**
+	 *	经销商渠道详细地址
+	 */
+	@Column(name = "admdz", columnDefinition = "varchar(128) comment '经销商渠道详细地址'")
+	private String admdz;
+	
+	/**
+	 *	经销商渠道id
+	 */
+	@Column(name = "aid", columnDefinition = "varchar(64) comment '经销商渠道id'")
+	private String aid;
+	
+	/**
+	 *	经销商渠道所在省
+	 */
+	@Column(name = "asf_code", columnDefinition = "varchar(64) comment '经销商渠道所在省'")
+	private String asfCode;
+	
+	/**
+	 *	经销商渠道所在省名称
+	 */
+	@Column(name = "asf_name", columnDefinition = "varchar(64) comment '经销商渠道所在省名称'")
+	private String asfName;
+	
+	/**
+	 *	订单来源(APP,PC)
+	 */
+	@Column(name = "order_source", columnDefinition = "varchar(32) comment '订单来源(APP,PC)'")
+	private String orderSource;
+	
+	/**
+	 *	提报人姓名
+	 */
+	@Column(name = "tlr_name", columnDefinition = "varchar(64) comment '提报人姓名'")
+	private String tlrName;
+	
+	/**
+	 *	提报人域账号
+	 */
+	@Column(name = "tlr_no", columnDefinition = "varchar(64) comment '提报人域账号'")
+	private String tlrNo;
+	
+	/**
+	 *	提报人电话
+	 */
+	@Column(name = "phone", columnDefinition = "varchar(32) comment '提报人电话'")
+	private String phone;
+	
+	/**
+	 *	是否电核标记Y-是N-否
+	 */
+	@Column(name = "tel_verification", columnDefinition = "varchar(32) comment '是否电核标记Y-是N-否'")
+	private String telVerification;
+	
+	//============== 2018/07/11 新增字段  =============================
+
+	@Column(name = "lease_type", columnDefinition = "varchar(64) comment '租赁类型'")
+	private String leaseType;
+
+	//============== 2018/08/30  新增字段  =============================
+	/**
+	 * GPS方案是否对私 0/否 1/是
+	 */
+	@Column(name = "gps_whether_private", columnDefinition = "varchar(32) comment 'GPS方案是否对私 0/否 1/是'")
+	private String gpsWhetherPrivate; 
+
+	
+	//============== 2018/09/05  新增字段开始  add by wangwenlong  =============================
+	/**
+	 * 提报日期
+	 */
+	@Column(name = "atbrq", columnDefinition = "datetime comment '提报日期'")
+	private Date atbrq;
+	//============== 2018/09/05  新增字段结束  =============================
+	
+	
+	//============== 2018/09/07  新增字段开始  add by wangwenlong  =============================
+	/**
+	 * 分公司代码
+	 */
+	@Column(name = "afgsdm", columnDefinition = "varchar(128) comment '分公司代码'")
+	private String afgsdm;
+	
+	/**
+	 * 分公司名称
+	 */
+	@Column(name = "afgsmc", columnDefinition = "varchar(128) comment '分公司名称'")
+	private String afgsmc;
+	
+	/**
+	 * 片区代码
+	 */
+	@Column(name = "apqdm", columnDefinition = "varchar(128) comment '片区代码'")
+	private String apqdm;
+	//============== 2018/09/07  新增字段结束  =============================
+
+
+	//============== 2018/09/13  工行新增字段开始  =============================
+	@Column(name = "businesstype", columnDefinition = "varchar(8) comment '业务类型'")
+	private String businesstype;
+
+	@Column(name = "mortgage", columnDefinition = "varchar(4) comment '抵押权'")
+	private String mortgage;
+
+	@Column(name = "dfmode", columnDefinition = "varchar(2) comment '抵放模式'")
+	private String dfmode;
+
+	@Column(name = "txflag", columnDefinition = "varchar(4) comment '贴息标识'")
+	private String txflag;
+
+	@Column(name = "txamt", columnDefinition = "decimal(19,2) comment '补息金额'")
+	private BigDecimal txamt;
+	//============== 2018/09/13  工行新增字段结束  =============================
+
+	//===============2018-09-26 新增字段开始===================
+	/**
+	 * 协议签约编号
+	 */
+	@Column(name = "sign_no", columnDefinition = "varchar(50) comment '四要素签约协议编号'")
+	private String signNo;
+
+	/**
+	 * 银行编码
+	 */
+	@Column(name = "bank_code", columnDefinition = "varchar(20) comment '四要素签约银行编码'")
+	private String bankCode;
+	
+	/**
+	 * 易鑫实际放款金额
+	 */
+	@Column(name = "actual_loan_amount", columnDefinition = "decimal(19,2) comment '易鑫实际放款金额'")
+	private BigDecimal actualLoanAmount;
+	
+	/**
+	 * 放款流水集合
+	 */
+	@Column(name = "loan_serial_list", columnDefinition = "varchar(1024) comment '放款流水集合'")
+	private String loanSerialList;
+
+	//===============2018-09-26 新增字段结束===================
+
+	public String getSignNo() {
+		return signNo;
+	}
+
+	public void setSignNo(String signNo) {
+		this.signNo = signNo;
+	}
+
+	public String getBankCode() {
+		return bankCode;
+	}
+
+	public void setBankCode(String bankCode) {
+		this.bankCode = bankCode;
+	}
+
+	public String getGpsWhetherPrivate() {
+		return gpsWhetherPrivate;
+	}
+
+	public String getAfgsdm() {
+		return afgsdm;
+	}
+
+	public void setAfgsdm(String afgsdm) {
+		this.afgsdm = afgsdm;
+	}
+
+	public String getAfgsmc() {
+		return afgsmc;
+	}
+
+	public void setAfgsmc(String afgsmc) {
+		this.afgsmc = afgsmc;
+	}
+
+	public String getApqdm() {
+		return apqdm;
+	}
+
+	public void setApqdm(String apqdm) {
+		this.apqdm = apqdm;
+	}
+
+	public Date getAtbrq() {
+		return atbrq;
+	}
+
+	public void setAtbrq(Date atbrq) {
+		this.atbrq = atbrq;
+	}
+
+	public void setGpsWhetherPrivate(String gpsWhetherPrivate) {
+		this.gpsWhetherPrivate = gpsWhetherPrivate;
+	}
+
+	public String getLeaseType() {
+		return leaseType;
+	}
+
+	public void setLeaseType(String leaseType) {
+		this.leaseType = leaseType;
+	}
+
+	public String getApplyNo() {
+		return applyNo;
+	}
+
+	public String getAffiliatedInstitutions() {
+		return affiliatedInstitutions;
+	}
+
+	public void setAffiliatedInstitutions(String affiliatedInstitutions) {
+		this.affiliatedInstitutions = affiliatedInstitutions;
+	}
+
+	public String getAckrsjhm() {
+		return ackrsjhm;
+	}
+
+	public void setAckrsjhm(String ackrsjhm) {
+		this.ackrsjhm = ackrsjhm;
+	}
+
+	public String getAcsCode() {
+		return acsCode;
+	}
+
+	public void setAcsCode(String acsCode) {
+		this.acsCode = acsCode;
+	}
+
+	public String getAcsName() {
+		return acsName;
+	}
+
+	public void setAcsName(String acsName) {
+		this.acsName = acsName;
+	}
+
+	public String getAdmdz() {
+		return admdz;
+	}
+
+	public void setAdmdz(String admdz) {
+		this.admdz = admdz;
+	}
+
+	public String getAid() {
+		return aid;
+	}
+
+	public void setAid(String aid) {
+		this.aid = aid;
+	}
+
+	public String getAsfCode() {
+		return asfCode;
+	}
+
+	public void setAsfCode(String asfCode) {
+		this.asfCode = asfCode;
+	}
+
+	public String getAsfName() {
+		return asfName;
+	}
+
+	public void setAsfName(String asfName) {
+		this.asfName = asfName;
+	}
+
+	public String getOrderSource() {
+		return orderSource;
+	}
+
+	public void setOrderSource(String orderSource) {
+		this.orderSource = orderSource;
+	}
+
+	public String getTlrName() {
+		return tlrName;
+	}
+
+	public void setTlrName(String tlrName) {
+		this.tlrName = tlrName;
+	}
+
+	public String getTlrNo() {
+		return tlrNo;
+	}
+
+	public void setTlrNo(String tlrNo) {
+		this.tlrNo = tlrNo;
+	}
+
+	public String getPhone() {
+		return phone;
+	}
+
+	public void setPhone(String phone) {
+		this.phone = phone;
+	}
+
+	public String getTelVerification() {
+		return telVerification;
+	}
+
+	public void setTelVerification(String telVerification) {
+		this.telVerification = telVerification;
+	}
+
+	public String getDealerChannelCode() {
+		return dealerChannelCode;
+	}
+
+	public void setDealerChannelCode(String dealerChannelCode) {
+		this.dealerChannelCode = dealerChannelCode;
+	}
+
+	public String getDealerChannelName() {
+		return dealerChannelName;
+	}
+
+	public void setDealerChannelName(String dealerChannelName) {
+		this.dealerChannelName = dealerChannelName;
+	}
+
+	public String getRentingCompanyCode() {
+		return rentingCompanyCode;
+	}
+
+	public void setRentingCompanyCode(String rentingCompanyCode) {
+		this.rentingCompanyCode = rentingCompanyCode;
+	}
+
+	public void setApplyNo(String applyNo) {
+		this.applyNo = applyNo;
+	}
+
+	public String getProductNo() {
+		return productNo;
+	}
+
+	public void setProductNo(String productNo) {
+		this.productNo = productNo;
+	}
+
+	public String getCapitalId() {
+		return capitalId;
+	}
+
+	public void setCapitalId(String capitalId) {
+		this.capitalId = capitalId;
+	}
+
+	public String getAhkkgsr() {
+		return ahkkgsr;
+	}
+
+	public void setAhkkgsr(String ahkkgsr) {
+		this.ahkkgsr = ahkkgsr;
+	}
+
+	public String getAckrzjhm() {
+		return ackrzjhm;
+	}
+
+	public void setAckrzjhm(String ackrzjhm) {
+		this.ackrzjhm = ackrzjhm;
+	}
+
+	public String getAhkrkzhlx() {
+		return ahkrkzhlx;
+	}
+
+	public void setAhkrkzhlx(String ahkrkzhlx) {
+		this.ahkrkzhlx = ahkrkzhlx;
+	}
+
+	public String getAkhrkhhzh() {
+		return akhrkhhzh;
+	}
+
+	public void setAkhrkhhzh(String akhrkhhzh) {
+		this.akhrkhhzh = akhrkhhzh;
+	}
+
+	public String getAhkrjjkzh() {
+		return ahkrjjkzh;
+	}
+
+	public void setAhkrjjkzh(String ahkrjjkzh) {
+		this.ahkrjjkzh = ahkrjjkzh;
+	}
+
+	public String getAhkrkhm() {
+		return ahkrkhm;
+	}
+
+	public void setAhkrkhm(String ahkrkhm) {
+		this.ahkrkhm = ahkrkhm;
+	}
+
+	public String getAdgskfs() {
+		return adgskfs;
+	}
+
+	public void setAdgskfs(String adgskfs) {
+		this.adgskfs = adgskfs;
+	}
+
+	public String getAremark() {
+		return aremark;
+	}
+
+	public void setAremark(String aremark) {
+		this.aremark = aremark;
+	}
+
+	public String getAhkpl() {
+		return ahkpl;
+	}
+
+	public void setAhkpl(String ahkpl) {
+		this.ahkpl = ahkpl;
+	}
+
+	public String getAhkfs() {
+		return ahkfs;
+	}
+
+	public void setAhkfs(String ahkfs) {
+		this.ahkfs = ahkfs;
+	}
+
+	public String getAllfs() {
+		return allfs;
+	}
+
+	public void setAllfs(String allfs) {
+		this.allfs = allfs;
+	}
+
+	public String getAgpsjglx() {
+		return agpsjglx;
+	}
+
+	public void setAgpsjglx(String agpsjglx) {
+		this.agpsjglx = agpsjglx;
+	}
+
+	public String getArzqx() {
+		return arzqx;
+	}
+
+	public void setArzqx(String arzqx) {
+		this.arzqx = arzqx;
+	}
+
+	public String getAddlxlx() {
+		return addlxlx;
+	}
+
+	public void setAddlxlx(String addlxlx) {
+		this.addlxlx = addlxlx;
+	}
+
+	public String getAcplx() {
+		return acplx;
+	}
+
+	public void setAcplx(String acplx) {
+		this.acplx = acplx;
+	}
+
+	public String getAfjid() {
+		return afjid;
+	}
+
+	public void setAfjid(String afjid) {
+		this.afjid = afjid;
+	}
+
+	public String getAdmsx() {
+		return admsx;
+	}
+
+	public void setAdmsx(String admsx) {
+		this.admsx = admsx;
+	}
+
+	public String getAsfrzxb() {
+		return asfrzxb;
+	}
+
+	public void setAsfrzxb(String asfrzxb) {
+		this.asfrzxb = asfrzxb;
+	}
+
+	public String getAdyqr() {
+		return adyqr;
+	}
+
+	public void setAdyqr(String adyqr) {
+		this.adyqr = adyqr;
+	}
+
+	public String getAcldycs() {
+		return acldycs;
+	}
+
+	public void setAcldycs(String acldycs) {
+		this.acldycs = acldycs;
+	}
+
+	public BigDecimal getDealerCollectAmount() {
+		return dealerCollectAmount;
+	}
+
+	public void setDealerCollectAmount(BigDecimal dealerCollectAmount) {
+		this.dealerCollectAmount = dealerCollectAmount;
+	}
+
+	public Date getAlixLoanDate() {
+		return alixLoanDate;
+	}
+
+	public void setAlixLoanDate(Date alixLoanDate) {
+		this.alixLoanDate = alixLoanDate;
+	}
+
+	public String getBusinesstype() {
+		return businesstype;
+	}
+
+	public void setBusinesstype(String businesstype) {
+		this.businesstype = businesstype;
+	}
+
+	public String getMortgage() {
+		return mortgage;
+	}
+
+	public void setMortgage(String mortgage) {
+		this.mortgage = mortgage;
+	}
+
+	public String getDfmode() {
+		return dfmode;
+	}
+
+	public void setDfmode(String dfmode) {
+		this.dfmode = dfmode;
+	}
+
+	public String getTxflag() {
+		return txflag;
+	}
+
+	public void setTxflag(String txflag) {
+		this.txflag = txflag;
+	}
+
+	public BigDecimal getTxamt() {
+		return txamt;
+	}
+
+	public void setTxamt(BigDecimal txamt) {
+		this.txamt = txamt;
+	}
+	
+	public BigDecimal getActualLoanAmount() {
+		return actualLoanAmount;
+	}
+
+	public void setActualLoanAmount(BigDecimal actualLoanAmount) {
+		this.actualLoanAmount = actualLoanAmount;
+	}
+
+	public String getLoanSerialList() {
+		return loanSerialList;
+	}
+
+	public void setLoanSerialList(String loanSerialList) {
+		this.loanSerialList = loanSerialList;
+	}
+
+	/**
+	 * 通过订单编号获取 准入资方记录 集合
+	 * @param applyNo 订单编号
+	 * @return
+	 * @author YixinCapital -- wangwenlong
+	 *	       2018年6月8日 下午1:56:43
+	 */
+	public static List<DscSalesApplyMain> getListByParms(String applyNo){
+		if(StringUtils.isBlank(applyNo)){
+			return null;
+		}
+		return DscSalesApplyMain.findByProperty(DscSalesApplyMain.class, "applyNo", applyNo);
+	}
+
+	/**
+	 * 通过订单编号获取申请信息
+	 * @param applyNo 订单编号
+	 * @return
+	 * @author YixinCapital -- wangwenlong
+	 *	       2018年6月8日 下午3:47:40
+	 */
+	public static DscSalesApplyMain getOneByApplyNo(String applyNo){
+		return DscSalesApplyMain.findFirstByProperty(DscSalesApplyMain.class, "applyNo", applyNo);
+	}
+
+
+    @SuppressWarnings("serial")
+	public static DscSalesApplyMain getByApplyNo(String applyNo) {
+
+        StringBuilder jpql = new StringBuilder("SELECT sam FROM DscSalesApplyMain sam WHERE sam.applyNo = ?1");
+        List<Object> filter = new ArrayList<Object>() {{
+            add(applyNo);
+        }};
+        return getRepository().createJpqlQuery(jpql.toString()).setParameters(filter)
+                .singleResult();
+    }
+    
+    public static boolean isExitByApplyNo(String applyNo) {
+        String hql = "SELECT dsa FROM  DscSalesApplyMain dsa WHERE dsa.applyNo = :applyNo ";
+
+        DscSalesApplyMain dscSalesApplyMain = getRepository().createJpqlQuery(hql)
+                .addParameter("applyNo", applyNo).singleResult();
+
+        return dscSalesApplyMain != null;
+    }
+	@SuppressWarnings("serial")
+	public static DscSalesApplyMain getByBankCode(String bankNo) {
+
+		StringBuilder jpql = new StringBuilder("SELECT sam FROM DscSalesApplyMain sam WHERE sam.bankCode = ?1");
+		List<Object> filter = new ArrayList<Object>() {{
+			add(bankNo);
+		}};
+		return getRepository().createJpqlQuery(jpql.toString()).setParameters(filter)
+				.singleResult();
+	}
+}

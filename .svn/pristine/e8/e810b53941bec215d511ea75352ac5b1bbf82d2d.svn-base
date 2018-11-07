@@ -1,0 +1,461 @@
+package com.yixin.dsc.util;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.math.BigDecimal;
+import java.text.DateFormat;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
+
+
+/**
+ * Created by lianghaoguan on 2017/7/3.
+ */
+public class DateUtil {
+    private static Logger logger = LoggerFactory.getLogger(DateUtil.class);
+    public static final String DEFAULT_DATE_SMALL = "yyyyMMdd";
+    public static final String DEFAULT_DATE_DAY = "dd";
+    public static final String DEFAULT_DATE_FORMAT = "yyyy-MM-dd";
+    public static final String FLOW_DATE_TIME_FORMAT = "yyyyMMddHHmm";
+    public static final String FLOW_DATE_TIME_FORMAT_HHmmss = "HHmmss";
+    public static final String DEFAULT_TIMESTAMP_FORMAT_SAMLL = "yyyyMMddHHmmss";
+    public static final String DEFAULT_TIMESTAMP_FORMAT_SAMLL_NEW = "yyyy-MM-dd HH:mm:ss";
+    public static final String DEFAULTCHINESE_DATE_FORMAT = "yyyy年MM月dd日";
+    public static final String DEFAULT_TIME_FORMAT = "HH:mm:ss";
+    public static final String DEFAULT_DATE_TIME_FORMAT = "yyyy-MM-dd HH:mm:ss";
+    public static final String DEFAULT_TIMESTAMP_FORMAT = "yyyy-MM-dd HH:mm:ss:SSS";
+    public static final String DEFAULT_TIMESTAMP_FORMAT_D = "yyyy-MM-dd HH:mm:ss.SSS";
+    public static final String DEFAULT_TIMESTAMP_SLASH = "yyyy/MM/dd";
+    public static final String DEFAULT_TIMESTAMP_FORMAT_SAMLL_D = "yyyyMMddHHmmssSSS";
+
+    private DateUtil() {
+    }
+
+    public static int isLastDayOfMonth(Date date) {
+        Calendar c = Calendar.getInstance();
+        c.setTime(date);
+        c.add(2, 1);
+        c.set(5, 1);
+        c.add(5, -1);
+        Date last = c.getTime();
+        return last.compareTo(date);
+    }
+
+    public static int isFirstDayOfMonth(Date date) {
+        Calendar c = Calendar.getInstance();
+        c.setTime(date);
+        c.set(5, 1);
+        Date first = c.getTime();
+        return first.compareTo(date);
+    }
+
+    public static int isLastDayOfYear(Date date) {
+        Calendar c = Calendar.getInstance();
+        c.setTime(date);
+        c.add(1, 1);
+        c.set(2, 1);
+        c.set(5, 1);
+        c.add(5, -1);
+        Date last = c.getTime();
+        return last.compareTo(date);
+    }
+
+    public static int isFirstDayOfYear(Date date) {
+        Calendar c = Calendar.getInstance();
+        c.setTime(date);
+        c.set(2, 1);
+        c.set(5, 1);
+        Date first = c.getTime();
+        return first.compareTo(date);
+    }
+
+    public static Date getEndTime(Date startTime, Integer mediaPutnum, Integer makeofferType) {
+        Calendar c = Calendar.getInstance();
+        c.setTime(startTime);
+        switch (makeofferType.intValue()) {
+            case 1:
+                if (isFirstDayOfYear(c.getTime()) == 0) {
+                    c.add(1, mediaPutnum.intValue());
+                    c.add(5, -1);
+                } else {
+                    c.add(5, mediaPutnum.intValue() * 365 - 1);
+                }
+                break;
+            case 2:
+                if (isFirstDayOfMonth(c.getTime()) == 0) {
+                    c.add(2, mediaPutnum.intValue());
+                } else {
+                    c.add(5, mediaPutnum.intValue() * 30 - 1);
+                }
+                break;
+            case 3:
+                c.add(4, mediaPutnum.intValue());
+                c.add(5, -1);
+                break;
+            case 4:
+                c.add(5, mediaPutnum.intValue() - 1);
+        }
+
+        return c.getTime();
+    }
+
+    public static Date StringToDate(String dateStr, String formatStr) {
+        DateFormat sdf = new SimpleDateFormat(formatStr);
+        Date date = null;
+
+        try {
+            date = sdf.parse(dateStr);
+        } catch (Exception var5) {
+            logger.error(var5.getMessage(), var5);
+        }
+
+        return date;
+    }
+
+    public static String dateToString(Date date, String formatStr) {
+        DateFormat sdf = new SimpleDateFormat(formatStr);
+        return sdf.format(date);
+    }
+
+    public static Map<Integer, String> getBsbRepaymentDate(String data, int trem) {
+        Map<Integer, String> map = new HashMap();
+        SimpleDateFormat format = new SimpleDateFormat("yyyyMMdd");
+        SimpleDateFormat format1 = new SimpleDateFormat("dd");
+        Date d = null;
+
+        try {
+            d = format.parse(data);
+
+            for (int i = 1; i <= trem; ++i) {
+                Calendar calendar = Calendar.getInstance();
+                calendar.setTime(d);
+                calendar.add(2, i);
+                int s = Integer.parseInt(format1.format(calendar.getTime()).replace("0", ""));
+                if (s > 25) {
+                    calendar.set(5, calendar.getActualMaximum(5));
+                    calendar.add(5, 1);
+                }
+
+                map.put(Integer.valueOf(i), format.format(calendar.getTime()));
+            }
+        } catch (ParseException var9) {
+            logger.error(var9.getMessage(), var9);
+        }
+
+        return map;
+    }
+
+    public static int daysBetween(String smdate, String bdate) {
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd");
+        Calendar cal = Calendar.getInstance();
+        int num = 0;
+
+        try {
+            cal.setTime(sdf.parse(smdate));
+            long time1 = cal.getTimeInMillis();
+            cal.setTime(sdf.parse(bdate));
+            long time2 = cal.getTimeInMillis();
+            long between_days = (time2 - time1) / 86400000L;
+            num = Integer.parseInt(String.valueOf(between_days));
+        } catch (ParseException var11) {
+            logger.error(var11.getMessage(), var11);
+        }
+
+        return num;
+    }
+
+    public static Date addDate(Date date, int day) {
+        Calendar cal = Calendar.getInstance();
+        cal.setTime(date);
+        cal.add(5, day);
+        return cal.getTime();
+    }
+
+    public static Date addHour(Date date, int hour) {
+        Calendar cal = Calendar.getInstance();
+        cal.setTime(date);
+        cal.add(Calendar.HOUR, hour);
+        return cal.getTime();
+    }
+
+    public static String getDateStr(Date date, int day, String formatStr) {
+        return dateToString(addDate(date, day), formatStr);
+    }
+
+    public static int compare_date(String DATE1, String DATE2) {
+        SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd hh:mm:ss");
+
+        try {
+            Date dt1 = df.parse(DATE1);
+            Date dt2 = df.parse(DATE2);
+            if (dt1.getTime() > dt2.getTime()) {
+                logger.info("dt1 在dt2前");
+                return 1;
+            } else if (dt1.getTime() < dt2.getTime()) {
+                logger.info("dt1在dt2后");
+                return -1;
+            } else {
+                return 0;
+            }
+        } catch (Exception var5) {
+            logger.error(var5.getMessage(), var5);
+            return 0;
+        }
+    }
+
+
+    public static String getRepayDate(int i, String date, int max, String type) {
+        Date d = StringToDate(date, "yyyyMMdd");
+        Calendar calendar = Calendar.getInstance();
+        calendar.setTime(d);
+        calendar.add(2, i);
+        String endxDt = date;
+        int s = Integer.parseInt(date.substring(6));
+        if (s > max) {
+            if ("2".equals(type)) {
+                endxDt = dateToString(calendar.getTime(), "yyyyMMdd");
+                endxDt = endxDt.substring(0, 6) + "27";
+            } else {
+                calendar.set(5, calendar.getActualMaximum(5));
+                calendar.add(5, 1);
+            }
+        } else if ("1".equals(type)) {
+            calendar.add(5, -1);
+        }
+
+        if (!"2".equals(type)) {
+            endxDt = dateToString(calendar.getTime(), "yyyyMMdd");
+        }
+
+        return endxDt;
+    }
+
+    public static int getMonthDays(String date) {
+        SimpleDateFormat format1 = new SimpleDateFormat("dd");
+        Date d = StringToDate(date, "yyyyMMdd");
+        Calendar calendar = Calendar.getInstance();
+        calendar.setTime(d);
+        calendar.set(5, calendar.getActualMaximum(5));
+        int s = Integer.parseInt(format1.format(calendar.getTime()));
+        return s;
+    }
+
+    public static int getDayCount(String date) {
+        SimpleDateFormat format1 = new SimpleDateFormat("dd");
+        Date d = StringToDate(date, "yyyyMMdd");
+        Calendar calendar = Calendar.getInstance();
+        calendar.setTime(d);
+        int s = Integer.parseInt(format1.format(calendar.getTime()));
+        return s;
+    }
+
+    public static int getDaysBetween(String smdate_s, int period) {
+        long between_days = 0L;
+
+        try {
+            Date smdate = StringToDate(smdate_s, "yyyyMMdd");
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+            smdate = sdf.parse(sdf.format(smdate));
+            Calendar cal = Calendar.getInstance();
+            cal.setTime(smdate);
+            long time1 = cal.getTimeInMillis();
+            cal.add(2, period);
+            Date bdate = cal.getTime();
+            bdate = sdf.parse(sdf.format(bdate));
+            cal.setTime(bdate);
+            long time2 = cal.getTimeInMillis();
+            between_days = (time2 - time1) / 86400000L;
+        } catch (Exception var12) {
+            logger.error(var12.getMessage(), var12);
+        }
+
+        return Integer.parseInt(String.valueOf(between_days));
+    }
+
+    public static String getMonthDay(String smdate_s, int i) {
+        String s = null;
+
+        try {
+            Date smdate = StringToDate(smdate_s, "yyyyMMdd");
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+            smdate = sdf.parse(sdf.format(smdate));
+            Calendar cal = Calendar.getInstance();
+            cal.setTime(smdate);
+            cal.add(2, i);
+            Date endDate = cal.getTime();
+            s = dateToString(endDate, "yyyyMMdd");
+        } catch (Exception var7) {
+            logger.error(var7.getMessage(), var7);
+        }
+
+        return s;
+    }
+
+    public static String getTimeByDays(String dateStr, int i) {
+        String s = null;
+
+        try {
+            Date smdate = StringToDate(dateStr, "yyyyMMdd");
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+            smdate = sdf.parse(sdf.format(smdate));
+            Calendar cal = Calendar.getInstance();
+            cal.setTime(smdate);
+            cal.add(5, i);
+            Date endDate = cal.getTime();
+            s = dateToString(endDate, "yyyyMMdd");
+        } catch (Exception var7) {
+            logger.error(var7.getMessage(), var7);
+        }
+
+        return s;
+    }
+
+    public static String longShortDateConvert(String dateStr, String oldFormatStr, String newFormatStr) {
+        DateFormat sdf = new SimpleDateFormat(oldFormatStr);
+        Date date = null;
+
+        try {
+            date = sdf.parse(dateStr);
+        } catch (Exception var6) {
+            logger.error(var6.getMessage(), var6);
+        }
+
+        sdf = new SimpleDateFormat(newFormatStr);
+        return sdf.format(date);
+    }
+
+    /**
+     * 计算两个日期之间相差的天数
+     *
+     * @param smdate 较小的时间
+     * @param bdate  较大的时间
+     * @return 相差天数
+     */
+    public static int daysBetween(Date smdate, Date bdate) {
+        Calendar cal = Calendar.getInstance();
+        cal.setTime(smdate);
+        long time1 = cal.getTimeInMillis();
+        cal.setTime(bdate);
+        long time2 = cal.getTimeInMillis();
+        long between_days = (time2 - time1) / (1000 * 3600 * 24);
+        return Integer.parseInt(String.valueOf(between_days));
+    }
+
+    /**
+     * 计算两个日期之间相差的月数
+     * <p>
+     * 一个月按30天算
+     * 四舍五入
+     *
+     * @param smdate 较小的时间
+     * @param bdate  较大的时间
+     * @return 相差天数
+     */
+    public static int monthsBetween(Date smdate, Date bdate) {
+        int daysBetween = daysBetween(smdate, bdate);
+
+        BigDecimal daysBet = new BigDecimal(daysBetween);
+
+        int monthBetween = daysBet.divide(new BigDecimal(30),0,BigDecimal.ROUND_HALF_UP).intValue();
+
+        return monthBetween;
+    }
+
+    /**
+     * 计算两个日期之间相差的小时数
+     *
+     * @param endDate
+     * @param nowDate
+     * @return
+     */
+    public static long getDatePoor(Date endDate, Date nowDate) {
+        long nd = 1000 * 24 * 60 * 60;
+        long nh = 1000 * 60 * 60;
+        long nm = 1000 * 60;
+        // 获得两个时间的毫秒时间差异
+        long diff = endDate.getTime() - nowDate.getTime();
+        // 计算差多少天
+        long day = diff / nd;
+        // 计算差多少小时
+        long hour = diff % nd / nh;
+        return hour;
+    }
+
+
+    /**
+     * 计算两个时间相差的分钟数
+     *
+     * @param startDate
+     * @param endDate
+     * @return
+     */
+    public static long getMinutesBetweentDates(Date startDate, Date endDate) {
+        long nm = 1000 * 60;
+        // 获得两个时间的毫秒时间差异
+        long diff = endDate.getTime() - startDate.getTime();
+        // 计算差多少分钟
+        long hour = diff / nm;
+        return hour;
+    }
+
+
+    /**
+     * 计算一天的开始时间
+     *
+     * @param date
+     * @return
+     */
+    public static Date getStartOfDay(Date date) {
+        Calendar calendar = Calendar.getInstance();
+        //获得实体对象里面一个Date类型的属性，set进Calender对象中。
+        calendar.setTime(date);
+        //设置时为0点
+        calendar.set(Calendar.HOUR_OF_DAY, 0);
+        //设置分钟为0分
+        calendar.set(Calendar.MINUTE, 0);
+        //设置秒为0秒
+        calendar.set(Calendar.SECOND, 0);
+        //设置毫秒为000
+        calendar.set(Calendar.MILLISECOND, 000);
+        return calendar.getTime();
+    }
+
+    /**
+     * 计算一天的结束时间
+     *
+     * @param date
+     * @return
+     */
+    public static Date getEndOfDay(Date date) {
+        Calendar calendar = Calendar.getInstance();
+        calendar.setTime(date);
+        calendar.set(Calendar.HOUR_OF_DAY, 23);
+        calendar.set(Calendar.MINUTE, 59);
+        calendar.set(Calendar.SECOND, 59);
+        calendar.set(Calendar.MILLISECOND, 999);
+        return calendar.getTime();
+
+    }
+
+    /**
+     * 计算两个时间相差多少个小时
+     *
+     * @param endDate
+     * @param nowDate
+     * @return
+     */
+    public static long getHourPoor(Date endDate, Date nowDate) {
+        long nh = 1000 * 60 * 60;
+        // 获得两个时间的毫秒时间差异
+        long diff = endDate.getTime() - nowDate.getTime();
+        // 计算差多少小时
+        long hour = diff / nh;
+        return hour;
+    }
+
+}
